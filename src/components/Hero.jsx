@@ -57,7 +57,7 @@ export default function Hero({ ready, onSceneReady }) {
     <section id="top" ref={root} className="hero" data-cursor-zone="lens" onClick={(e) => !e.target.closest('a, button') && listenTilt(true)}>
       <div className="hero-sticky">
         <SafeGL fallback={<Fallback onReady={onSceneReady} />}>
-          <Stage className="hero-canvas" eventSource={root}>
+          <Stage className="hero-canvas" eventSource={root} warmOffscreen>
             <HeroScene ready={ready} progress={progress} onReady={onSceneReady} />
           </Stage>
         </SafeGL>
@@ -90,7 +90,9 @@ export default function Hero({ ready, onSceneReady }) {
                   scrollToId('work')
                 }}
               >
-                <span className="hide-sm">See the</span>work
+                <span>
+                  <span className="hide-sm">See the </span>work
+                </span>
               </a>
             </motion.div>
           </div>

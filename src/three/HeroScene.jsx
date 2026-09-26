@@ -209,13 +209,6 @@ export default function HeroScene({ ready, progress, onReady }) {
     if (ready && readyAt.current == null) readyAt.current = clock.elapsedTime
   }, [ready, clock])
 
-  useEffect(() => {
-    if (lines.every((l) => h[l.t]) && !reported.current) {
-      reported.current = true
-      // two frames later the shaders are compiled and the first real frame is on screen
-      requestAnimationFrame(() => requestAnimationFrame(onReady))
-    }
-  }, [h, lines, onReady])
 
   const gap = width * 0.03
   // stack lines top-down; each FitLine reports its scaled height once troika has laid it out
@@ -228,7 +221,13 @@ export default function HeroScene({ ready, progress, onReady }) {
   const total = -cursor - gap
   const textY = portrait ? vh * 0.15 : vh * 0.04
 
+  const framesSinceSync = useRef(0)
   useFrame((state, dt) => {
+    // ready = headline laid out AND real frames on screen (frames only start once the shaders are compiled)
+    if (!reported.current && lines.every((l) => h[l.t]) && ++framesSinceSync.current === 2) {
+      reported.current = true
+      onReady()
+    }
     sp.current += (progress.current - sp.current) * (1 - Math.exp(-dt * 6))
     const p = sp.current
     const k = readyAt.current == null ? 0 : elasticOut((state.clock.elapsedTime - readyAt.current) / 1.4)

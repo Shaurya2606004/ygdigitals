@@ -42,7 +42,7 @@ function Mock({ w }) {
           <i className="mk-line short" />
           <div className="mk-stars">★★★★★ <small>(2,184)</small></div>
           <div className="mk-price">
-            ₹499 <s>₹999</s>
+            <span className="rs">₹</span>499 <s><span className="rs">₹</span>999</s>
           </div>
           <div className="mk-btn">Add to cart</div>
         </div>

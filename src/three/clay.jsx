@@ -1,8 +1,9 @@
 import * as THREE from 'three'
-import { Component, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
-import { Environment, Lightformer, RoundedBox, Text } from '@react-three/drei'
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
+import { PerformanceMonitor, RoundedBox, Text } from '@react-three/drei'
 import displayFont from '@fontsource/unbounded/files/unbounded-latin-800-normal.woff?url'
+import envAtlas from './studio-env.png'
 import { REDUCED, TOUCH, aim, spring } from '../lib/motion'
 
 export { displayFont }
@@ -292,17 +293,34 @@ export const SERVICE_PROPS = {
 
 /* ---------- canvas shell ---------- */
 
+/*
+ * Soft studio reflections: three glowing panels (a wide top softbox, a ring, a side strip), pre-filtered
+ * once through three's PMREM and baked into a 23 KB CubeUV atlas (8-bit sRGB, scaled down by 2.5).
+ * Using the atlas directly skips PMREM at runtime, whose synchronous shader compile blocked the main thread
+ * for ~0.4s per 3D stage. Suspends until loaded, so shaders are compiled against it (see Warmup).
+ */
+function StudioEnv() {
+  const { scene } = useThree()
+  const env = useLoader(THREE.TextureLoader, envAtlas)
+  useLayoutEffect(() => {
+    env.mapping = THREE.CubeUVReflectionMapping
+    env.colorSpace = THREE.SRGBColorSpace
+    env.generateMipmaps = false
+    env.minFilter = env.magFilter = THREE.LinearFilter
+    scene.environment = env
+    scene.environmentIntensity = 2.5
+    return () => (scene.environment = null)
+  }, [env, scene])
+  return null
+}
+
 function ClayLights() {
   return (
     <>
       <ambientLight intensity={0.9} />
       <directionalLight position={[4, 6, 6]} intensity={2.1} />
       <directionalLight position={[-6, -2, 3]} intensity={0.5} color="#ffd9dd" />
-      <Environment resolution={128}>
-        <Lightformer form="rect" intensity={2.5} position={[0, 5, 5]} scale={[10, 3, 1]} />
-        <Lightformer form="ring" intensity={1.5} position={[-5, 1, 3]} scale={3} />
-        <Lightformer form="rect" intensity={1} position={[5, -1, -3]} scale={[4, 6, 1]} />
-      </Environment>
+      <StudioEnv />
     </>
   )
 }
@@ -318,29 +336,74 @@ export class SafeGL extends Component {
   }
 }
 
-export function Stage({ children, className, camera = { position: [0, 0, 10], fov: 30 }, eventSource, ...rest }) {
-  const wrap = useRef()
-  const [visible, setVisible] = useState(true)
+/*
+ * Compiles every shader in the scene before the first frame, in parallel and off the main thread
+ * (KHR_parallel_shader_compile), instead of three.js doing it synchronously on first render — which froze the
+ * page for over a second. `offscreen` also compiles the variants used when the scene is drawn into a render
+ * target (the glass lens re-renders the scene into one every frame).
+ */
+function Warmup({ offscreen, onDone }) {
+  const { gl, scene, camera } = useThree()
   useEffect(() => {
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '120px' })
-    io.observe(wrap.current)
-    return () => io.disconnect()
+    let alive = true
+    const jobs = [gl.compileAsync(scene, camera)]
+    const rt = offscreen && new THREE.WebGLRenderTarget(1, 1)
+    if (rt) {
+      gl.setRenderTarget(rt)
+      jobs.push(gl.compileAsync(scene, camera))
+      gl.setRenderTarget(null)
+    }
+    Promise.all(jobs).then(() => alive && onDone(), () => alive && onDone())
+    return () => {
+      alive = false
+      rt?.dispose()
+    }
+  }, [gl, scene, camera, offscreen, onDone])
+  return null
+}
+
+/*
+ * A WebGL context is only created once the stage comes within ~1.5 screens of the viewport, so the scenes
+ * further down don't compete with the hero while the page loads. Once mounted it stays mounted and only
+ * renders while on screen (and only after its shaders are compiled). If the device can't hold the frame
+ * rate, it drops to 1x pixel density.
+ */
+export function Stage({ children, className, camera = { position: [0, 0, 10], fov: 30 }, eventSource, warmOffscreen = false, ...rest }) {
+  const wrap = useRef()
+  const [near, setNear] = useState(false)
+  const [visible, setVisible] = useState(false)
+  const [compiled, setCompiled] = useState(false)
+  const [lowDpr, setLowDpr] = useState(false)
+  const onCompiled = useCallback(() => setCompiled(true), [])
+  useEffect(() => {
+    const onScreen = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '120px' })
+    const ahead = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: '150% 0px' })
+    onScreen.observe(wrap.current)
+    ahead.observe(wrap.current)
+    return () => {
+      onScreen.disconnect()
+      ahead.disconnect()
+    }
   }, [])
   return (
     <div ref={wrap} className={className}>
-      <Canvas
-        flat
-        frameloop={visible ? 'always' : 'never'}
-        dpr={[1, TOUCH ? 1.5 : 2]}
-        camera={camera}
-        eventSource={eventSource}
-        eventPrefix={eventSource ? 'client' : 'offset'}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
-        {...rest}
-      >
-        <ClayLights />
-        {children}
-      </Canvas>
+      {near && (
+        <Canvas
+          flat
+          frameloop={visible && compiled ? 'always' : 'never'}
+          dpr={lowDpr ? 1 : [1, TOUCH ? 1.5 : 2]}
+          camera={camera}
+          eventSource={eventSource}
+          eventPrefix={eventSource ? 'client' : 'offset'}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
+          {...rest}
+        >
+          <PerformanceMonitor onDecline={() => setLowDpr(true)} />
+          <ClayLights />
+          {children}
+          <Warmup offscreen={warmOffscreen} onDone={onCompiled} />
+        </Canvas>
+      )}
     </div>
   )
 }

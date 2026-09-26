@@ -1218,6 +1218,11 @@ body::after {
   font-size: 11px;
   opacity: 0.45;
 }
+/* ₹ sits outside the latin subsets: in the brand fonts it would pull ~60 KB of extra font files */
+.mk-price .rs {
+  font-family: system-ui, sans-serif;
+  font-weight: 700;
+}
 .mk-btn {
   padding: 7px;
   border-radius: 8px;
