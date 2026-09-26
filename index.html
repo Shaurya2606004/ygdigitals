@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>YG Digitals — Social Media Ads, E-commerce, Packaging & Websites | Gohana, Pan-India</title>
     <meta name="description" content="YG Digitals is a Gohana-based digital studio for social media ads, Amazon/Flipkart/Meesho/Myntra e-commerce handling, packaging design, website design and video editing — serving brands across India." />
-    <meta name="theme-color" content="#e04c5c" />
+    <meta name="theme-color" content="#0d0d0d" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href="https://ygdigitals.com/" />
     <meta property="og:type" content="website" />
@@ -22,14 +22,12 @@
       html, body { background: #0d0d0d; margin: 0; }
       /* the loader's clay blob, painted before any JS arrives; React's loader takes over from this exact frame */
       .boot { position: fixed; inset: 0; display: grid; place-items: center; }
-      .boot > div { width: 150px; height: 150px; display: grid; place-items: center; background: #e04c5c; border-radius: 42% 58% 55% 45% / 50% 45% 55% 50%; box-shadow: inset -14px -18px 0 rgba(0, 0, 0, 0.12), inset 12px 14px 0 rgba(255, 255, 255, 0.2); animation: boot 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-      .boot p { display: flex; gap: 16px; margin: -14px 0 0; }
-      .boot i { width: 30px; height: 36px; border-radius: 50%; background: #fff; }
+      .boot > div { width: 150px; height: 150px; background: #e04c5c; border-radius: 42% 58% 55% 45% / 50% 45% 55% 50%; box-shadow: inset -14px -18px 0 rgba(0, 0, 0, 0.12), inset 12px 14px 0 rgba(255, 255, 255, 0.2); animation: boot 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
       @keyframes boot { from { transform: scale(0); } }
     </style>
   </head>
   <body>
-    <div id="root"><div class="boot" aria-hidden="true"><div><p><i></i><i></i></p></div></div></div>
+    <div id="root"><div class="boot" aria-hidden="true"><div></div></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { REDUCED, gsap } from '../lib/motion'
 import { PROCESS } from '../data'
 
-const TONES = ['red', 'black', 'white', 'red']
+const TONES = ['black', 'white', 'black', 'white']
 
 /*
  * Sticky card stack: each step sticks slightly lower than the last; as the next card slides over,
@@ -42,10 +42,6 @@ export default function Process() {
               <h3>{p.title}</h3>
               <p>{p.text}</p>
             </div>
-            <span className="step-blob" aria-hidden>
-              <i />
-              <i />
-            </span>
             <span className="step-shade" aria-hidden />
           </article>
         ))}

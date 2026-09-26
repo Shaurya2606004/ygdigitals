@@ -5,8 +5,8 @@ import { REDUCED } from '../lib/motion'
 const WORDS = ['Loading likes', 'Stacking boxes', 'Cutting reels', 'Listing products', 'Pushing pixels']
 
 /*
- * Counter follows real readiness (fonts + first hero frame). At 100 the clay blob swells until it
- * *is* the red hero background, then the loader fades and the hero props pop in.
+ * Counter follows real readiness (fonts + first hero frame). At 100 the red clay blob swells and pales until it
+ * *is* the hero's light backdrop, then the loader fades and the hero props pop in.
  * The blob itself is already on screen before any JS runs (static copy in index.html), so it starts full size.
  */
 export default function Loader({ progress, onDone }) {
@@ -56,15 +56,10 @@ export default function Loader({ progress, onDone }) {
       <motion.div
         className="loader-blob"
         initial={false}
-        animate={{ scale: grow ? cover : 1 }}
+        animate={{ scale: grow ? cover : 1, backgroundColor: grow ? '#f2f1ee' : '#e04c5c' }}
         transition={grow ? { duration: REDUCED ? 0.2 : 0.75, ease: [0.76, 0, 0.24, 1] } : { type: 'spring', stiffness: 260, damping: 12 }}
         onAnimationComplete={() => grow && onDone()}
-      >
-        <div className="loader-eyes">
-          <i />
-          <i />
-        </div>
-      </motion.div>
+      />
     </motion.div>
   )
 }

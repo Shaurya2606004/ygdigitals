@@ -11,7 +11,7 @@ export const CONTACT = {
 export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
   `${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`
 
-// theme = section background while this service is on screen; buddy = clay mascot colour on that background
+// theme = section background while this service is on screen; buddy = the mascot's outfit colour on that background
 export const SERVICES = [
   {
     id: 'ads',
@@ -20,8 +20,8 @@ export const SERVICES = [
     lines: ['Social', 'Media Ads'],
     desc: 'Thumb-stopping creatives and Meta campaigns on Instagram & Facebook, built to turn scrollers into enquiries — not just likes.',
     tags: ['Reels & static creatives', 'Audience targeting', 'Retargeting', 'Monthly reports'],
-    theme: 'red',
-    buddy: 'white',
+    theme: 'white',
+    buddy: 'black',
   },
   {
     id: 'ecom',
@@ -31,7 +31,7 @@ export const SERVICES = [
     desc: 'We run your marketplace stores end to end — listings, catalogue and sponsored ads on Amazon, Flipkart, Meesho & Myntra.',
     tags: ['Amazon', 'Flipkart', 'Meesho', 'Myntra', 'Listings', 'Marketplace ads'],
     theme: 'black',
-    buddy: 'red',
+    buddy: 'white',
   },
   {
     id: 'pack',
@@ -50,8 +50,8 @@ export const SERVICES = [
     lines: ['Website', 'Design'],
     desc: 'Fast, mobile-first websites and landing pages that look expensive and are built to turn visitors into calls.',
     tags: ['Business websites', 'Landing pages', 'Mobile-first', 'SEO-ready'],
-    theme: 'red',
-    buddy: 'black',
+    theme: 'black',
+    buddy: 'white',
   },
   {
     id: 'video',
@@ -60,8 +60,8 @@ export const SERVICES = [
     lines: ['Video', 'Editing'],
     desc: 'Reels, ad films and product videos cut for the first three seconds — hooks, captions, motion graphics and sound.',
     tags: ['Reels & shorts', 'Ad films', 'Product videos', 'Motion graphics'],
-    theme: 'black',
-    buddy: 'white',
+    theme: 'white',
+    buddy: 'black',
   },
 ]
 
@@ -71,19 +71,19 @@ export const INDUSTRIES = ['Factory owners', 'Real estate', 'E-commerce sellers'
 
 // PLACEHOLDER WORK — swap in real client projects. Set `image` to a path in /public to replace the illustrated mock.
 export const WORK = [
-  { id: 'w1', cat: 'ads', title: 'Festive Sale Blitz', client: 'Apparel label', year: '2025', tone: 'red', image: null,
+  { id: 'w1', cat: 'ads', title: 'Festive Sale Blitz', client: 'Apparel label', year: '2025', tone: 'mist', image: null,
     did: ['12 Reels + carousel ad creatives', 'Instagram & Facebook campaign setup', 'Retargeting for cart abandoners'] },
   { id: 'w2', cat: 'ecom', title: 'Marketplace Launch', client: 'Home-décor seller', year: '2025', tone: 'black', image: null,
     did: ['Amazon & Flipkart store setup', 'Keyword-rich product listings', 'Sponsored product ads'] },
   { id: 'w3', cat: 'pack', title: 'Masala Box Series', client: 'Spice brand', year: '2025', tone: 'white', image: null,
     did: ['Packaging system for 6 SKUs', 'Print-ready dielines', '3D product mockups'] },
-  { id: 'w4', cat: 'web', title: 'Builder Showcase', client: 'Real-estate developer', year: '2024', tone: 'red', image: null,
+  { id: 'w4', cat: 'web', title: 'Builder Showcase', client: 'Real-estate developer', year: '2024', tone: 'mist', image: null,
     did: ['Project showcase website', 'Lead-capture landing pages', 'WhatsApp enquiry flow'] },
   { id: 'w5', cat: 'video', title: 'Inside the Factory', client: 'Manufacturer', year: '2024', tone: 'black', image: null,
     did: ['Brand film edit', 'Reels cut-downs', 'Captions & motion graphics'] },
   { id: 'w6', cat: 'ads', title: 'Site-Visit Machine', client: 'Housing project', year: '2024', tone: 'white', image: null,
     did: ['Lead-generation campaign', 'Walkthrough video ads', 'Weekly lead reports'] },
-  { id: 'w7', cat: 'ecom', title: 'Catalogue Glow-Up', client: 'Ethnic-wear seller', year: '2024', tone: 'red', image: null,
+  { id: 'w7', cat: 'ecom', title: 'Catalogue Glow-Up', client: 'Ethnic-wear seller', year: '2024', tone: 'mist', image: null,
     did: ['Meesho & Myntra catalogue refresh', 'Listing images & copy', 'Pricing & ads review'] },
   { id: 'w8', cat: 'video', title: 'Product Reels Pack', client: 'Skincare brand', year: '2025', tone: 'white', image: null,
     did: ['20 product Reels', 'Hook-first scripting', 'Trending audio & captions'] },

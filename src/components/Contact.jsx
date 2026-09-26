@@ -86,7 +86,7 @@ export function Contact() {
           <span>Anything else?</span>
           <textarea name="message" rows={3} placeholder="Tell us about your goals, budget or deadline…" />
         </label>
-        <button className="btn btn-dark full" type="submit" data-cursor="Send">
+        <button className="btn btn-red full" type="submit" data-cursor="Send">
           Send on WhatsApp <Arrow />
         </button>
       </form>

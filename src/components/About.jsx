@@ -63,10 +63,6 @@ export default function About() {
     <section className="about" ref={root} aria-label="About YG Digitals">
       <p className="eyebrow">( Hello )</p>
       <p className="statement">
-        <span className="inline-buddy" aria-hidden>
-          <i />
-          <i />
-        </span>{' '}
         {words.map(({ w, hl }, i) => (
           <span key={i} className={`w ${hl ? 'hl' : ''}`}>
             {w}{' '}

@@ -1,17 +1,17 @@
 import * as THREE from 'three'
-import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { PerformanceMonitor, RoundedBox, Text } from '@react-three/drei'
 import displayFont from '@fontsource/unbounded/files/unbounded-latin-800-normal.woff?url'
 import envAtlas from './studio-env.png'
-import { REDUCED, TOUCH, aim, spring } from '../lib/motion'
+import { REDUCED, TOUCH } from '../lib/motion'
 
 export { displayFont }
 export const RED = '#e04c5c'
 export const RED_DEEP = '#a92a39'
 export const WHITE = '#ffffff'
 export const BLACK = '#161616'
-export const TONE = { red: RED, white: WHITE, black: BLACK }
+export const MIST = '#f2f1ee' // the light backdrop behind the 3D (hero, contact)
 
 /* ---------- material + geometry ---------- */
 
@@ -30,22 +30,26 @@ export function Clay({ color, ...props }) {
   )
 }
 
-// Hand-pressed look: wobble each vertex along its direction with cheap trig noise.
-function lumpy(geo, amt, seed) {
-  const p = geo.attributes.position
-  const v = new THREE.Vector3()
-  for (let i = 0; i < p.count; i++) {
-    v.fromBufferAttribute(p, i)
-    const n = Math.sin(v.x * 5.1 + seed) * Math.sin(v.y * 4.3 + seed * 1.7) * Math.sin(v.z * 5.7 + seed * 2.3)
-    v.multiplyScalar(1 + n * amt)
-    p.setXYZ(i, v.x, v.y, v.z)
+// a tube along a smooth path whose thickness follows taper(0..1): hair clumps, brows, mouth, cords
+export function strand(pts, r, taper = (u) => Math.sin(Math.PI * u) ** 0.5, segs = 28, radial = 10) {
+  const curve = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)))
+  const g = new THREE.TubeGeometry(curve, segs, r, radial, false)
+  const pos = g.attributes.position
+  const P = new THREE.Vector3()
+  const V = new THREE.Vector3()
+  for (let i = 0; i <= segs; i++) {
+    curve.getPointAt(i / segs, P)
+    const k = Math.max(0.04, taper(i / segs))
+    for (let j = 0; j <= radial; j++) {
+      const n = i * (radial + 1) + j
+      V.fromBufferAttribute(pos, n).sub(P).multiplyScalar(k).add(P)
+      pos.setXYZ(n, V.x, V.y, V.z)
+    }
   }
-  geo.computeVertexNormals()
-  return geo
+  g.computeVertexNormals()
+  return g
 }
 
-const useLumpySphere = (r, amt = 0.04, seed = 1, seg = 56) =>
-  useMemo(() => lumpy(new THREE.SphereGeometry(r, seg, seg), amt, seed), [r, amt, seed, seg])
 
 let heartGeo
 function getHeart() {
@@ -86,112 +90,46 @@ const Ball = ({ color, r, ...props }) => (
   </mesh>
 )
 
-/* ---------- the mascot ---------- */
-
-// 3D hovers can't reach the DOM cursor via pointerover, so they announce themselves.
-const cursorLabel = (label) => window.dispatchEvent(new CustomEvent('cursor-label', { detail: label }))
-
-const LIMB = { [WHITE]: BLACK, [BLACK]: WHITE, [RED]: BLACK, [RED_DEEP]: WHITE }
-
-export function ClayBuddy({ color = RED, seed = 1, wave = false, hop = 0, children, ...props }) {
-  const body = useLumpySphere(1, 0.035, seed, 64)
-  const limb = LIMB[color] ?? BLACK
-  const inner = useRef()
-  const bodyRef = useRef()
-  const armL = useRef()
-  const armR = useRef()
-  const eyes = useRef()
-  const pupils = [useRef(), useRef()]
-  const jump = useRef({ x: 0, v: 0 })
-
-  const doJump = () => {
-    jump.current.v = 9
-  }
-  useEffect(() => {
-    if (hop) doJump()
-  }, [hop])
-
-  useFrame((state, dt) => {
-    dt = Math.min(dt, 1 / 30)
-    const t = state.clock.elapsedTime + seed * 7
-    const j = jump.current
-    spring(j, 0, dt, 90, 7)
-    const b = REDUCED ? 0 : Math.sin(t * 3.2)
-    // squash & stretch: idle breathing + jump
-    const stretch = b * 0.045 + j.x * 0.12
-    bodyRef.current.scale.set(1 - stretch * 0.6, 1.05 + stretch, 0.95 - stretch * 0.6)
-    inner.current.position.y = Math.max(0, j.x) * 0.5 + (REDUCED ? 0 : Math.abs(Math.sin(t * 1.6)) * 0.06)
-    // arms
-    armL.current.rotation.z = -0.25 - (REDUCED ? 0 : Math.sin(t * 2) * 0.12) - j.x * 0.4
-    armR.current.rotation.z = wave && !REDUCED ? 2.3 + Math.sin(t * 9) * 0.45 : 0.25 + Math.sin(t * 2) * 0.12 + j.x * 0.4
-    // blink every ~4s
-    const blink = (t % 4.3) < 0.13 ? 0.12 : 1
-    eyes.current.scale.y = blink
-    // pupils look at the pointer (or follow the phone's tilt)
-    const a = aim(state)
-    for (const p of pupils) {
-      p.current.position.x = a.x * 0.07
-      p.current.position.y = a.y * 0.07
-    }
+// gentle independent float, so a group of props doesn't move as one rigid block
+function Bob({ phase = 0, children, ...props }) {
+  const g = useRef()
+  useFrame(({ clock }) => {
+    if (REDUCED) return
+    const t = clock.elapsedTime + phase
+    g.current.position.y = Math.sin(t * 1.3) * 0.05
+    g.current.rotation.z = Math.sin(t * 0.9) * 0.05
   })
-
   return (
     <group {...props}>
-      <group
-        ref={inner}
-        onClick={(e) => {
-          e.stopPropagation()
-          doJump()
-        }}
-        onPointerOver={() => cursorLabel('Poke')}
-        onPointerOut={() => cursorLabel(null)}
-      >
-        <mesh ref={bodyRef} geometry={body}>
-          <Clay color={color} />
-        </mesh>
-        <group ref={eyes} position={[0, 0.3, 0]}>
-          {[-1, 1].map((s, i) => (
-            <group key={s} position={[s * 0.33, 0, 0.84]}>
-              <Ball color={WHITE} r={0.23} scale={[1, 1.12, 0.7]} />
-              <group ref={pupils[i]}>
-                <Ball color={BLACK} r={0.11} position={[0, 0, 0.14]} />
-                <Ball color={WHITE} r={0.035} position={[0.04, 0.05, 0.24]} />
-              </group>
-            </group>
-          ))}
-        </group>
-        {/* smile */}
-        <mesh position={[0, 0.0, 0.97]} rotation={[0.35, 0, Math.PI]}>
-          <torusGeometry args={[0.17, 0.045, 12, 24, Math.PI]} />
-          <Clay color={limb} />
-        </mesh>
-        {/* cheeks */}
-        {[-1, 1].map((s) => (
-          <Ball key={s} color={color === RED ? '#f28a95' : RED} r={0.1} scale={[1, 0.6, 0.4]} position={[s * 0.55, 0.02, 0.8]} />
-        ))}
-        {/* arms pivot at the shoulder */}
-        <group ref={armL} position={[-0.88, 0.05, 0]}>
-          <mesh position={[0, -0.32, 0]}>
-            <capsuleGeometry args={[0.13, 0.42, 8, 16]} />
-            <Clay color={limb} />
-          </mesh>
-        </group>
-        <group ref={armR} position={[0.88, 0.05, 0]}>
-          <mesh position={[0, -0.32, 0]}>
-            <capsuleGeometry args={[0.13, 0.42, 8, 16]} />
-            <Clay color={limb} />
-          </mesh>
-        </group>
-        {children}
-      </group>
-      {[-1, 1].map((s) => (
-        <Ball key={s} color={limb} r={0.26} scale={[1, 0.55, 1.35]} position={[s * 0.4, -1.02, 0.15]} />
-      ))}
+      <group ref={g}>{children}</group>
     </group>
   )
 }
 
 /* ---------- service props ---------- */
+
+// Meta's infinity mark: one closed loop that rises into two arches and crosses itself low in the middle
+let metaGeo
+function getMeta() {
+  if (metaGeo) return metaGeo
+  const half = [[0.2, 0.3], [0.42, 0.5], [0.64, 0.48], [0.82, 0.25], [0.86, -0.08], [0.74, -0.36], [0.5, -0.42], [0.25, -0.24]]
+  const pts = [
+    [0, 0, 0.08],
+    ...half.map(([x, y], i) => [x, y, 0.06 - i * 0.015]),
+    [0, 0, -0.08],
+    ...half.map(([x, y], i) => [-x, y, -0.06 + i * 0.015]),
+  ].map((p) => new THREE.Vector3(...p))
+  metaGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), 220, 0.1, 16, true)
+  return metaGeo
+}
+
+export function MetaLogo({ color = '#0866ff', ...props }) {
+  return (
+    <mesh geometry={getMeta()} {...props}>
+      <Clay color={color} roughness={0.45} sheen={0.15} clearcoat={0.4} />
+    </mesh>
+  )
+}
 
 export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
   return (
@@ -199,8 +137,9 @@ export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
       <Rb color={body} args={[1.1, 2.1, 0.22]} radius={0.15} />
       <Rb color={screen} args={[0.94, 1.86, 0.05]} radius={0.1} position={[0, 0, 0.1]} />
       <Rb color={body} args={[0.3, 0.07, 0.04]} radius={0.03} position={[0, 0.84, 0.14]} />
-      <Rb color={accent} args={[0.78, 0.8, 0.05]} radius={0.06} position={[0, 0.3, 0.13]} />
-      <Heart color={WHITE} scale={0.3} position={[0, 0.3, 0.2]} />
+      {/* a Meta ad: the post, two lines of copy, the CTA */}
+      <Rb color="#e9f0ff" args={[0.78, 0.8, 0.05]} radius={0.06} position={[0, 0.3, 0.13]} />
+      <MetaLogo scale={0.36} position={[0, 0.3, 0.2]} />
       <Rb color={body} args={[0.62, 0.09, 0.04]} radius={0.04} position={[-0.07, -0.3, 0.14]} />
       <Rb color={body} args={[0.42, 0.09, 0.04]} radius={0.04} position={[-0.17, -0.45, 0.14]} />
       <Rb color={accent} args={[0.78, 0.2, 0.06]} radius={0.09} position={[0, -0.7, 0.14]} />
@@ -223,7 +162,87 @@ export function Bag({ body = RED, trim = WHITE }) {
   )
 }
 
-export function Box({ body = RED, tape = BLACK, label = WHITE }) {
+/* marketplace stand-ins: an Amazon shipping box, the Flipkart bag and Walmart's spark */
+let smileGeo
+const getSmile = () => (smileGeo ??= strand([[-0.4, 0, 0], [-0.12, -0.15, 0], [0.18, -0.13, 0], [0.38, -0.02, 0]], 0.045, (u) => 0.45 + 0.55 * Math.sin(Math.PI * u), 40, 12))
+
+export function AmazonBox() {
+  return (
+    <group>
+      <Rb color="#c9965e" args={[1.5, 1.0, 1.1]} radius={0.06} />
+      <Rb color="#b3814b" args={[0.3, 0.03, 1.12]} radius={0.012} position={[0, 0.5, 0]} />
+      <Text font={displayFont} fontSize={0.2} letterSpacing={-0.04} position={[0, 0.12, 0.56]} color={BLACK} anchorX="center" anchorY="middle">
+        amazon
+      </Text>
+      <group position={[0.02, -0.02, 0.57]}>
+        <mesh geometry={getSmile()}>
+          <Clay color="#ff9900" />
+        </mesh>
+        <mesh position={[0.4, 0.02, 0]} rotation-z={-0.95}>
+          <coneGeometry args={[0.075, 0.15, 20]} />
+          <Clay color="#ff9900" />
+        </mesh>
+      </group>
+    </group>
+  )
+}
+
+// italic slant for the "f", which the display font doesn't have
+const SLANT = new THREE.Matrix4().makeShear(0, 0, 0.22, 0, 0, 0)
+
+export function FlipkartBag() {
+  return (
+    <group>
+      <Rb color="#ffe11b" args={[1.2, 1.3, 0.5]} radius={0.1} />
+      <mesh position={[0, 0.64, 0]}>
+        <torusGeometry args={[0.3, 0.06, 16, 36, Math.PI]} />
+        <Clay color="#2874f0" />
+      </mesh>
+      <group position={[0.03, -0.05, 0.26]}>
+        <group matrix={SLANT} matrixAutoUpdate={false}>
+          <Text font={displayFont} fontSize={0.9} color="#2874f0" anchorX="center" anchorY="middle">
+            f
+          </Text>
+        </group>
+      </group>
+    </group>
+  )
+}
+
+export function WalmartSpark({ color = '#ffc220' }) {
+  return (
+    <group>
+      {[0, 1, 2, 3, 4, 5].map((i) => {
+        const a = (i * Math.PI) / 3
+        return (
+          <mesh key={i} position={[Math.sin(a) * 0.43, Math.cos(a) * 0.43, 0]} rotation-z={-a} scale={[1, 1, 0.7]}>
+            <capsuleGeometry args={[0.13, 0.3, 8, 16]} />
+            <Clay color={color} />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
+export function Marketplaces() {
+  return (
+    <group>
+      <Bob phase={0} position={[-0.52, -0.38, -0.35]} rotation={[0.2, 0.5, 0]} scale={0.78}>
+        <AmazonBox />
+      </Bob>
+      <Bob phase={1.7} position={[0.6, -0.12, 0.3]} rotation={[0.05, -0.4, 0.04]} scale={0.72}>
+        <FlipkartBag />
+      </Bob>
+      <Bob phase={3.1} position={[-0.25, 0.78, -0.1]} rotation={[0.1, 0.35, 0]} scale={0.62}>
+        <WalmartSpark />
+      </Bob>
+    </group>
+  )
+}
+
+export function Box({ body = BLACK, tape = RED, label = WHITE }) {
+
   return (
     <group>
       <Rb color={body} args={[1.4, 1.1, 1.4]} radius={0.08} />
@@ -241,7 +260,7 @@ export function Box({ body = RED, tape = BLACK, label = WHITE }) {
   )
 }
 
-export function Browser({ frame = WHITE, bar = BLACK, accent = RED }) {
+export function Browser({ frame = WHITE, bar = BLACK, accent = RED, img = BLACK }) {
   return (
     <group>
       <Rb color={frame} args={[2.1, 1.5, 0.16]} radius={0.1} />
@@ -249,7 +268,7 @@ export function Browser({ frame = WHITE, bar = BLACK, accent = RED }) {
       {[-0.85, -0.7, -0.55].map((x, i) => (
         <Ball key={x} color={i === 0 ? accent : frame} r={0.05} position={[x, 0.6, 0.11]} />
       ))}
-      <Rb color={accent} args={[0.85, 0.62, 0.06]} radius={0.06} position={[-0.47, 0.02, 0.1]} />
+      <Rb color={img} args={[0.85, 0.62, 0.06]} radius={0.06} position={[-0.47, 0.02, 0.1]} />
       <Rb color={bar} args={[0.72, 0.1, 0.05]} radius={0.045} position={[0.46, 0.2, 0.1]} />
       <Rb color={bar} args={[0.56, 0.1, 0.05]} radius={0.045} position={[0.38, 0.04, 0.1]} />
       <Rb color={accent} args={[0.42, 0.17, 0.07]} radius={0.08} position={[0.31, -0.18, 0.1]} />
@@ -258,7 +277,7 @@ export function Browser({ frame = WHITE, bar = BLACK, accent = RED }) {
   )
 }
 
-export function Clapper({ body = RED, a = WHITE, b = BLACK }) {
+export function Clapper({ body = BLACK, a = WHITE, b = BLACK, play = RED }) {
   const arm = useRef()
   useFrame(({ clock }) => {
     if (REDUCED) return
@@ -276,7 +295,7 @@ export function Clapper({ body = RED, a = WHITE, b = BLACK }) {
       <group position={[0.05, -0.15, 0.11]} rotation-z={Math.PI / 2}>
         <mesh rotation-x={Math.PI / 2}>
           <cylinderGeometry args={[0.28, 0.28, 0.1, 3]} />
-          <Clay color={a} />
+          <Clay color={play} />
         </mesh>
       </group>
     </group>
@@ -285,7 +304,7 @@ export function Clapper({ body = RED, a = WHITE, b = BLACK }) {
 
 export const SERVICE_PROPS = {
   ads: <Phone />,
-  ecom: <Bag />,
+  ecom: <Marketplaces />,
   pack: <Box />,
   web: <Browser />,
   video: <Clapper />,

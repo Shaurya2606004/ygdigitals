@@ -59,7 +59,7 @@ export default function Nav() {
           ))}
         </nav>
         <div className="nav-right">
-          <a className="btn btn-dark nav-cta" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
+          <a className="btn btn-light nav-cta" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
             Book a call <Arrow />
           </a>
           <button className={`nav-burger ${open ? 'is-open' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="menu" aria-label={open ? 'Close menu' : 'Open menu'}>

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
-import { BLACK, Bag, Box, Browser, Clapper, ClayBuddy, Clay, Heart, Phone, RED, RED_DEEP, WHITE, displayFont } from './clay'
+import { BLACK, Bag, Box, Browser, Clapper, Clay, Heart, MIST, Phone, RED, RED_DEEP, WHITE, displayFont } from './clay'
+import { Buddy } from './character'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
 /* Block-letter headline: stacked troika layers fake a chunky extrusion; each line is scaled to fit `width`. */
@@ -29,8 +30,8 @@ function FitLine({ text, width, y, onHeight, layers = 8 }) {
             lineHeight={1}
             anchorX="center"
             anchorY="top"
-            position={[d * 0.011, -d * 0.013, -d * 0.02]}
-            color={d === 0 ? WHITE : d === 1 ? '#ffd6da' : RED_DEEP}
+            position={[d * 0.008, -d * 0.0095, -d * 0.02]}
+            color={d === 0 ? BLACK : d === 1 ? '#3a3a3a' : RED_DEEP}
             onSync={
               d === 0
                 ? (mesh) => {
@@ -140,13 +141,10 @@ function Lens({ radius, sp, wander }) {
 const DESKTOP = [
   { el: <Phone />, p: [-0.8, 0.24, 0.8], r: [0.1, 0.45, 0.2], s: 0.62, d: 0.1 },
   { el: <Bag body={BLACK} />, p: [0.82, 0.26, -0.6], r: [0.15, -0.5, -0.15], s: 0.68, d: 0.2 },
-  { el: <Box body={WHITE} tape={RED_DEEP} label={BLACK} />, p: [0.76, -0.3, 1.0], r: [0.5, 0.6, 0.1], s: 0.52, d: 0.3 },
-  { el: <Browser />, p: [-0.74, -0.34, -0.4], r: [-0.1, 0.45, -0.1], s: 0.6, d: 0.25 },
-  { el: <Clapper body={BLACK} a={WHITE} b={RED_DEEP} />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
-  { el: <Heart color={WHITE} />, p: [-0.14, 0.62, 0.5], r: [0, 0, 0.3], s: 0.42, d: 0.4 },
-  { el: <Heart color={BLACK} />, p: [0.52, -0.05, 1.8], r: [0, 0, -0.3], s: 0.3, d: 0.45 },
-  { el: <Heart color={WHITE} />, p: [-0.22, -0.6, 1.2], r: [0, 0, -0.2], s: 0.34, d: 0.5 },
-  { el: <Heart color={RED_DEEP} />, p: [1.0, 0.02, -1.2], r: [0, 0, 0.4], s: 0.36, d: 0.55 },
+  { el: <Box body={WHITE} tape={RED} label={BLACK} />, p: [0.76, -0.3, 1.0], r: [0.5, 0.6, 0.1], s: 0.52, d: 0.3 },
+  { el: <Clapper />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
+  { el: <Heart color={RED} />, p: [-0.14, 0.62, 0.5], r: [0, 0, 0.3], s: 0.36, d: 0.4 },
+  { el: <Heart color={BLACK} />, p: [0.52, -0.05, 1.8], r: [0, 0, -0.3], s: 0.26, d: 0.45 },
 ]
 
 // portrait: a composed sticker sheet — phone + bag flank the short "THE" line, the browser peeks from behind
@@ -155,10 +153,8 @@ const PORTRAIT = [
   { el: <Phone />, p: [-0.76, 0.25, 0.4], r: [0.1, 0.5, 0.25], s: 0.27, d: 0.1 },
   { el: <Bag body={BLACK} />, p: [0.77, 0.22, 0.2], r: [0.15, -0.5, -0.15], s: 0.29, d: 0.2 },
   { el: <Browser />, p: [-0.6, 0.64, -1.2], r: [-0.1, 0.5, -0.2], s: 0.25, d: 0.25 },
-  { el: <Clapper body={BLACK} a={WHITE} b={RED_DEEP} />, p: [0.12, -0.36, -0.3], r: [0.2, -0.3, 0.15], s: 0.26, d: 0.35 },
-  { el: <Box body={WHITE} tape={RED_DEEP} label={BLACK} />, p: [0.64, -0.36, 0.6], r: [0.5, 0.6, 0.1], s: 0.26, d: 0.3 },
-  { el: <Heart color={WHITE} />, p: [0.4, -0.14, 1.2], r: [0, 0, -0.2], s: 0.13, d: 0.5 },
-  { el: <Heart color={RED_DEEP} />, p: [-0.88, -0.1, -0.4], r: [0, 0, 0.4], s: 0.17, d: 0.55 },
+  { el: <Clapper />, p: [0.12, -0.36, -0.3], r: [0.2, -0.3, 0.15], s: 0.26, d: 0.35 },
+  { el: <Box body={WHITE} tape={RED} label={BLACK} />, p: [0.64, -0.36, 0.6], r: [0.5, 0.6, 0.1], s: 0.26, d: 0.3 },
 ]
 
 const LINES_WIDE = [
@@ -171,21 +167,20 @@ const LINES_PORTRAIT = [
   { t: 'SCROLL.', f: 1 },
 ]
 
-function Confetti({ count, spread, offY = 0, fly, readyAt, sp }) {
+function Confetti({ count, spread, readyAt, sp }) {
   const bits = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => ({
         p: [(Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 4],
-        c: [WHITE, BLACK, RED_DEEP][i % 3],
+        c: [WHITE, BLACK, RED][i % 3],
         s: 0.05 + Math.random() * 0.07,
-        torus: i % 4 === 0,
       })),
     [count],
   )
   return bits.map((b, i) => (
-    <Pop key={i} readyAt={readyAt} sp={sp} fly={fly} delay={0.3 + i * 0.03} position={[b.p[0] * spread[0], b.p[1] * spread[1] + offY, b.p[2]]} scale={b.s}>
+    <Pop key={i} readyAt={readyAt} sp={sp} delay={0.3 + i * 0.03} position={[b.p[0] * spread[0], b.p[1] * spread[1], b.p[2]]} scale={b.s}>
       <mesh>
-        {b.torus ? <torusGeometry args={[1, 0.4, 12, 24]} /> : <sphereGeometry args={[1, 16, 16]} />}
+        <sphereGeometry args={[1, 16, 16]} />
         <Clay color={b.c} />
       </mesh>
     </Pop>
@@ -244,21 +239,22 @@ export default function HeroScene({ ready, progress, onReady }) {
   const fly = portrait ? [0.9, 6.5] : undefined
   return (
     <>
-      <color attach="background" args={[RED]} />
+      <color attach="background" args={[MIST]} />
       <group ref={text}>
         <group position-y={total / 2}>
           {lines.map((l, i) => (
             <FitLine key={l.t} text={l.t} width={width * l.f} y={ys[i]} onHeight={(v) => setH((o) => (o[l.t] === v ? o : { ...o, [l.t]: v }))} />
           ))}
         </group>
-        {/* white buddy peeks over the top of STOP, black buddy waves from the bottom corner */}
-        <ClayBuddy color={WHITE} seed={2} position={[width * 0.3, total / 2 + 0.05, -0.6]} scale={width * 0.065} />
-        <ClayBuddy
-          color={BLACK}
+        {/* she peeks over the top of STOP, he waves from the bottom corner */}
+        <Buddy look="girl" outfit="white" seed={2} position={[width * 0.3, total / 2 - width * 0.045, -0.6]} scale={width * 0.1} rotation={[0, -0.25, 0]} />
+        <Buddy
+          look="guy"
+          outfit="black"
           seed={5}
           wave
           position={portrait ? [-width * 0.3, -total / 2 - width * 0.2, 0.8] : [-width * 0.5, -total / 2 - width * 0.02, 0.8]}
-          scale={width * (portrait ? 0.1 : 0.05)}
+          scale={width * (portrait ? 0.1 : 0.06)}
           rotation={[0, 0.4, 0]}
         />
       </group>
@@ -267,10 +263,10 @@ export default function HeroScene({ ready, progress, onReady }) {
           {it.el}
         </Pop>
       ))}
-      {/* portrait confetti stays in the band under the headline, off the letters and clear of the CTAs */}
-      <Confetti count={portrait ? 7 : 18} spread={[vw * 0.5, vh * (portrait ? 0.13 : 0.5)]} offY={portrait ? -vh * 0.16 : 0} fly={fly} readyAt={readyAt} sp={sp} />
+      {/* a phone screen is busy enough with the props; confetti only on wide screens */}
+      {!portrait && <Confetti count={8} spread={[vw * 0.5, vh * 0.5]} readyAt={readyAt} sp={sp} />}
       <Lens
-        radius={portrait ? 0.2 : 0.55}
+        radius={portrait ? 0.13 : 0.3}
         sp={sp}
         wander={{ y: textY / (vh / 2), ax: (width / vw) * 0.75, ay: (total / vh) * 0.7 }}
       />

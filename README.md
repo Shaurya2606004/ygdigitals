@@ -11,7 +11,8 @@ npm run build   # static output in dist/
 ```
 
 - Content (services, work, process, stats, contact details): `src/data.js`
-- Clay models + mascots: `src/three/clay.jsx`
+- Clay props (incl. Meta / Amazon / Flipkart / Walmart models): `src/three/clay.jsx`
+- Mascots (guy + girl): `src/three/character.jsx`
 - Hero scene + glass lens: `src/three/HeroScene.jsx`
 - One component per section: `src/components/`
 

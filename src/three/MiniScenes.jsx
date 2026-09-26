@@ -1,6 +1,7 @@
 import { useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { ClayBuddy, Heart, RED_DEEP, SERVICE_PROPS, TONE, WHITE, BLACK } from './clay'
+import { BLACK, Heart, RED, SERVICE_PROPS, WHITE } from './clay'
+import { Buddy } from './character'
 import { REDUCED, spring } from '../lib/motion'
 import { SERVICES } from '../data'
 
@@ -31,27 +32,27 @@ function Swap({ active, scale, children }) {
   )
 }
 
+/*
+ * Laid out from the canvas shape (tall on desktop, wide on phones and tablets): the mascot stands in the
+ * bottom-right corner with room for its waving arm, and the prop is centred and sized in the space left of it.
+ */
 export function ServicesScene({ index, buddy }) {
-  const { size } = useThree()
-  const narrow = size.width / size.height < 1
+  const { size, camera } = useThree()
+  const hh = Math.tan((camera.fov * Math.PI) / 360) * (camera.position.z - 0.8) // visible half-height at the mascot's depth
+  const hw = hh * (size.width / size.height)
+  const s = Math.min(0.6, hw * 0.3)
+  const bx = Math.min(hw - 0.8 * s - 0.1, 1.9)
+  const room = bx - 0.6 * s + hw // width left of the mascot
   return (
     <>
-      <group position={narrow ? [-0.35, 0.15, 0] : [-0.3, 0.2, 0]}>
-        {SERVICES.map((s, i) => (
-          <Swap key={s.id} active={i === index} scale={narrow ? 1.05 : 1.25}>
-            {SERVICE_PROPS[s.id]}
+      <group position={[Math.max((bx - 0.6 * s - hw) / 2, -0.6), 0.15, 0]}>
+        {SERVICES.map((x, i) => (
+          <Swap key={x.id} active={i === index} scale={Math.min(1.25, room / 2.4)}>
+            {SERVICE_PROPS[x.id]}
           </Swap>
         ))}
       </group>
-      <ClayBuddy
-        color={TONE[buddy]}
-        hop={index + 1}
-        seed={3}
-        wave
-        position={narrow ? [1.2, -0.85, 0.8] : [1.35, -1.0, 0.8]}
-        scale={narrow ? 0.45 : 0.55}
-        rotation={[0, -0.45, 0]}
-      />
+      <Buddy outfit={buddy} hop={index + 1} seed={3} wave position={[bx, -hh + 0.25 + 1.23 * s, 0.8]} scale={s} rotation={[0, -0.45, 0]} />
     </>
   )
 }
@@ -65,7 +66,7 @@ function HeartStream({ count }) {
         x: (Math.random() - 0.5) * 5,
         off: Math.random() * 6,
         speed: 0.45 + Math.random() * 0.45,
-        c: [WHITE, BLACK, RED_DEEP][i % 3],
+        c: [BLACK, RED, WHITE][i % 3],
         s: 0.16 + Math.random() * 0.16,
       })),
     [count],
@@ -90,9 +91,9 @@ function HeartStream({ count }) {
 export function ContactScene() {
   return (
     <>
-      {!REDUCED && <HeartStream count={12} />}
-      <ClayBuddy color={WHITE} wave seed={7} position={[-0.95, -0.35, 0]} scale={0.95} rotation={[0, 0.35, 0]} />
-      <ClayBuddy color={BLACK} seed={11} position={[1.05, -0.7, -0.4]} scale={0.72} rotation={[0, -0.35, 0]} />
+      {!REDUCED && <HeartStream count={6} />}
+      <Buddy look="girl" outfit="white" wave seed={7} position={[-0.95, -0.05, 0]} scale={1.3} rotation={[0, 0.35, 0]} />
+      <Buddy look="guy" outfit="black" seed={11} position={[1.1, -0.3, -0.4]} scale={1.15} rotation={[0, -0.35, 0]} />
     </>
   )
 }
