@@ -3,7 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ScrollTrigger, gsap, scroller } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import { ServicesScene } from '../three/MiniScenes'
-import { SERVICES } from '../data'
+import { SERVICES, pagePath } from '../data'
+import { Arrow } from './ui'
 
 const ease = [0.22, 1, 0.36, 1]
 const line = {
@@ -83,6 +84,9 @@ export default function Services() {
                   <li key={t}>{t}</li>
                 ))}
               </motion.ul>
+              <motion.a className="svc-more" variants={fade} href={pagePath(s)} data-cursor="Read">
+                How we think <Arrow />
+              </motion.a>
             </motion.div>
           </AnimatePresence>
         </div>

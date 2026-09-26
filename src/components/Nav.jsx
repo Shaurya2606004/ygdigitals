@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ScrollTrigger, lockScroll, scrollToId } from '../lib/motion'
-import { CONTACT, waLink } from '../data'
+import { CONTACT, ECOSYSTEM, PAGES, pagePath, waLink } from '../data'
 import { Arrow } from './ui'
 
 const LINKS = [
@@ -12,6 +12,7 @@ const LINKS = [
 ]
 
 const ease = [0.76, 0, 0.24, 1]
+const HOME = typeof location !== 'undefined' && location.pathname === '/'
 
 export default function Nav() {
   const [open, setOpen] = useState(false)
@@ -37,23 +38,25 @@ export default function Nav() {
     }
   }, [open])
 
+  // sections on this page scroll smoothly; the rest (home sections seen from a service page) are normal links to /#id
   const go = (id) => (e) => {
-    e.preventDefault()
     lockScroll(false)
     setOpen(false)
+    if (!document.getElementById(id)) return
+    e.preventDefault()
     scrollToId(id)
   }
 
   return (
     <>
       <header className={`nav ${hidden && !open ? 'is-hidden' : ''}`}>
-        <a href="#top" className="nav-logo" onClick={go('top')} aria-label="YG Digitals — back to top">
+        <a href={HOME ? '#top' : '/'} className="nav-logo" onClick={HOME ? go('top') : undefined} aria-label={HOME ? 'YG Digitals — back to top' : 'YG Digitals — home'}>
           <span className="nav-mark">YG</span>
           <span className="nav-word">digitals</span>
         </a>
         <nav className="nav-links" aria-label="Primary">
-          {LINKS.map(([id, label]) => (
-            <a key={id} href={`#${id}`} onClick={go(id)}>
+          {[LINKS[0], ['eco', 'Ecosystem', pagePath(ECOSYSTEM)], ...LINKS.slice(1)].map(([id, label, page]) => (
+            <a key={id} href={page || `/#${id}`} onClick={page ? undefined : go(id)}>
               {label}
             </a>
           ))}
@@ -83,8 +86,8 @@ export default function Nav() {
               {[['top', 'Home'], ...LINKS].map(([id, label], i) => (
                 <span key={id} className="menu-mask">
                   <motion.a
-                    href={`#${id}`}
-                    onClick={go(id)}
+                    href={id === 'top' ? '/' : `/#${id}`}
+                    onClick={id === 'top' && !HOME ? undefined : go(id)}
                     initial={{ y: '110%', rotate: 6 }}
                     animate={{ y: 0, rotate: 0 }}
                     exit={{ y: '110%' }}
@@ -96,6 +99,16 @@ export default function Nav() {
                 </span>
               ))}
             </nav>
+            <motion.nav className="menu-pages" aria-label="Service pages" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.5, duration: 0.6, ease } }} exit={{ opacity: 0 }}>
+              <p>Service pages</p>
+              <ul>
+                {PAGES.map((p) => (
+                  <li key={p.id}>
+                    <a href={pagePath(p)}>{p.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </motion.nav>
             <motion.div className="menu-foot" initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.6 } }} exit={{ opacity: 0 }}>
               <a href={CONTACT.tel}>{CONTACT.phone}</a>
               <a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a>

@@ -147,21 +147,6 @@ export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
   )
 }
 
-export function Bag({ body = RED, trim = WHITE }) {
-  return (
-    <group>
-      <Rb color={body} args={[1.3, 1.45, 0.62]} radius={0.12} />
-      <mesh position={[0, 0.72, 0]}>
-        <torusGeometry args={[0.34, 0.07, 16, 36, Math.PI]} />
-        <Clay color={trim} />
-      </mesh>
-      <Text font={displayFont} fontSize={0.62} position={[0, -0.02, 0.32]} color={trim} anchorX="center" anchorY="middle">
-        %
-      </Text>
-    </group>
-  )
-}
-
 /* marketplace stand-ins: an Amazon shipping box, the Flipkart bag and Walmart's spark */
 let smileGeo
 const getSmile = () => (smileGeo ??= strand([[-0.4, 0, 0], [-0.12, -0.15, 0], [0.18, -0.13, 0], [0.38, -0.02, 0]], 0.045, (u) => 0.45 + 0.55 * Math.sin(Math.PI * u), 40, 12))
@@ -366,7 +351,7 @@ function Warmup({ offscreen, onDone }) {
   useEffect(() => {
     let alive = true
     const jobs = [gl.compileAsync(scene, camera)]
-    const rt = offscreen && new THREE.WebGLRenderTarget(1, 1)
+    const rt = offscreen ? new THREE.WebGLRenderTarget(1, 1) : null // not `&&`: false?.dispose() throws
     if (rt) {
       gl.setRenderTarget(rt)
       jobs.push(gl.compileAsync(scene, camera))

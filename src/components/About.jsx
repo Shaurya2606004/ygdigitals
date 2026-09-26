@@ -1,23 +1,10 @@
 import { useLayoutEffect, useRef } from 'react'
 import { REDUCED, gsap } from '../lib/motion'
 import { INDUSTRIES, STATS } from '../data'
+import { Statement } from './ui'
 
-// *starred* phrases are highlighted in brand red
 const STATEMENT =
   "We're a Gohana-born studio helping *factory owners*, *real-estate brands* and *e-commerce sellers* across India look big online — and sell even bigger."
-
-const words = STATEMENT.split(/(\*[^*]+\*)/)
-  .filter(Boolean)
-  .flatMap((chunk) => {
-    const hl = chunk.startsWith('*')
-    return chunk
-      .replace(/\*/g, '')
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => ({ w, hl }))
-  })
-  // glue stray punctuation (", ") back onto the word before it
-  .reduce((acc, t) => (/^[,.;:!?]+$/.test(t.w) ? (acc[acc.length - 1].w += t.w, acc) : [...acc, t]), [])
 
 /*
  * Statement words brighten one by one, scrubbed to scroll. Stats count up once on entry.
@@ -27,12 +14,6 @@ export default function About() {
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
-      if (!REDUCED)
-        gsap.fromTo(
-          '.statement .w',
-          { opacity: 0.12 },
-          { opacity: 1, stagger: 0.1, ease: 'none', scrollTrigger: { trigger: '.statement', start: 'top 80%', end: 'bottom 50%', scrub: true } },
-        )
       gsap.utils.toArray('.stat-num').forEach((el) => {
         const end = Number(el.dataset.value)
         const obj = { v: REDUCED ? end : 0 }
@@ -62,13 +43,7 @@ export default function About() {
   return (
     <section className="about" ref={root} aria-label="About YG Digitals">
       <p className="eyebrow">( Hello )</p>
-      <p className="statement">
-        {words.map(({ w, hl }, i) => (
-          <span key={i} className={`w ${hl ? 'hl' : ''}`}>
-            {w}{' '}
-          </span>
-        ))}
-      </p>
+      <Statement text={STATEMENT} />
 
       <ul className="stats">
         {STATS.map((s) => (

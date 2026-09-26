@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ScrollTrigger } from '../lib/motion'
+import { ScrollTrigger, scrollToId } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import { ContactScene } from '../three/MiniScenes'
-import { CONTACT, SERVICES, waLink } from '../data'
+import { CONTACT, PAGES, SERVICES, pagePath, waLink } from '../data'
 import { Arrow, Chat } from './ui'
 
 /* No backend: the form composes a WhatsApp message to the studio — the channel their clients already use. */
-export function Contact() {
+export function Contact({ service = SERVICES[0].title }) {
   const root = useRef()
   const submit = (e) => {
     e.preventDefault()
@@ -75,7 +75,7 @@ export function Contact() {
         </label>
         <label>
           <span>What do you need?</span>
-          <select name="service" defaultValue={SERVICES[0].title}>
+          <select name="service" defaultValue={service}>
             {SERVICES.map((s) => (
               <option key={s.id}>{s.title}</option>
             ))}
@@ -96,9 +96,40 @@ export function Contact() {
 
 const WORD = 'YG DIGITALS'
 
+// a section on this page scrolls smoothly; otherwise the link goes to the home page
+const jump = (id) => (e) => {
+  if (!document.getElementById(id)) return
+  e.preventDefault()
+  scrollToId(id)
+}
+
 export function Footer() {
   return (
     <footer className="footer">
+      <nav className="footer-map" aria-label="Sitemap">
+        <div>
+          <p className="eyebrow">Services</p>
+          <ul>
+            {PAGES.map((p) => (
+              <li key={p.id}>
+                <a href={pagePath(p)}>{p.title}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <p className="eyebrow">Studio</p>
+          <ul>
+            {[['top', 'Home'], ['services', 'What we do'], ['work', 'Work'], ['process', 'Process'], ['contact', 'Book a call']].map(([id, label]) => (
+              <li key={id}>
+                <a href={id === 'top' ? '/' : `/#${id}`} onClick={jump(id)}>
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
       <div className="footer-row">
         <p>
           {CONTACT.city}

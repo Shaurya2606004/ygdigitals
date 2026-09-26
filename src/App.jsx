@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import Lenis from 'lenis'
-import 'lenis/dist/lenis.css'
-import { REDUCED, ScrollTrigger, gsap, lockScroll, scroller } from './lib/motion'
+import { ScrollTrigger, lockScroll, scrollToId, smoothScroll } from './lib/motion'
 import Loader from './components/Loader'
 import Cursor from './components/Cursor'
 import Nav from './components/Nav'
@@ -28,24 +26,14 @@ export default function App() {
     return () => clearTimeout(t)
   }, [])
 
-  useEffect(() => {
-    if (REDUCED) return
-    const lenis = new Lenis({ lerp: 0.1 })
-    scroller.lenis = lenis
-    lenis.on('scroll', ScrollTrigger.update)
-    const tick = (time) => lenis.raf(time * 1000)
-    gsap.ticker.add(tick)
-    gsap.ticker.lagSmoothing(0)
-    return () => {
-      gsap.ticker.remove(tick)
-      lenis.destroy()
-      scroller.lenis = null
-    }
-  }, [])
+  useEffect(smoothScroll, [])
 
   useEffect(() => {
     lockScroll(loading)
-    if (!loading) ScrollTrigger.refresh()
+    if (loading) return
+    ScrollTrigger.refresh()
+    // arriving from a service page's menu (/#work etc.): jump straight to that section once the loader is gone
+    if (location.hash) scrollToId(decodeURIComponent(location.hash.slice(1)), true)
   }, [loading])
 
   const onSceneReady = useCallback(() => setSceneReady(true), [])

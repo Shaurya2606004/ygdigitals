@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
-import { BLACK, Bag, Box, Browser, Clapper, Clay, Heart, MIST, Phone, RED, RED_DEEP, WHITE, displayFont } from './clay'
+import { AmazonBox, BLACK, Clapper, FlipkartBag, MIST, Phone, RED_DEEP, displayFont } from './clay'
 import { Buddy } from './character'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
@@ -138,23 +138,19 @@ function Lens({ radius, sp, wander }) {
   )
 }
 
+// the brands the studio works on: a Meta ad on the phone, the Flipkart bag, the Amazon box — plus the video clapper
 const DESKTOP = [
   { el: <Phone />, p: [-0.8, 0.24, 0.8], r: [0.1, 0.45, 0.2], s: 0.62, d: 0.1 },
-  { el: <Bag body={BLACK} />, p: [0.82, 0.26, -0.6], r: [0.15, -0.5, -0.15], s: 0.68, d: 0.2 },
-  { el: <Box body={WHITE} tape={RED} label={BLACK} />, p: [0.76, -0.3, 1.0], r: [0.5, 0.6, 0.1], s: 0.52, d: 0.3 },
+  { el: <FlipkartBag />, p: [0.82, 0.26, -0.6], r: [0.15, -0.5, -0.1], s: 0.76, d: 0.2 },
+  { el: <AmazonBox />, p: [0.76, -0.32, 1.0], r: [0.3, -0.45, 0.05], s: 0.5, d: 0.3 },
   { el: <Clapper />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
-  { el: <Heart color={RED} />, p: [-0.14, 0.62, 0.5], r: [0, 0, 0.3], s: 0.36, d: 0.4 },
-  { el: <Heart color={BLACK} />, p: [0.52, -0.05, 1.8], r: [0, 0, -0.3], s: 0.26, d: 0.45 },
 ]
 
-// portrait: a composed sticker sheet — phone + bag flank the short "THE" line, the browser peeks from behind
-// STOP, and the rest sit in the band under the headline, clear of the copy and CTAs below it
+// portrait: phone + bag flank the short "THE" line, the Amazon box sits in the band under the headline, opposite the guy
 const PORTRAIT = [
   { el: <Phone />, p: [-0.76, 0.25, 0.4], r: [0.1, 0.5, 0.25], s: 0.27, d: 0.1 },
-  { el: <Bag body={BLACK} />, p: [0.77, 0.22, 0.2], r: [0.15, -0.5, -0.15], s: 0.29, d: 0.2 },
-  { el: <Browser />, p: [-0.6, 0.64, -1.2], r: [-0.1, 0.5, -0.2], s: 0.25, d: 0.25 },
-  { el: <Clapper />, p: [0.12, -0.36, -0.3], r: [0.2, -0.3, 0.15], s: 0.26, d: 0.35 },
-  { el: <Box body={WHITE} tape={RED} label={BLACK} />, p: [0.64, -0.36, 0.6], r: [0.5, 0.6, 0.1], s: 0.26, d: 0.3 },
+  { el: <FlipkartBag />, p: [0.77, 0.22, 0.2], r: [0.15, -0.5, -0.1], s: 0.33, d: 0.2 },
+  { el: <AmazonBox />, p: [0.5, -0.36, 0.6], r: [0.3, -0.45, 0.05], s: 0.28, d: 0.3 },
 ]
 
 const LINES_WIDE = [
@@ -166,26 +162,6 @@ const LINES_PORTRAIT = [
   { t: 'THE', f: 0.52 },
   { t: 'SCROLL.', f: 1 },
 ]
-
-function Confetti({ count, spread, readyAt, sp }) {
-  const bits = useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => ({
-        p: [(Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 4],
-        c: [WHITE, BLACK, RED][i % 3],
-        s: 0.05 + Math.random() * 0.07,
-      })),
-    [count],
-  )
-  return bits.map((b, i) => (
-    <Pop key={i} readyAt={readyAt} sp={sp} delay={0.3 + i * 0.03} position={[b.p[0] * spread[0], b.p[1] * spread[1], b.p[2]]} scale={b.s}>
-      <mesh>
-        <sphereGeometry args={[1, 16, 16]} />
-        <Clay color={b.c} />
-      </mesh>
-    </Pop>
-  ))
-}
 
 export default function HeroScene({ ready, progress, onReady }) {
   const { viewport, size, clock, camera } = useThree()
@@ -263,10 +239,8 @@ export default function HeroScene({ ready, progress, onReady }) {
           {it.el}
         </Pop>
       ))}
-      {/* a phone screen is busy enough with the props; confetti only on wide screens */}
-      {!portrait && <Confetti count={8} spread={[vw * 0.5, vh * 0.5]} readyAt={readyAt} sp={sp} />}
       <Lens
-        radius={portrait ? 0.13 : 0.3}
+        radius={portrait ? 0.1 : 0.2}
         sp={sp}
         wander={{ y: textY / (vh / 2), ax: (width / vw) * 0.75, ay: (total / vh) * 0.7 }}
       />

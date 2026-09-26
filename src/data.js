@@ -8,6 +8,9 @@ export const CONTACT = {
   reach: 'Working with brands across India',
 }
 
+// the live address; canonical links, link previews and sitemap.xml are built from it — switch to the custom domain once it's attached
+export const SITE = 'https://ygdigitals.vercel.app'
+
 export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
   `${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`
 
@@ -15,6 +18,7 @@ export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
 export const SERVICES = [
   {
     id: 'ads',
+    slug: 'social-media-ads',
     no: '01',
     title: 'Social Media Ads',
     lines: ['Social', 'Media Ads'],
@@ -22,9 +26,15 @@ export const SERVICES = [
     tags: ['Reels & static creatives', 'Audience targeting', 'Retargeting', 'Monthly reports'],
     theme: 'white',
     buddy: 'black',
+    meta: {
+      title: 'Social Media Ads Agency in Gohana — Meta Ads for Instagram & Facebook | YG Digitals',
+      description:
+        'How YG Digitals plans, designs and runs Meta ads on Instagram & Facebook for brands in Gohana and across India — research, hook-first creatives, proper tracking and daily optimisation.',
+    },
   },
   {
     id: 'ecom',
+    slug: 'ecommerce-handling',
     no: '02',
     title: 'E-commerce',
     lines: ['E-commerce', 'Handling'],
@@ -32,9 +42,15 @@ export const SERVICES = [
     tags: ['Amazon', 'Flipkart', 'Meesho', 'Myntra', 'Listings', 'Marketplace ads'],
     theme: 'black',
     buddy: 'white',
+    meta: {
+      title: 'E-commerce Handling in Gohana — Amazon, Flipkart, Meesho & Myntra | YG Digitals',
+      description:
+        'Marketplace store management by YG Digitals: keyword-researched listings, images that sell, sponsored ads and daily store care on Amazon, Flipkart, Meesho and Myntra.',
+    },
   },
   {
     id: 'pack',
+    slug: 'packaging-design',
     no: '03',
     title: 'Packaging Design',
     lines: ['Packaging', 'Design'],
@@ -42,9 +58,15 @@ export const SERVICES = [
     tags: ['Boxes & labels', 'Pouches', 'Print-ready files', '3D mockups'],
     theme: 'white',
     buddy: 'black',
+    meta: {
+      title: 'Packaging Design in Gohana — Boxes, Labels & Pouches | YG Digitals',
+      description:
+        'Packaging design by YG Digitals: boxes, labels and pouches designed for the shelf and the thumbnail, with print-ready dielines, correct legal text and photo-real 3D mockups.',
+    },
   },
   {
     id: 'web',
+    slug: 'website-design',
     no: '04',
     title: 'Website Design',
     lines: ['Website', 'Design'],
@@ -52,9 +74,15 @@ export const SERVICES = [
     tags: ['Business websites', 'Landing pages', 'Mobile-first', 'SEO-ready'],
     theme: 'black',
     buddy: 'white',
+    meta: {
+      title: 'Website Design in Gohana — Fast, Mobile-First Websites | YG Digitals',
+      description:
+        'Website design by YG Digitals: fast, mobile-first business websites and landing pages built to turn visitors into calls and WhatsApp enquiries — SEO-ready and tracked.',
+    },
   },
   {
     id: 'video',
+    slug: 'video-editing',
     no: '05',
     title: 'Video Editing',
     lines: ['Video', 'Editing'],
@@ -62,8 +90,29 @@ export const SERVICES = [
     tags: ['Reels & shorts', 'Ad films', 'Product videos', 'Motion graphics'],
     theme: 'white',
     buddy: 'black',
+    meta: {
+      title: 'Video Editing in Gohana — Reels, Ad Films & Product Videos | YG Digitals',
+      description:
+        'Video editing by YG Digitals: Reels, ad films and product videos cut hook-first for the first three seconds, with captions, motion graphics, sound and colour.',
+    },
   },
 ]
+
+// the sixth page: all five services run as one system, for bigger companies
+export const ECOSYSTEM = {
+  id: 'eco',
+  slug: 'online-presence-ecosystem',
+  title: 'Online Presence Ecosystem',
+  meta: {
+    title: 'Online Presence Ecosystem for Enterprises — One Digital Team | YG Digitals',
+    description:
+      'YG Digitals designs, builds and runs the entire online presence of factories, developers and growing brands as one connected system: website, ads, marketplaces, packaging and video.',
+  },
+}
+
+// every page besides the home page lives at /services/<slug>
+export const PAGES = [...SERVICES, ECOSYSTEM]
+export const pagePath = (p) => `/services/${p.slug}`
 
 export const PLATFORMS = ['Instagram', 'Facebook', 'Amazon', 'Flipkart', 'Meesho', 'Myntra', 'YouTube', 'Google']
 

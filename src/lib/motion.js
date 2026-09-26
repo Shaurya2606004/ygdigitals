@@ -1,5 +1,7 @@
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import Lenis from 'lenis'
+import 'lenis/dist/lenis.css'
 
 gsap.registerPlugin(ScrollTrigger)
 
@@ -12,11 +14,27 @@ export const TOUCH = mq('(pointer: coarse)')
 // Lenis instance lives here so nav / modal can reach it without context plumbing.
 export const scroller = { lenis: null }
 
-export function scrollToId(id) {
+export function scrollToId(id, instant = false) {
   const el = document.getElementById(id)
   if (!el) return
-  if (scroller.lenis) scroller.lenis.scrollTo(el, { duration: 1.4 })
-  else el.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth' })
+  if (scroller.lenis) scroller.lenis.scrollTo(el, instant ? { immediate: true } : { duration: 1.4 })
+  else el.scrollIntoView({ behavior: REDUCED || instant ? 'auto' : 'smooth' })
+}
+
+// Lenis inertia, driven by GSAP's ticker so ScrollTrigger reads the same scroll position. Returns the cleanup.
+export function smoothScroll() {
+  if (REDUCED) return
+  const lenis = new Lenis({ lerp: 0.1 })
+  scroller.lenis = lenis
+  lenis.on('scroll', ScrollTrigger.update)
+  const tick = (time) => lenis.raf(time * 1000)
+  gsap.ticker.add(tick)
+  gsap.ticker.lagSmoothing(0)
+  return () => {
+    gsap.ticker.remove(tick)
+    lenis.destroy()
+    scroller.lenis = null
+  }
 }
 
 export function lockScroll(locked) {
