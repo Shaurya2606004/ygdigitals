@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ScrollTrigger, lockScroll, scrollToId } from '../lib/motion'
-import { CONTACT, ECOSYSTEM, PAGES, pagePath, waLink } from '../data'
+import { CONTACT, ECOSYSTEM, PAGES, SERVICES, pagePath, waLink } from '../data'
 import { Arrow } from './ui'
 
 const LINKS = [
@@ -55,7 +55,23 @@ export default function Nav() {
           <span className="nav-word">digitals</span>
         </a>
         <nav className="nav-links" aria-label="Primary">
-          {[LINKS[0], ['eco', 'Ecosystem', pagePath(ECOSYSTEM)], ...LINKS.slice(1)].map(([id, label, page]) => (
+          {/* both on purpose: clicking Services scrolls to the home section, hovering (or tabbing in) opens the five service pages */}
+          <div className="nav-drop">
+            <a href="/#services" onClick={go('services')}>
+              Services
+            </a>
+            <ul>
+              {SERVICES.map((s) => (
+                <li key={s.id}>
+                  <a href={pagePath(s)}>
+                    <small>{s.no}</small>
+                    {s.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          {[['eco', 'Ecosystem', pagePath(ECOSYSTEM)], ...LINKS.slice(1)].map(([id, label, page]) => (
             <a key={id} href={page || `/#${id}`} onClick={page ? undefined : go(id)}>
               {label}
             </a>

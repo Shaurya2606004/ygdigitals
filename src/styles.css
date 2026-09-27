@@ -370,6 +370,61 @@ body::after {
 .nav-links a:hover {
   background: rgba(255, 255, 255, 0.14);
 }
+/* Services dropdown: the service pages open on hover or keyboard focus (touch screens get the burger menu instead) */
+.nav-drop {
+  position: relative;
+  display: flex;
+}
+.nav-drop > a::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin: 0 0 3px 8px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  transition: transform 0.35s var(--ease);
+}
+.nav-drop ul {
+  position: absolute;
+  top: calc(100% + 16px);
+  left: -6px;
+  display: grid;
+  padding: 6px;
+  border-radius: 24px;
+  background: rgba(13, 13, 13, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.4s var(--ease);
+}
+/* invisible bridge over the gap, so the menu stays open on the way down to it */
+.nav-drop ul::before {
+  content: '';
+  position: absolute;
+  inset: -18px 0 100%;
+}
+.nav-drop:hover ul,
+.nav-drop:has(:focus-visible) ul {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.nav-drop:hover > a::after,
+.nav-drop:has(:focus-visible) > a::after {
+  transform: translateY(3px) rotate(225deg);
+}
+.nav-drop ul a {
+  display: block;
+  white-space: nowrap;
+}
+.nav-drop small {
+  margin-right: 10px;
+  font-size: 11px;
+  color: var(--red);
+}
 .nav-right {
   display: flex;
   align-items: center;
@@ -2198,7 +2253,8 @@ body::after {
 }
 
 /* ---------- responsive ---------- */
-@media (max-width: 960px) {
+/* phones, and touch screens of any width (they can't hover the Services dropdown): the burger menu lists every page */
+@media (max-width: 960px), (hover: none) {
   .nav-links,
   .nav-cta {
     display: none;
@@ -2206,6 +2262,8 @@ body::after {
   .nav-burger {
     display: grid;
   }
+}
+@media (max-width: 960px) {
   .stats {
     grid-template-columns: 1fr 1fr;
   }
