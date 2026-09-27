@@ -587,13 +587,7 @@ body::after {
 .hero-ui button {
   pointer-events: auto;
 }
-.hero-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-.hero-kicker,
-.hero-hint {
+.hero-kicker {
   font-family: var(--f-display);
   font-size: 12px;
   font-weight: 700;
@@ -615,34 +609,8 @@ body::after {
     opacity: 0.4;
   }
 }
-.hero-hint {
-  text-align: right;
-}
-.hero-hint span {
-  display: block;
-  opacity: 0.7;
-  margin-top: 4px;
-}
-.hero-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 24px;
-}
-.hero-sub {
-  max-width: 30ch;
-  font-size: clamp(16px, 1.35vw, 21px);
-  font-weight: 600;
-  line-height: 1.4;
-}
-.hero-sub b {
-  font-weight: 800;
-  color: var(--white);
-  background: var(--black);
-  padding: 0 0.3em;
-  border-radius: 6px;
-}
 .hero-ctas {
+  align-self: flex-end;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -2276,7 +2244,7 @@ body::after {
     margin-top: 28px;
   }
   .svc-sticky {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 40%) auto 1fr;
     padding-top: calc(var(--gutter) + 76px);
   }
@@ -2355,41 +2323,16 @@ body::after {
   .hero {
     height: 150vh;
   }
-  /* one column: kicker up top; hint, copy and CTAs stacked at the bottom, leaving the middle to the 3D scene */
+  /* kicker up top, full-width CTAs at the bottom, the middle left to the 3D scene */
   .hero-ui {
-    justify-content: flex-start;
-    gap: 14px;
     padding-top: calc(var(--gutter) + 76px);
   }
-  .hero-top,
-  .hero-bottom {
-    display: contents;
-  }
-  .hero-kicker,
-  .hero-hint {
+  .hero-kicker {
     font-size: 10.5px;
     letter-spacing: 0.1em;
   }
-  .hero-hint {
-    margin-top: auto;
-    align-self: flex-start;
-    text-align: left;
-    padding: 0.8em 1.1em;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.5);
-    border: 1px solid rgba(13, 13, 13, 0.12);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-  .hero-hint span {
-    display: inline;
-    margin: 0 0 0 0.5em;
-  }
-  .hero-sub {
-    max-width: none;
-    font-size: 15px;
-  }
   .hero-ctas {
+    align-self: stretch;
     flex-wrap: nowrap;
   }
   .hero-ctas .btn {

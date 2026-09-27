@@ -120,13 +120,16 @@ export function Footer() {
         <div>
           <p className="eyebrow">Studio</p>
           <ul>
-            {[['top', 'Home'], ['services', 'What we do'], ['work', 'Work'], ['process', 'Process'], ['contact', 'Book a call']].map(([id, label]) => (
+            {[['top', 'Home'], ['services', 'What we do'], ['work', 'Work'], ['process', 'Process']].map(([id, label]) => (
               <li key={id}>
                 <a href={id === 'top' ? '/' : `/#${id}`} onClick={jump(id)}>
                   {label}
                 </a>
               </li>
             ))}
+            <li>
+              <a href={CONTACT.tel}>Book a call</a>
+            </li>
           </ul>
         </div>
       </nav>

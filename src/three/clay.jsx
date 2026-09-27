@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { PerformanceMonitor, RoundedBox, Text } from '@react-three/drei'
+import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
 import displayFont from '@fontsource/unbounded/files/unbounded-latin-800-normal.woff?url'
 import envAtlas from './studio-env.png'
 import { REDUCED, TOUCH } from '../lib/motion'
@@ -108,26 +109,81 @@ function Bob({ phase = 0, children, ...props }) {
 
 /* ---------- service props ---------- */
 
-// Meta's infinity mark: one closed loop that rises into two arches and crosses itself low in the middle
-let metaGeo
-function getMeta() {
-  if (metaGeo) return metaGeo
-  const half = [[0.2, 0.3], [0.42, 0.5], [0.64, 0.48], [0.82, 0.25], [0.86, -0.08], [0.74, -0.36], [0.5, -0.42], [0.25, -0.24]]
-  const pts = [
-    [0, 0, 0.08],
-    ...half.map(([x, y], i) => [x, y, 0.06 - i * 0.015]),
-    [0, 0, -0.08],
-    ...half.map(([x, y], i) => [-x, y, -0.06 + i * 0.015]),
-  ].map((p) => new THREE.Vector3(...p))
-  metaGeo = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), 220, 0.1, 16, true)
-  return metaGeo
+/*
+ * Instagram: the gradient squircle with the white camera glyph. One unit across, face on +z.
+ * Flat as the post on the phone, chunky as the cube floating in the hero.
+ */
+// a square with soft corners (superellipse |x|⁴ + |y|⁴ = r⁴), an app icon's outline
+const squircle = (r, n = 64) =>
+  Array.from({ length: n }, (_, i) => {
+    const c = Math.cos((i / n) * Math.PI * 2)
+    const s = Math.sin((i / n) * Math.PI * 2)
+    return new THREE.Vector2(Math.sign(c) * Math.sqrt(Math.abs(c)) * r, Math.sign(s) * Math.sqrt(Math.abs(s)) * r)
+  })
+
+// Instagram's radial gradient: pale yellow in the bottom-left corner → coral → magenta → blue at the top
+let igMap
+function getIgMap() {
+  if (igMap) return igMap
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const x = c.getContext('2d')
+  const g = x.createRadialGradient(38, 137, 0, 38, 137, 164)
+  ;[[0, '#fdf497'], [0.05, '#fdf497'], [0.45, '#fd5949'], [0.6, '#d6249f'], [0.9, '#285aeb']].forEach(([at, col]) => g.addColorStop(at, col))
+  x.fillStyle = g
+  x.fillRect(0, 0, 128, 128)
+  igMap = new THREE.CanvasTexture(c)
+  igMap.colorSpace = THREE.SRGBColorSpace
+  return igMap
 }
 
-export function MetaLogo({ color = '#0866ff', ...props }) {
+// the icon as a rounded slab `depth + 2 * bevel` thick, the gradient projected straight onto its face
+function igSlab(depth, bevel) {
+  const g = new THREE.ExtrudeGeometry(new THREE.Shape(squircle(0.5 - bevel)), { depth, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6 })
+  g.center()
+  const p = g.attributes.position
+  for (let i = 0; i < p.count; i++) g.attributes.uv.setXY(i, p.getX(i) + 0.5, p.getY(i) + 0.5)
+  return toCreasedNormals(g, 0.6)
+}
+let igTile, igCube, igGlyph
+const getIgTile = () => (igTile ??= igSlab(0.02, 0.03))
+const getIgCube = () => (igCube ??= igSlab(0.64, 0.18))
+// the camera glyph, centred on the face: rounded-square outline, lens ring and flash dot, one mesh
+const getIgGlyph = () =>
+  (igGlyph ??= mergeGeometries([
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(squircle(0.28).map((v) => new THREE.Vector3(v.x, v.y, 0)), true), 128, 0.04, 10, true),
+    new THREE.TorusGeometry(0.12, 0.04, 10, 40),
+    new THREE.SphereGeometry(0.042, 16, 12).translate(0.165, 0.165, 0),
+  ]))
+
+const IG_MAT = { roughness: 0.45, sheen: 0.15, clearcoat: 0.4 }
+
+export function InstagramLogo(props) {
   return (
-    <mesh geometry={getMeta()} {...props}>
-      <Clay color={color} roughness={0.45} sheen={0.15} clearcoat={0.4} />
-    </mesh>
+    <group {...props}>
+      <mesh geometry={getIgTile()}>
+        <Clay color={WHITE} map={getIgMap()} {...IG_MAT} />
+      </mesh>
+      <mesh geometry={getIgGlyph()} position-z={0.04}>
+        <Clay color={WHITE} {...IG_MAT} />
+      </mesh>
+    </group>
+  )
+}
+
+// the glyph sits on the front and the back, so it still reads when the cube tumbles away on scroll
+export function InstaCube() {
+  return (
+    <group>
+      <mesh geometry={getIgCube()}>
+        <Clay color={WHITE} map={getIgMap()} {...IG_MAT} />
+      </mesh>
+      {[1, -1].map((s) => (
+        <mesh key={s} geometry={getIgGlyph()} position-z={s * 0.5} rotation-y={s < 0 ? Math.PI : 0}>
+          <Clay color={WHITE} {...IG_MAT} />
+        </mesh>
+      ))}
+    </group>
   )
 }
 
@@ -137,9 +193,8 @@ export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
       <Rb color={body} args={[1.1, 2.1, 0.22]} radius={0.15} />
       <Rb color={screen} args={[0.94, 1.86, 0.05]} radius={0.1} position={[0, 0, 0.1]} />
       <Rb color={body} args={[0.3, 0.07, 0.04]} radius={0.03} position={[0, 0.84, 0.14]} />
-      {/* a Meta ad: the post, two lines of copy, the CTA */}
-      <Rb color="#e9f0ff" args={[0.78, 0.8, 0.05]} radius={0.06} position={[0, 0.3, 0.13]} />
-      <MetaLogo scale={0.36} position={[0, 0.3, 0.2]} />
+      {/* an Instagram post: the logo, two lines of copy, the CTA */}
+      <InstagramLogo scale={0.78} position={[0, 0.3, 0.16]} />
       <Rb color={body} args={[0.62, 0.09, 0.04]} radius={0.04} position={[-0.07, -0.3, 0.14]} />
       <Rb color={body} args={[0.42, 0.09, 0.04]} radius={0.04} position={[-0.17, -0.45, 0.14]} />
       <Rb color={accent} args={[0.78, 0.2, 0.06]} radius={0.09} position={[0, -0.7, 0.14]} />
@@ -147,7 +202,7 @@ export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
   )
 }
 
-/* marketplace stand-ins: an Amazon shipping box, the Flipkart bag and Walmart's spark */
+/* marketplace stand-ins: an Amazon shipping box, the Flipkart bag and a Meesho tag */
 let smileGeo
 const getSmile = () => (smileGeo ??= strand([[-0.4, 0, 0], [-0.12, -0.15, 0], [0.18, -0.13, 0], [0.38, -0.02, 0]], 0.045, (u) => 0.45 + 0.55 * Math.sin(Math.PI * u), 40, 12))
 
@@ -194,18 +249,14 @@ export function FlipkartBag() {
   )
 }
 
-export function WalmartSpark({ color = '#ffc220' }) {
+// Meesho's lowercase wordmark, white on its pink
+export function MeeshoTag() {
   return (
     <group>
-      {[0, 1, 2, 3, 4, 5].map((i) => {
-        const a = (i * Math.PI) / 3
-        return (
-          <mesh key={i} position={[Math.sin(a) * 0.43, Math.cos(a) * 0.43, 0]} rotation-z={-a} scale={[1, 1, 0.7]}>
-            <capsuleGeometry args={[0.13, 0.3, 8, 16]} />
-            <Clay color={color} />
-          </mesh>
-        )
-      })}
+      <Rb color="#f43397" args={[1.5, 0.66, 0.26]} radius={0.13} />
+      <Text font={displayFont} fontSize={0.27} letterSpacing={-0.04} position={[0, 0.03, 0.135]} color={WHITE} anchorX="center" anchorY="middle">
+        meesho
+      </Text>
     </group>
   )
 }
@@ -219,8 +270,8 @@ export function Marketplaces() {
       <Bob phase={1.7} position={[0.6, -0.12, 0.3]} rotation={[0.05, -0.4, 0.04]} scale={0.72}>
         <FlipkartBag />
       </Bob>
-      <Bob phase={3.1} position={[-0.25, 0.78, -0.1]} rotation={[0.1, 0.35, 0]} scale={0.62}>
-        <WalmartSpark />
+      <Bob phase={3.1} position={[-0.35, 0.82, -0.1]} rotation={[0.1, 0.35, 0]} scale={0.62}>
+        <MeeshoTag />
       </Bob>
     </group>
   )
@@ -287,12 +338,47 @@ export function Clapper({ body = BLACK, a = WHITE, b = BLACK, play = RED }) {
   )
 }
 
+// a movie camera, side on, its lens toward the mascot; the film reels turn while it rolls
+export function Camera({ body = WHITE, reel = RED, dots = BLACK }) {
+  const reels = useRef([])
+  useFrame((_, dt) => {
+    if (REDUCED) return
+    for (const r of reels.current) r.rotation.z -= dt * 1.5
+  })
+  return (
+    <group>
+      <Rb color={body} args={[1.3, 0.78, 0.62]} radius={0.1} position={[-0.2, -0.3, 0]} />
+      <mesh position={[0.65, -0.3, 0]} rotation-z={-Math.PI / 2}>
+        <cylinderGeometry args={[0.32, 0.2, 0.4, 32]} />
+        <Clay color={body} />
+      </mesh>
+      <Ball color={reel} r={0.06} position={[0.26, -0.02, 0.3]} scale={[1, 1, 0.5]} />
+      {[
+        [-0.52, 0.39, 0.3],
+        [0.1, 0.33, 0.24],
+      ].map(([x, y, r], i) => (
+        <group key={i} ref={(el) => (reels.current[i] = el)} position={[x, y, 0]}>
+          <mesh rotation-x={Math.PI / 2}>
+            <cylinderGeometry args={[r, r, 0.14, 40]} />
+            <Clay color={reel} />
+          </mesh>
+          {[0, 1, 2].map((k) => (
+            <Ball key={k} color={dots} r={r * 0.2} position={[Math.cos(k * 2.09) * r * 0.55, Math.sin(k * 2.09) * r * 0.55, 0.07]} scale={[1, 1, 0.35]} />
+          ))}
+          <Ball color={body} r={r * 0.15} position-z={0.07} scale={[1, 1, 0.5]} />
+        </group>
+      ))}
+    </group>
+  )
+}
+
 export const SERVICE_PROPS = {
   ads: <Phone />,
   ecom: <Marketplaces />,
   pack: <Box />,
   web: <Browser />,
   video: <Clapper />,
+  shoot: <Camera />,
 }
 
 /* ---------- canvas shell ---------- */

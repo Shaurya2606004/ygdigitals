@@ -51,7 +51,7 @@ export default function ServicePage({ page }) {
             <nav className="sp-crumbs" aria-label="Breadcrumb">
               <a href="/">Home</a> / <a href="/#services">Services</a> / <span aria-current="page">{fullName(page)}</span>
             </nav>
-            <p className="eyebrow">( {c.kicker} )</p>
+            <p className="eyebrow">( {c.kicker || `Service ${page.no} / ${String(SERVICES.length).padStart(2, '0')}`} )</p>
             <h1 className="sp-title">
               {(c.lines || page.lines).map((l) => (
                 <span key={l}>{l}</span>
@@ -117,7 +117,7 @@ export default function ServicePage({ page }) {
         {c.roles && (
           <section className="sp-system" aria-labelledby="system-title">
             <header className="sp-head">
-              <p className="eyebrow">( Five services, one system )</p>
+              <p className="eyebrow">( Every service, one system )</p>
               <h2 id="system-title" className="h-xl">
                 Every part <em>connects</em>
               </h2>

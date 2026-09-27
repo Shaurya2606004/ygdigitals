@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
-import { AmazonBox, BLACK, Clapper, FlipkartBag, MIST, Phone, RED_DEEP, displayFont } from './clay'
+import { AmazonBox, BLACK, Clapper, FlipkartBag, InstaCube, MIST, Phone, RED_DEEP, displayFont } from './clay'
 import { Buddy } from './character'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
@@ -138,19 +138,22 @@ function Lens({ radius, sp, wander }) {
   )
 }
 
-// the brands the studio works on: a Meta ad on the phone, the Flipkart bag, the Amazon box — plus the video clapper
+// the brands the studio works on: an Instagram post on the phone, the Instagram cube, the Flipkart bag, the Amazon box — plus the video clapper
 const DESKTOP = [
   { el: <Phone />, p: [-0.8, 0.24, 0.8], r: [0.1, 0.45, 0.2], s: 0.62, d: 0.1 },
+  { el: <InstaCube />, p: [-0.72, -0.52, 0.6], r: [0.3, 0.6, -0.15], s: 0.5, d: 0.25 },
   { el: <FlipkartBag />, p: [0.82, 0.26, -0.6], r: [0.15, -0.5, -0.1], s: 0.76, d: 0.2 },
   { el: <AmazonBox />, p: [0.76, -0.32, 1.0], r: [0.3, -0.45, 0.05], s: 0.5, d: 0.3 },
   { el: <Clapper />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
 ]
 
-// portrait: phone + bag flank the short "THE" line, the Amazon box sits in the band under the headline, opposite the guy
+// portrait: phone + bag flank the short "THE" line, the Amazon box sits in the band under the headline, opposite the guy,
+// and the Instagram cube floats below them, above the buttons
 const PORTRAIT = [
   { el: <Phone />, p: [-0.76, 0.25, 0.4], r: [0.1, 0.5, 0.25], s: 0.27, d: 0.1 },
   { el: <FlipkartBag />, p: [0.77, 0.22, 0.2], r: [0.15, -0.5, -0.1], s: 0.33, d: 0.2 },
   { el: <AmazonBox />, p: [0.5, -0.36, 0.6], r: [0.3, -0.45, 0.05], s: 0.28, d: 0.3 },
+  { el: <InstaCube />, p: [-0.4, -0.6, 0.5], r: [0.3, 0.6, -0.15], s: 0.4, d: 0.25 },
 ]
 
 const LINES_WIDE = [

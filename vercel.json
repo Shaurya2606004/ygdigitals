@@ -1,4 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [{ "source": "/services/social-media-ads", "destination": "/services/social-media-management", "permanent": true }]
 }

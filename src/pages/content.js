@@ -13,58 +13,56 @@ export const WHY = [
 
 export const CONTENT = {
   ads: {
-    kicker: 'Service 01 / 05',
-    lede: 'Meta ads for Instagram and Facebook that are researched like a business plan, designed like a brand campaign and watched every working day. Built to bring enquiries and sales — not vanity likes.',
-    belief: 'Boosting a post is easy. *Building an ad system* — where every rupee has a job and every creative earns its place — is the work we love.',
+    lede: 'Your Instagram and Facebook, run end to end — a content calendar planned a month ahead, posts and Reels made in-house, replies handled every day and Meta ads that bring enquiries and sales. Not vanity likes.',
+    belief: 'Posting is easy. *Building a page people trust* — where every post has a job and every rupee of ad spend earns its place — is the work we love.',
     steps: [
       {
-        t: 'Understand the business before the ad',
-        d: 'We start with your numbers, not our ideas: margins, best-sellers, order values and what a lead is actually worth to you.',
-        p: ['Cost-per-lead and cost-per-sale targets set before a rupee is spent', 'Competitor ads studied in the Meta Ad Library', 'Real buyer questions collected from your sales team and WhatsApp chats'],
+        t: 'Understand the business before the content',
+        d: 'We start with your numbers and your buyers, not our ideas: best-sellers, margins, the questions people ask before they buy — and what a lead is actually worth to you.',
+        p: ['Goals set before a single post: enquiries, sales, followers who buy', 'Competitor pages and ads studied, including the Meta Ad Library', 'Real buyer questions collected from your sales team and WhatsApp chats'],
       },
       {
-        t: 'Plan the funnel',
-        d: 'New audiences, warm audiences and people who almost bought each get a different message, budget and creative.',
-        p: ['Awareness, consideration and retargeting planned as separate campaigns', 'Budget split by stage — never spread thin', 'Offer and landing page matched to every stage'],
+        t: 'Plan the month',
+        d: 'A content calendar agreed a month ahead — what goes out, when and why — with the ads planned alongside it, not as an afterthought.',
+        p: ['Content pillars: products, proof, behind the scenes and offers', 'Posts, Reels and Stories scheduled for when your audience is online', 'Ad budget split by stage: new people, warm followers, almost-buyers'],
       },
       {
-        t: 'Creatives made for the first three seconds',
-        d: 'Every ad is written hook-first and designed for how people really watch on a phone: sound off, thumb moving.',
+        t: 'Content made for the first three seconds',
+        d: 'Every post and ad is written hook-first and designed for how people really watch on a phone: sound off, thumb moving.',
         p: ['Several hooks per idea, so the data picks the winner', 'Captions burned in, key text kept inside the Reels safe zone', 'Separate sizes for Feed, Stories and Reels — never one stretched file'],
       },
       {
-        t: 'Track everything, properly',
-        d: 'If it can’t be measured, it can’t be improved. Tracking is set up and tested before launch — not after.',
-        p: ['Meta Pixel and Conversions API installed and test-fired', 'UTM links on every ad, so every enquiry traces back to its creative', 'Lead forms and WhatsApp clicks counted as real conversions'],
+        t: 'Show up every day',
+        d: 'Posting on time is the easy part. Replies are where followers turn into customers — so comments and DMs never wait.',
+        p: ['Posts and Stories published on schedule', 'Comments and DMs answered, or flagged to you the same day', 'Bio, highlights and profile kept current'],
       },
       {
-        t: 'Optimise daily, report plainly',
-        d: 'Winners get more budget, losers get cut, and you get a report you can read in two minutes.',
-        p: ['Spend, frequency and cost-per-result checked every working day', 'Fresh creatives ready before audiences tire of the old ones', 'Monthly report in plain language: what we spent, what it got, what’s next'],
+        t: 'Track, optimise, report plainly',
+        d: 'Ads run on proper tracking. Winners get more budget, losers get cut, and you get a report you can read in two minutes.',
+        p: ['Meta Pixel, Conversions API and UTM links set up and tested before launch', 'Spend, frequency and cost-per-result checked every working day', 'Monthly report in plain language: what we posted, spent and got — and what’s next'],
       },
     ],
     details: [
       'The hook is written before the design starts',
       'Text kept clear of the Reels buttons and captions',
-      'Every ad previewed on a real phone before launch',
-      'Campaign names that tell you exactly what’s running',
+      'Every post and ad previewed on a real phone first',
+      'A grid that looks planned, not random',
       'Audience overlap checked so your ads don’t bid against each other',
       'Frequency watched so nobody sees the same ad to death',
-      'Comments and DMs on ads flagged to you the same day',
+      'Comments and DMs flagged to you the same day',
       'Copy in the language your buyer speaks — English, Hindi or Hinglish',
     ],
-    deliver: ['Campaign strategy and funnel plan', 'Monthly creative set — Reels and static ads', 'Ad copy and hooks', 'Pixel, Conversions API and UTM setup', 'Day-to-day campaign management', 'Monthly report and review call'],
+    deliver: ['Monthly content calendar', 'Posts, Reels and Stories — designed and written in-house', 'Captions, hashtags and cover frames', 'Comment and DM handling', 'Meta ads setup, tracking and daily management', 'Monthly report and review call'],
     faq: [
-      { q: 'What budget do I need to start?', a: 'It depends on your city, product and goal. On the first call we work out a test budget big enough to learn from and small enough to be safe — then scale what works.' },
-      { q: 'Do you make the creatives too?', a: 'Yes. Scripts, design, Reels editing and copy are all done in-house, so the idea never gets lost between the ad maker and the ad runner.' },
-      { q: 'How soon will I see results?', a: 'The first weeks are about finding the creatives and audiences that work. We share what the numbers say at every step — honestly, even when it’s early.' },
-      { q: 'Will I own my ad account?', a: 'Always. Campaigns run inside your own Meta Business account and we work as partners in it. Your data stays yours.' },
+      { q: 'How many posts a month do we get?', a: 'It depends on your goals and how fast you want to grow. On the first call we agree a monthly plan — posts, Reels and Stories — and stick to it.' },
+      { q: 'Do you make the content too?', a: 'Yes. Scripts, design, Reels editing and copy are all done in-house, so the idea never gets lost between the people who make it and the people who post it.' },
+      { q: 'Do we need to run ads as well?', a: 'Not always. Good content builds trust; ads bring new people in faster. We look at your goals and budget and tell you honestly what’s worth it.' },
+      { q: 'Will I own my pages and ad account?', a: 'Always. Your pages and ad account stay in your name and we work as partners in them. Your data stays yours.' },
     ],
   },
 
   ecom: {
-    kicker: 'Service 02 / 05',
-    lede: 'We run your marketplace stores like they’re our own shop — listings that rank, catalogues that convert and ads that pay their way. Amazon, Flipkart, Meesho and Myntra, handled end to end.',
+    lede: 'We run your marketplace stores like they’re our own shop — listings that rank, catalogues that convert and ads that pay their way. Amazon, Flipkart and Meesho, handled end to end.',
     belief: 'On a marketplace, *your listing is your salesman*. We make sure it’s the best-dressed, best-spoken one on the page.',
     steps: [
       {
@@ -103,17 +101,16 @@ export const CONTENT = {
       'Sale events and festive season planned in advance',
       'Listings re-checked whenever marketplace rules change',
     ],
-    deliver: ['Store setup or takeover on Amazon, Flipkart, Meesho & Myntra', 'Keyword-researched titles, bullets and descriptions', 'Listing images, infographics and A+ content', 'Sponsored ads setup and weekly optimisation', 'Price, stock and account-health monitoring', 'Monthly sales and ads report'],
+    deliver: ['Store setup or takeover on Amazon, Flipkart & Meesho', 'Keyword-researched titles, bullets and descriptions', 'Listing images, infographics and A+ content', 'Sponsored ads setup and weekly optimisation', 'Price, stock and account-health monitoring', 'Monthly sales and ads report'],
     faq: [
       { q: 'Can you take over a store I already run?', a: 'Yes. We start with a full audit of listings, ads and account health, fix the leaks first, then grow.' },
-      { q: 'Which marketplaces do you handle?', a: 'Amazon, Flipkart, Meesho and Myntra — one of them or all four, from the same catalogue.' },
+      { q: 'Which marketplaces do you handle?', a: 'Amazon, Flipkart and Meesho — one of them or all three, from the same catalogue.' },
       { q: 'Should I sell on more than one marketplace?', a: 'Often, yes — buyers are split across platforms. We look at your category and margins and tell you honestly where to start.' },
       { q: 'How will I know what’s happening?', a: 'One monthly report across every marketplace — sales, ad spend, returns and what we’ll do next — plus a review call to go through it.' },
     ],
   },
 
   pack: {
-    kicker: 'Service 03 / 05',
     lede: 'Boxes, labels and pouches that win the shelf and the thumbnail. Premium on the outside, print-ready on the inside — because a beautiful design that prints wrong is a bad design.',
     belief: 'Packaging is the *only ad your customer holds in their hands*. We design it to be picked up, photographed and remembered.',
     steps: [
@@ -163,7 +160,6 @@ export const CONTENT = {
   },
 
   web: {
-    kicker: 'Service 04 / 05',
     lede: 'Fast, mobile-first websites and landing pages that look expensive and are built to turn visitors into calls. Designed and built in-house, for how India actually browses — on a phone, on mobile data.',
     belief: 'A website isn’t a brochure. It’s *your best salesperson, working 24 hours* — so every page is designed around the one thing it should get people to do.',
     steps: [
@@ -213,7 +209,6 @@ export const CONTENT = {
   },
 
   video: {
-    kicker: 'Service 05 / 05',
     lede: 'Reels, ad films and product videos cut for the first three seconds. Hooks, captions, motion graphics and sound — edited frame by frame for people who scroll fast.',
     belief: 'People decide in *three seconds* whether to keep watching. We edit every frame like the video depends on it — because it does.',
     steps: [
@@ -262,6 +257,55 @@ export const CONTENT = {
     ],
   },
 
+  shoot: {
+    lede: 'Video ads and Reels shot properly — planned on paper, lit well, framed for a phone screen and directed on the day. We come to your shop, factory or site and leave with footage worth editing.',
+    belief: 'A great edit starts with great footage. *A shoot planned on paper* is a shoot that works on the day — and gives every video something worth cutting.',
+    steps: [
+      {
+        t: 'The idea before the camera',
+        d: 'Every shoot starts with what the video has to do: stop the scroll, show the product or get the call. The idea and the hook are agreed before anyone presses record.',
+        p: ['Goal, platform and length decided first — ad, Reel or both', 'Hooks and scripts written for the first three seconds', 'Reference videos agreed, so the style is clear on both sides'],
+      },
+      {
+        t: 'Plan the day on paper',
+        d: 'A shot list, a schedule and a checklist mean the shoot runs on time and nothing is forgotten.',
+        p: ['Shot list and a simple storyboard for every video', 'Location, products, props and people confirmed in advance', 'Several ads and Reels planned from one shoot day'],
+      },
+      {
+        t: 'Framed for the phone',
+        d: 'We shoot for 9:16 first — where your buyer will actually watch — with room left for captions and buttons.',
+        p: ['Vertical framing that keeps clear of the Reels buttons', 'Extra angles and close-ups, so the edit has options', 'B-roll of the product, the process and the people'],
+      },
+      {
+        t: 'Light, sound and direction',
+        d: 'Good light and clean sound are what make video look premium on a small screen. And most people aren’t actors — so we direct them.',
+        p: ['Light set up for faces, products and spaces', 'Clean audio recorded for every spoken line', 'Owners and staff coached to look natural on camera'],
+      },
+      {
+        t: 'Straight into the edit',
+        d: 'Footage is backed up, sorted and handed to our editors the same day, so the videos go out while the idea is still fresh.',
+        p: ['Footage backed up twice before we leave', 'Best takes marked on set, so the edit starts fast', 'Cut into ads and Reels by our own video team'],
+      },
+    ],
+    details: [
+      'The hook is shot first, while the energy is high',
+      'Background noise checked before every take',
+      'Products cleaned and labels turned to the camera',
+      'Every shot framed for 9:16, with room for captions',
+      'Extra takes of every key line',
+      'Close-ups of hands, textures and details',
+      'No clutter in the back of the frame',
+      'Kit packed from a checklist — nothing forgotten on the day',
+    ],
+    deliver: ['Concepts, hooks and scripts', 'Shot list and shoot-day plan', 'On-location shoot', 'Lighting, sound and direction', 'Raw footage, sorted and backed up', 'Edited ads and Reels, ready to post'],
+    faq: [
+      { q: 'Do you shoot at our place?', a: 'Yes — at your shop, factory, site or office. We plan the day around your space and your team’s schedule.' },
+      { q: 'How many videos come out of one shoot?', a: 'We plan every shoot to give several ads and Reels, not just one video. The exact number is agreed up front.' },
+      { q: 'Do we have to be on camera?', a: 'Only if you want to. Owners and staff often make the most trusted videos, and we direct you so it feels easy. Products and spaces can carry a video on their own too.' },
+      { q: 'Can you edit the footage and run the ads too?', a: 'Yes. Our editors cut the footage and our social media team can post it and run the ads — one team from idea to results.' },
+    ],
+  },
+
   eco: {
     kicker: 'For enterprises',
     lines: ['Online', 'Presence', 'Ecosystem'],
@@ -300,6 +344,7 @@ export const CONTENT = {
       pack: 'The handshake — your brand in their hands.',
       web: 'The home base — where trust is built and leads land.',
       video: 'The voice — what makes people stop and remember.',
+      shoot: 'The footage — your products, place and people, filmed properly.',
     },
     details: [
       'One brand kit, used the same way on every channel',
@@ -311,9 +356,9 @@ export const CONTENT = {
       'Accounts, domains and files always in your company’s name',
       'Access handed over cleanly — nothing lost if people change',
     ],
-    deliver: ['Full digital audit and roadmap', 'Brand kit and website', 'Social media ads and content', 'Marketplace store management', 'Packaging and product visuals', 'Monthly management reporting'],
+    deliver: ['Full digital audit and roadmap', 'Brand kit and website', 'Social media management and ads', 'Marketplace store management', 'Packaging and product visuals', 'Monthly management reporting'],
     faq: [
-      { q: 'Do we have to take all five services?', a: 'No. Most companies start with what hurts most and add the rest as the system grows. The plan is built around your priorities.' },
+      { q: 'Do we have to take every service?', a: 'No. Most companies start with what hurts most and add the rest as the system grows. The plan is built around your priorities.' },
       { q: 'We already have an agency for one channel. Can you work alongside them?', a: 'Yes. We plug into what’s already working and take over the rest, keeping one brand and one report across all of it.' },
       { q: 'Who owns the accounts and files?', a: 'You do. Ad accounts, marketplace stores, domains and design files stay in your company’s name.' },
       { q: 'Is this only for big companies?', a: 'It’s built for businesses that have outgrown doing digital in bits — whether that’s one factory or ten locations.' },

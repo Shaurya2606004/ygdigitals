@@ -92,14 +92,14 @@ export function ContactScene() {
   return (
     <>
       {!REDUCED && <HeartStream count={6} />}
-      <Buddy look="girl" outfit="white" wave seed={7} position={[-0.95, -0.05, 0]} scale={1.3} rotation={[0, 0.35, 0]} />
-      <Buddy look="guy" outfit="black" seed={11} position={[1.1, -0.3, -0.4]} scale={1.15} rotation={[0, -0.35, 0]} />
+      <Buddy look="girl" outfit="white" wave seed={7} follow={false} position={[-0.95, -0.05, 0]} scale={1.3} rotation={[0, 0.35, 0]} />
+      <Buddy look="guy" outfit="black" seed={11} follow={false} position={[1.1, -0.3, -0.4]} scale={1.15} rotation={[0, -0.35, 0]} />
     </>
   )
 }
 
 /*
- * Ecosystem page: the five service props float in one arch over the two mascots, each bobbing on its own beat.
+ * Ecosystem page: the service props float in one arch over the two mascots, each bobbing on its own beat.
  * Sized from the canvas width so the arch always fits.
  */
 export function EcosystemScene() {

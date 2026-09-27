@@ -18,6 +18,19 @@ const fade = {
   out: { opacity: 0, transition: { duration: 0.2 } },
 }
 
+// shrinks a title only when its longest line is wider than the column ("Management" is, at full size)
+function fit(h) {
+  if (!h) return
+  const run = () => {
+    h.style.fontSize = ''
+    const widest = Math.max(...[...h.querySelectorAll('.line > span')].map((s) => s.offsetWidth))
+    if (widest > h.clientWidth) h.style.fontSize = `${(parseFloat(getComputedStyle(h).fontSize) * h.clientWidth) / widest}px`
+  }
+  run()
+  addEventListener('resize', run)
+  return () => removeEventListener('resize', run)
+}
+
 /*
  * One sticky viewport per 100vh of scroll. Each step: the background floods to the service's colour,
  * the title lines are masked out/in, and the 3D prop clay-squishes into the next one while the mascot hops.
@@ -67,7 +80,7 @@ export default function Services() {
         <div className="svc-copy">
           <AnimatePresence mode="wait">
             <motion.div key={s.id} initial="hide" animate="show" exit="out">
-              <h2 className="svc-title">
+              <h2 className="svc-title" ref={fit}>
                 {s.lines.map((l, k) => (
                   <span className="line" key={l}>
                     <motion.span variants={line} custom={k}>

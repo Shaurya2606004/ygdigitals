@@ -253,7 +253,10 @@ const CLOTH_MAT = {
 }
 const EYE_MAT = { roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08 }
 
-export function Buddy({ look = 'guy', outfit = 'black', seed = 1, wave = false, hop = 0, ...props }) {
+const AHEAD = { x: 0, y: 0 }
+
+// follow: head and eyes track the pointer (or the phone's tilt); false keeps them looking straight ahead
+export function Buddy({ look = 'guy', outfit = 'black', seed = 1, wave = false, hop = 0, follow = true, ...props }) {
   const g = useMemo(() => build(look, outfit), [look, outfit])
   const cloth = CLOTH_MAT[outfit]
   const root = useRef()
@@ -286,8 +289,7 @@ export function Buddy({ look = 'guy', outfit = 'black', seed = 1, wave = false, 
     root.current.scale.set(1 - st * 0.5, 1 + st, 1 - st * 0.5)
     root.current.rotation.z = Math.sin(t * 0.8) * 0.025 * idle
     torso.current.scale.y = 1 + Math.sin(t * 2.4) * 0.012 * idle
-    // head and eyes follow the pointer (or the phone's tilt)
-    const a = aim(state)
+    const a = follow ? aim(state) : AHEAD
     const gz = gaze.current
     const k = 1 - Math.exp(-dt * 6)
     gz.x += (a.x - gz.x) * k

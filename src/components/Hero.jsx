@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { REDUCED, TOUCH, ScrollTrigger, gsap, listenTilt, scrollToId } from '../lib/motion'
+import { REDUCED, ScrollTrigger, gsap, listenTilt, scrollToId } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import HeroScene from '../three/HeroScene'
 import { waLink } from '../data'
@@ -61,42 +61,31 @@ export default function Hero({ ready, onSceneReady }) {
             <HeroScene ready={ready} progress={progress} onReady={onSceneReady} />
           </Stage>
         </SafeGL>
-        <h1 className="sr-only">YG Digitals — stop the scroll. Social media ads, e-commerce, packaging design, website design and video editing.</h1>
+        <h1 className="sr-only">YG Digitals — stop the scroll. Social media management, e-commerce, packaging design, website design, video editing and video ad &amp; Reel shoots.</h1>
 
         <motion.div className="hero-ui" initial="hide" animate={ready ? 'show' : 'hide'}>
-          <div className="hero-top">
-            <motion.p className="hero-kicker" variants={rise} custom={0}>
-              <span className="dot" /> <span className="hide-sm">Digital studio — </span>Gohana → all of India
-            </motion.p>
-            <motion.p className="hero-hint" variants={rise} custom={1}>
-              {TOUCH ? 'Touch the glass' : 'Move your cursor — it’s glass'}
-              <span>{TOUCH ? '( tilt your phone )' : '( poke the clay guys )'}</span>
-            </motion.p>
-          </div>
-          <div className="hero-bottom">
-            <motion.p className="hero-sub" variants={rise} custom={2}>
-              Ads, marketplaces, packaging, websites &amp; video that make people <b>stop</b>, <b>look</b> — and <b>buy</b>.
-            </motion.p>
-            <motion.div className="hero-ctas" variants={rise} custom={3}>
-              <a className="btn btn-dark" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
-                Book a free call <Arrow />
-              </a>
-              <a
-                className="btn btn-glass"
-                href="#work"
-                data-cursor="Peek"
-                onClick={(e) => {
-                  e.preventDefault()
-                  scrollToId('work')
-                }}
-              >
-                <span>
-                  <span className="hide-sm">See the </span>work
-                </span>
-              </a>
-            </motion.div>
-          </div>
-          <motion.div className="hero-scroll" variants={rise} custom={4} aria-hidden>
+          <motion.p className="hero-kicker" variants={rise} custom={0}>
+            <span className="dot" /> Digital studio
+          </motion.p>
+          <motion.div className="hero-ctas" variants={rise} custom={1}>
+            <a className="btn btn-dark" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
+              Book a free call <Arrow />
+            </a>
+            <a
+              className="btn btn-glass"
+              href="#work"
+              data-cursor="Peek"
+              onClick={(e) => {
+                e.preventDefault()
+                scrollToId('work')
+              }}
+            >
+              <span>
+                <span className="hide-sm">See the </span>work
+              </span>
+            </a>
+          </motion.div>
+          <motion.div className="hero-scroll" variants={rise} custom={2} aria-hidden>
             <span>Scroll</span>
             <i />
           </motion.div>

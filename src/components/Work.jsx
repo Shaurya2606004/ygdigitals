@@ -4,7 +4,8 @@ import { lockScroll } from '../lib/motion'
 import { SERVICES, WORK, waLink } from '../data'
 import { Arrow } from './ui'
 
-const CATS = [{ id: 'all', title: 'All' }, ...SERVICES]
+// a filter only for services that have projects to show (none is an empty grid)
+const CATS = [{ id: 'all', title: 'All' }, ...SERVICES.filter((s) => WORK.some((w) => w.cat === s.id))]
 const catTitle = Object.fromEntries(SERVICES.map((s) => [s.id, s.title]))
 const ease = [0.22, 1, 0.36, 1]
 

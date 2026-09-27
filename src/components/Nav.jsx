@@ -55,7 +55,7 @@ export default function Nav() {
           <span className="nav-word">digitals</span>
         </a>
         <nav className="nav-links" aria-label="Primary">
-          {/* both on purpose: clicking Services scrolls to the home section, hovering (or tabbing in) opens the five service pages */}
+          {/* both on purpose: clicking Services scrolls to the home section, hovering (or tabbing in) opens the service pages */}
           <div className="nav-drop">
             <a href="/#services" onClick={go('services')}>
               Services

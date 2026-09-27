@@ -18,18 +18,18 @@ export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
 export const SERVICES = [
   {
     id: 'ads',
-    slug: 'social-media-ads',
+    slug: 'social-media-management',
     no: '01',
-    title: 'Social Media Ads',
-    lines: ['Social', 'Media Ads'],
-    desc: 'Thumb-stopping creatives and Meta campaigns on Instagram & Facebook, built to turn scrollers into enquiries — not just likes.',
-    tags: ['Reels & static creatives', 'Audience targeting', 'Retargeting', 'Monthly reports'],
+    title: 'Social Media Management',
+    lines: ['Social', 'Media', 'Management'],
+    desc: 'Your Instagram & Facebook, run for you — planned posts, Reels, replies and Meta ads that turn scrollers into enquiries, not just likes.',
+    tags: ['Content calendar', 'Posts & Reels', 'Comments & DMs', 'Meta ads'],
     theme: 'white',
     buddy: 'black',
     meta: {
-      title: 'Social Media Ads Agency in Gohana — Meta Ads for Instagram & Facebook | YG Digitals',
+      title: 'Social Media Management in Gohana — Instagram & Facebook | YG Digitals',
       description:
-        'How YG Digitals plans, designs and runs Meta ads on Instagram & Facebook for brands in Gohana and across India — research, hook-first creatives, proper tracking and daily optimisation.',
+        'How YG Digitals runs Instagram & Facebook for brands in Gohana and across India — a planned content calendar, posts and Reels made in-house, comments and DMs handled daily, and Meta ads that bring enquiries.',
     },
   },
   {
@@ -38,14 +38,14 @@ export const SERVICES = [
     no: '02',
     title: 'E-commerce',
     lines: ['E-commerce', 'Handling'],
-    desc: 'We run your marketplace stores end to end — listings, catalogue and sponsored ads on Amazon, Flipkart, Meesho & Myntra.',
-    tags: ['Amazon', 'Flipkart', 'Meesho', 'Myntra', 'Listings', 'Marketplace ads'],
+    desc: 'We run your marketplace stores end to end — listings, catalogue and sponsored ads on Amazon, Flipkart & Meesho.',
+    tags: ['Amazon', 'Flipkart', 'Meesho', 'Listings', 'Marketplace ads'],
     theme: 'black',
     buddy: 'white',
     meta: {
-      title: 'E-commerce Handling in Gohana — Amazon, Flipkart, Meesho & Myntra | YG Digitals',
+      title: 'E-commerce Handling in Gohana — Amazon, Flipkart & Meesho | YG Digitals',
       description:
-        'Marketplace store management by YG Digitals: keyword-researched listings, images that sell, sponsored ads and daily store care on Amazon, Flipkart, Meesho and Myntra.',
+        'Marketplace store management by YG Digitals: keyword-researched listings, images that sell, sponsored ads and daily store care on Amazon, Flipkart and Meesho.',
     },
   },
   {
@@ -96,9 +96,25 @@ export const SERVICES = [
         'Video editing by YG Digitals: Reels, ad films and product videos cut hook-first for the first three seconds, with captions, motion graphics, sound and colour.',
     },
   },
+  {
+    id: 'shoot',
+    slug: 'video-ad-reel-shoot',
+    no: '06',
+    title: 'Video Ad & Reel Shoot',
+    lines: ['Video Ad &', 'Reel Shoot'],
+    desc: 'We script, plan and shoot your video ads and Reels — at your shop, factory or site — lit, framed for the phone and directed on the day.',
+    tags: ['Ad shoots', 'Reel shoots', 'Scripts & shot lists', 'On location'],
+    theme: 'black',
+    buddy: 'white',
+    meta: {
+      title: 'Video Ad & Reel Shoot in Gohana — Shot On Location | YG Digitals',
+      description:
+        'Video ad and Reel shoots by YG Digitals: scripted, planned and shot at your shop, factory or site — lit well, framed for the phone screen and directed so your team looks natural on camera.',
+    },
+  },
 ]
 
-// the sixth page: all five services run as one system, for bigger companies
+// the last page: every service run as one system, for bigger companies
 export const ECOSYSTEM = {
   id: 'eco',
   slug: 'online-presence-ecosystem',
@@ -114,7 +130,7 @@ export const ECOSYSTEM = {
 export const PAGES = [...SERVICES, ECOSYSTEM]
 export const pagePath = (p) => `/services/${p.slug}`
 
-export const PLATFORMS = ['Instagram', 'Facebook', 'Amazon', 'Flipkart', 'Meesho', 'Myntra', 'YouTube', 'Google']
+export const PLATFORMS = ['Instagram', 'Facebook', 'Amazon', 'Flipkart', 'Meesho', 'YouTube', 'Google']
 
 export const INDUSTRIES = ['Factory owners', 'Real estate', 'E-commerce sellers', 'D2C brands', 'Local businesses']
 
@@ -133,7 +149,7 @@ export const WORK = [
   { id: 'w6', cat: 'ads', title: 'Site-Visit Machine', client: 'Housing project', year: '2024', tone: 'white', image: null,
     did: ['Lead-generation campaign', 'Walkthrough video ads', 'Weekly lead reports'] },
   { id: 'w7', cat: 'ecom', title: 'Catalogue Glow-Up', client: 'Ethnic-wear seller', year: '2024', tone: 'mist', image: null,
-    did: ['Meesho & Myntra catalogue refresh', 'Listing images & copy', 'Pricing & ads review'] },
+    did: ['Meesho catalogue refresh', 'Listing images & copy', 'Pricing & ads review'] },
   { id: 'w8', cat: 'video', title: 'Product Reels Pack', client: 'Skincare brand', year: '2025', tone: 'white', image: null,
     did: ['20 product Reels', 'Hook-first scripting', 'Trending audio & captions'] },
 ]
@@ -147,8 +163,8 @@ export const PROCESS = [
 
 // Keep only numbers you can prove. `placeholder: true` ones MUST be confirmed with the client before launch.
 export const STATS = [
-  { value: 5, suffix: '', label: 'services under one roof' },
-  { value: 6, suffix: '', label: 'platforms we run every day' },
+  { value: SERVICES.length, suffix: '', label: 'services under one roof' },
+  { value: 5, suffix: '', label: 'platforms we run every day' },
   { value: 100, suffix: '+', label: 'projects delivered', placeholder: true },
   { value: 1, suffix: '', label: 'call to get started' },
 ]
