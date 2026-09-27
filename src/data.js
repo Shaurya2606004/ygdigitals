@@ -1,7 +1,7 @@
 export const CONTACT = {
   phone: '+91 98174 58931',
   tel: 'tel:+919817458931',
-  email: 'yashgarg6564@gmail.com',
+  email: 'ygdigitalsacc@gmail.com',
   whatsapp: 'https://wa.me/919817458931',
   instagram: 'https://www.instagram.com/ygdigitals.marketing',
   city: 'Gohana, Haryana',
@@ -114,52 +114,12 @@ export const SERVICES = [
   },
 ]
 
-// the last page: every service run as one system, for bigger companies
-export const ECOSYSTEM = {
-  id: 'eco',
-  slug: 'online-presence-ecosystem',
-  title: 'Online Presence Ecosystem',
-  meta: {
-    title: 'Online Presence Ecosystem for Enterprises — One Digital Team | YG Digitals',
-    description:
-      'YG Digitals designs, builds and runs the entire online presence of factories, developers and growing brands as one connected system: website, ads, marketplaces, packaging and video.',
-  },
-}
-
-// every page besides the home page lives at /services/<slug>
-export const PAGES = [...SERVICES, ECOSYSTEM]
+// every service has its own page at /services/<slug>
 export const pagePath = (p) => `/services/${p.slug}`
 
 export const PLATFORMS = ['Instagram', 'Facebook', 'Amazon', 'Flipkart', 'Meesho', 'YouTube', 'Google']
 
 export const INDUSTRIES = ['Factory owners', 'Real estate', 'E-commerce sellers', 'D2C brands', 'Local businesses']
-
-// PLACEHOLDER WORK — swap in real client projects. Set `image` to a path in /public to replace the illustrated mock.
-export const WORK = [
-  { id: 'w1', cat: 'ads', title: 'Festive Sale Blitz', client: 'Apparel label', year: '2025', tone: 'mist', image: null,
-    did: ['12 Reels + carousel ad creatives', 'Instagram & Facebook campaign setup', 'Retargeting for cart abandoners'] },
-  { id: 'w2', cat: 'ecom', title: 'Marketplace Launch', client: 'Home-décor seller', year: '2025', tone: 'black', image: null,
-    did: ['Amazon & Flipkart store setup', 'Keyword-rich product listings', 'Sponsored product ads'] },
-  { id: 'w3', cat: 'pack', title: 'Masala Box Series', client: 'Spice brand', year: '2025', tone: 'white', image: null,
-    did: ['Packaging system for 6 SKUs', 'Print-ready dielines', '3D product mockups'] },
-  { id: 'w4', cat: 'web', title: 'Builder Showcase', client: 'Real-estate developer', year: '2024', tone: 'mist', image: null,
-    did: ['Project showcase website', 'Lead-capture landing pages', 'WhatsApp enquiry flow'] },
-  { id: 'w5', cat: 'video', title: 'Inside the Factory', client: 'Manufacturer', year: '2024', tone: 'black', image: null,
-    did: ['Brand film edit', 'Reels cut-downs', 'Captions & motion graphics'] },
-  { id: 'w6', cat: 'ads', title: 'Site-Visit Machine', client: 'Housing project', year: '2024', tone: 'white', image: null,
-    did: ['Lead-generation campaign', 'Walkthrough video ads', 'Weekly lead reports'] },
-  { id: 'w7', cat: 'ecom', title: 'Catalogue Glow-Up', client: 'Ethnic-wear seller', year: '2024', tone: 'mist', image: null,
-    did: ['Meesho catalogue refresh', 'Listing images & copy', 'Pricing & ads review'] },
-  { id: 'w8', cat: 'video', title: 'Product Reels Pack', client: 'Skincare brand', year: '2025', tone: 'white', image: null,
-    did: ['20 product Reels', 'Hook-first scripting', 'Trending audio & captions'] },
-]
-
-export const PROCESS = [
-  { no: '01', title: 'Discovery call', text: 'A free call where we learn your business, your buyers and what growth actually means for you.' },
-  { no: '02', title: 'Plan & design', text: 'We map platforms, creatives, listings and budgets — then design everything in-house.' },
-  { no: '03', title: 'Launch', text: 'Ads go live, listings get published, sites ship. Fast, and checked twice.' },
-  { no: '04', title: 'Report & scale', text: "Plain-language monthly reports. What works gets more budget; what doesn't gets cut." },
-]
 
 // Keep only numbers you can prove. `placeholder: true` ones MUST be confirmed with the client before launch.
 export const STATS = [

@@ -1,11 +1,11 @@
 import * as THREE from 'three'
-import { Component, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { PerformanceMonitor, RoundedBox, Text } from '@react-three/drei'
 import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
 import displayFont from '@fontsource/unbounded/files/unbounded-latin-800-normal.woff?url'
 import envAtlas from './studio-env.png'
-import { REDUCED, TOUCH } from '../lib/motion'
+import { REDUCED, TOUCH, clamp01, elasticOut } from '../lib/motion'
 
 export { displayFont }
 export const RED = '#e04c5c'
@@ -111,7 +111,7 @@ function Bob({ phase = 0, children, ...props }) {
 
 /*
  * Instagram: the gradient squircle with the white camera glyph. One unit across, face on +z.
- * Flat as the post on the phone, chunky as the cube floating in the hero.
+ * Flat as the post on the phone, an app-icon slab floating in the hero.
  */
 // a square with soft corners (superellipse |x|⁴ + |y|⁴ = r⁴), an app icon's outline
 const squircle = (r, n = 64) =>
@@ -147,7 +147,8 @@ function igSlab(depth, bevel) {
 }
 let igTile, igCube, igGlyph
 const getIgTile = () => (igTile ??= igSlab(0.02, 0.03))
-const getIgCube = () => (igCube ??= igSlab(0.64, 0.18))
+// the hero's slab: 0.12 deep plus a 0.12 bevel each side, so its faces sit at z = ±0.18
+const getIgCube = () => (igCube ??= igSlab(0.12, 0.12))
 // the camera glyph, centred on the face: rounded-square outline, lens ring and flash dot, one mesh
 const getIgGlyph = () =>
   (igGlyph ??= mergeGeometries([
@@ -179,7 +180,7 @@ export function InstaCube() {
         <Clay color={WHITE} map={getIgMap()} {...IG_MAT} />
       </mesh>
       {[1, -1].map((s) => (
-        <mesh key={s} geometry={getIgGlyph()} position-z={s * 0.5} rotation-y={s < 0 ? Math.PI : 0}>
+        <mesh key={s} geometry={getIgGlyph()} position-z={s * 0.18} rotation-y={s < 0 ? Math.PI : 0}>
           <Clay color={WHITE} {...IG_MAT} />
         </mesh>
       ))}
@@ -198,6 +199,103 @@ export function Phone({ body = BLACK, screen = WHITE, accent = RED }) {
       <Rb color={body} args={[0.62, 0.09, 0.04]} radius={0.04} position={[-0.07, -0.3, 0.14]} />
       <Rb color={body} args={[0.42, 0.09, 0.04]} radius={0.04} position={[-0.17, -0.45, 0.14]} />
       <Rb color={accent} args={[0.78, 0.2, 0.06]} radius={0.09} position={[0, -0.7, 0.14]} />
+    </group>
+  )
+}
+
+/*
+ * The phone hero's phone: a feed races up the screen and snaps to a stop on the studio's own post, which then gets
+ * liked, the headline acted out. `readyAt` holds the clock time the intro starts (null = hold still). The posts are
+ * clipped to the screen by two planes that follow the phone wherever it moves.
+ */
+const POST_H = 1.3
+const FEED = ['#d8d2c7', '#262626', '#c9965e', '#bec5c8', '#e6e0d5', '#3a3d44'] // everyone else's posts, scrolled past
+const SCREEN_EDGES = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.9), new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.9)]
+const easeOut = (x) => 1 - (1 - clamp01(x)) ** 4
+
+// avatar + name, the picture, like / comment / save, two lines of caption
+function Post({ y, image, avatar = '#b9b3a9', clip, children }) {
+  const m = (color) => <Clay color={color} clippingPlanes={clip} />
+  const bar = (args, position, color, radius = 0.017) => (
+    <RoundedBox args={args} radius={radius} smoothness={3} position={position}>
+      {m(color)}
+    </RoundedBox>
+  )
+  return (
+    <group position-y={y}>
+      <mesh position={[-0.36, 0.53, 0]} scale={[0.055, 0.055, 0.02]}>
+        <sphereGeometry args={[1, 20, 14]} />
+        {m(avatar)}
+      </mesh>
+      {bar([0.26, 0.045, 0.02], [-0.17, 0.53, 0], BLACK)}
+      {bar([0.86, 0.78, 0.02], [0, 0.07, 0], image, 0.05)}
+      <mesh geometry={getHeart()} position={[-0.36, -0.42, 0]} scale={0.075}>
+        {m(BLACK)}
+      </mesh>
+      <mesh position={[-0.23, -0.42, 0]}>
+        <torusGeometry args={[0.032, 0.012, 8, 20]} />
+        {m(BLACK)}
+      </mesh>
+      {bar([0.05, 0.07, 0.015], [0.38, -0.42, 0], BLACK, 0.012)}
+      {bar([0.62, 0.035, 0.015], [-0.1, -0.54, 0], '#9a948b')}
+      {bar([0.4, 0.035, 0.015], [-0.21, -0.61, 0], '#9a948b')}
+      {children}
+    </group>
+  )
+}
+
+export function FeedPhone({ readyAt }) {
+  const { gl } = useThree()
+  const screen = useRef()
+  const strip = useRef()
+  const badge = useRef()
+  const liked = useRef()
+  const like = useRef()
+  const clip = useMemo(() => SCREEN_EDGES.map((p) => p.clone()), [])
+  useLayoutEffect(() => {
+    gl.localClippingEnabled = true
+  }, [gl])
+  useFrame((state) => {
+    screen.current.updateWorldMatrix(true, false)
+    clip.forEach((p, i) => p.copy(SCREEN_EDGES[i]).applyMatrix4(screen.current.matrixWorld))
+    const t = readyAt.current == null ? 0 : state.clock.elapsedTime - readyAt.current
+    // full speed at once, braking hard onto our post, then a little spring-back
+    const after = REDUCED ? 9 : t - 2.1
+    const settle = after > 0 ? Math.sin(after * 16) * Math.exp(-after * 6) * 0.05 : 0
+    strip.current.position.y = FEED.length * POST_H * (REDUCED ? 1 : easeOut((t - 0.3) / 1.8)) - settle
+    badge.current.scale.setScalar(Math.max(1e-4, elasticOut(after / 0.9)))
+    liked.current.scale.setScalar(Math.max(1e-4, 0.075 * elasticOut((after - 0.35) / 0.6)))
+    // the double-tap heart: pops, holds, then floats off shrinking; again every 4s
+    const c = REDUCED || after < 0.3 ? -1 : (after - 0.3) % 4
+    const on = c >= 0 && c < 1.3
+    like.current.scale.setScalar(Math.max(1e-4, on ? 0.3 * (c < 0.9 ? elasticOut(c / 0.5) : 1 - (c - 0.9) / 0.4) : 0))
+    like.current.position.y = 0.07 + (on && c > 0.9 ? (c - 0.9) * 0.6 : 0)
+  })
+  return (
+    <group>
+      <Rb color={BLACK} args={[1.1, 2.1, 0.22]} radius={0.15} />
+      <Rb color={WHITE} args={[0.94, 1.86, 0.05]} radius={0.1} position={[0, 0, 0.1]} />
+      <Rb color={BLACK} args={[0.3, 0.07, 0.04]} radius={0.03} position={[0, 0.84, 0.17]} />
+      <group ref={screen} position-z={0.14}>
+        <group ref={strip}>
+          {FEED.map((c, i) => (
+            <Post key={i} y={-i * POST_H} image={c} clip={clip} />
+          ))}
+          <Post y={-FEED.length * POST_H} image={RED} avatar={RED} clip={clip}>
+            <group ref={badge} position={[0, 0.07, 0.02]} scale={1e-4}>
+              <Text font={displayFont} fontSize={0.34} letterSpacing={-0.04} color={BLACK} anchorX="center" anchorY="middle">
+                YG
+              </Text>
+            </group>
+            <mesh ref={liked} geometry={getHeart()} position={[-0.36, -0.42, 0.012]} scale={1e-4}>
+              <Clay color={RED} />
+            </mesh>
+            <mesh ref={like} geometry={getHeart()} position={[0, 0.07, 0.12]} scale={1e-4}>
+              <Clay color={WHITE} />
+            </mesh>
+          </Post>
+        </group>
+      </group>
     </group>
   )
 }

@@ -1,10 +1,19 @@
 import { useLayoutEffect, useRef } from 'react'
 import { REDUCED, gsap } from '../lib/motion'
+import { CONTACT } from '../data'
 
 export const Arrow = () => (
   <svg className="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d="M5 12h14M13 6l6 6-6 6" />
   </svg>
+)
+
+// every "Book a call" dials the studio, with the number right on the button
+export const BookCall = ({ className = 'btn-dark', children = 'Book a call' }) => (
+  <a className={`btn ${className}`} href={CONTACT.tel} data-cursor="Call">
+    {children}
+    <span className="btn-num">{CONTACT.phone}</span>
+  </a>
 )
 
 // Chunky 8-point star used as a separator in the tapes.

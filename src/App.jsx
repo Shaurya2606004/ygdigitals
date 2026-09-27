@@ -8,8 +8,6 @@ import Hero from './components/Hero'
 import Tapes from './components/Tapes'
 import About from './components/About'
 import Services from './components/Services'
-import Work from './components/Work'
-import Process from './components/Process'
 import { Contact, Footer, WhatsAppFab } from './components/Contact'
 
 export default function App() {
@@ -32,7 +30,7 @@ export default function App() {
     lockScroll(loading)
     if (loading) return
     ScrollTrigger.refresh()
-    // arriving from a service page's menu (/#work etc.): jump straight to that section once the loader is gone
+    // arriving from a service page's menu (/#services etc.): jump straight to that section once the loader is gone
     if (location.hash) scrollToId(decodeURIComponent(location.hash.slice(1)), true)
   }, [loading])
 
@@ -49,8 +47,6 @@ export default function App() {
         <Tapes />
         <About />
         <Services />
-        <Work />
-        <Process />
         <Contact />
       </main>
       <Footer />

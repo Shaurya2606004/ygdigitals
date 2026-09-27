@@ -97,9 +97,11 @@ export default function Services() {
                   <li key={t}>{t}</li>
                 ))}
               </motion.ul>
-              <motion.a className="svc-more" variants={fade} href={pagePath(s)} data-cursor="Read">
-                How we think <Arrow />
-              </motion.a>
+              <motion.div className="svc-more" variants={fade}>
+                <a className="btn btn-red" href={pagePath(s)} data-cursor="Open">
+                  Explore service <Arrow />
+                </a>
+              </motion.div>
             </motion.div>
           </AnimatePresence>
         </div>

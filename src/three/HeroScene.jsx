@@ -1,7 +1,8 @@
+import * as THREE from 'three'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
-import { AmazonBox, BLACK, Clapper, FlipkartBag, InstaCube, MIST, Phone, RED_DEEP, displayFont } from './clay'
+import { AmazonBox, BLACK, Clapper, FeedPhone, FlipkartBag, InstaCube, MIST, Phone, RED_DEEP, displayFont } from './clay'
 import { Buddy } from './character'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
@@ -147,14 +148,20 @@ const DESKTOP = [
   { el: <Clapper />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
 ]
 
-// portrait: phone + bag flank the short "THE" line, the Amazon box sits in the band under the headline, opposite the guy,
-// and the Instagram cube floats below them, above the buttons
-const PORTRAIT = [
-  { el: <Phone />, p: [-0.76, 0.25, 0.4], r: [0.1, 0.5, 0.25], s: 0.27, d: 0.1 },
-  { el: <FlipkartBag />, p: [0.77, 0.22, 0.2], r: [0.15, -0.5, -0.1], s: 0.33, d: 0.2 },
-  { el: <AmazonBox />, p: [0.5, -0.36, 0.6], r: [0.3, -0.45, 0.05], s: 0.28, d: 0.3 },
-  { el: <InstaCube />, p: [-0.4, -0.6, 0.5], r: [0.3, 0.6, -0.15], s: 0.4, d: 0.25 },
-]
+// a soft oval of shade on the floor under the phone and the two of them
+let shadeMap
+function getShadeMap() {
+  if (shadeMap) return shadeMap
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const x = c.getContext('2d')
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32)
+  g.addColorStop(0, 'rgba(0,0,0,0.2)')
+  g.addColorStop(1, 'rgba(0,0,0,0)')
+  x.fillStyle = g
+  x.fillRect(0, 0, 64, 64)
+  return (shadeMap = new THREE.CanvasTexture(c))
+}
 
 const LINES_WIDE = [
   { t: 'STOP', f: 1 },
@@ -171,12 +178,22 @@ export default function HeroScene({ ready, progress, onReady }) {
   const portrait = size.width / size.height < 0.85
   const vw = viewport.width
   const vh = viewport.height
-  const width = portrait ? Math.min(vw * 0.9, vh * 0.42) : Math.min(vw * 0.58, 8)
+  // phones: the layout fills the band between the kicker and the call button, measured in units of `u`.
+  // Their room follows .hero-ui's CSS: the gutter, plus a taller button row and the scroll hint above 640px.
+  const px = vh / size.height
+  const gutter = Math.min(56, Math.max(16, size.width * 0.04))
+  const narrow = size.width <= 640
+  const bandTop = vh / 2 - (gutter + (narrow ? 102 : 110)) * px
+  const bandBottom = -vh / 2 + (gutter + (narrow ? 72 : 100)) * px
+  const mid = (bandTop + bandBottom) / 2
+  const u = Math.min(vw / 2.75, (bandTop - bandBottom) / 4.1)
+  const width = portrait ? Math.min(u * 2.15, vw * 0.92) : Math.min(vw * 0.45, 6.2)
   const lines = portrait ? LINES_PORTRAIT : LINES_WIDE
   const [h, setH] = useState({})
   const readyAt = useRef(null)
   const sp = useRef(0)
   const text = useRef()
+  const stage = useRef()
   const reported = useRef(false)
 
   useEffect(() => {
@@ -193,7 +210,9 @@ export default function HeroScene({ ready, progress, onReady }) {
     return y
   })
   const total = -cursor - gap
-  const textY = portrait ? vh * 0.15 : vh * 0.04
+  const textY = portrait ? mid + u * 2 - total / 2 : vh * 0.04
+  // the middle of the short "THE" line: the Instagram slab and the Flipkart bag fill the gaps either side of it
+  const theY = textY + total / 2 + ys[1] - (h.THE || 0) / 2
 
   const framesSinceSync = useRef(0)
   useFrame((state, dt) => {
@@ -204,16 +223,30 @@ export default function HeroScene({ ready, progress, onReady }) {
     }
     sp.current += (progress.current - sp.current) * (1 - Math.exp(-dt * 6))
     const p = sp.current
-    const k = readyAt.current == null ? 0 : elasticOut((state.clock.elapsedTime - readyAt.current) / 1.4)
+    const since = readyAt.current == null ? null : state.clock.elapsedTime - readyAt.current
+    const k = since == null ? 0 : elasticOut(since / 1.4)
     const g = text.current
     g.scale.setScalar(Math.max(1e-4, k))
     const a = REDUCED ? { x: 0, y: 0 } : aim(state)
     g.position.set(0, textY + p * vh * 0.12, -p * (portrait ? 3 : 5))
     g.rotation.set(-p * 0.6 - a.y * 0.05, a.x * 0.1, 0)
+    // the phone pops a beat after the headline, then leaves with it
+    if (portrait) {
+      const s = stage.current
+      s.scale.setScalar(Math.max(1e-4, since == null ? 0 : elasticOut((since - 0.12) / 1.4)))
+      s.position.set(0, mid + p * vh * 0.12, -p * 3)
+      s.rotation.set(-p * 0.6 - a.y * 0.05, a.x * 0.1, 0)
+    }
     camera.position.z = 10 - p * 1.5
   })
 
-  const items = portrait ? PORTRAIT : DESKTOP
+  const items = portrait
+    ? [
+        { el: <InstaCube />, p: [-u * 0.8, theY, 0.4], r: [0.3, 0.6, -0.15], s: u * 0.4, d: 0.25 },
+        { el: <FlipkartBag />, p: [u * 0.8, theY, 0.2], r: [0.15, -0.5, -0.1], s: u * 0.3, d: 0.2 },
+        { el: <AmazonBox />, p: [-u * 0.97, mid - u * 0.08, 0.4], r: [0.3, 0.45, 0.05], s: u * 0.26, d: 0.3 },
+      ]
+    : DESKTOP.map((it) => ({ ...it, p: [it.p[0] * vw * 0.5, it.p[1] * vh * 0.5, it.p[2]] }))
   // on a narrow screen a sideways burst leaves it empty at once, so props swell toward the camera and rush past instead
   const fly = portrait ? [0.9, 6.5] : undefined
   return (
@@ -226,27 +259,34 @@ export default function HeroScene({ ready, progress, onReady }) {
           ))}
         </group>
         {/* she peeks over the top of STOP, he waves from the bottom corner */}
-        <Buddy look="girl" outfit="white" seed={2} position={[width * 0.3, total / 2 - width * 0.045, -0.6]} scale={width * 0.1} rotation={[0, -0.25, 0]} />
-        <Buddy
-          look="guy"
-          outfit="black"
-          seed={5}
-          wave
-          position={portrait ? [-width * 0.3, -total / 2 - width * 0.2, 0.8] : [-width * 0.5, -total / 2 - width * 0.02, 0.8]}
-          scale={width * (portrait ? 0.1 : 0.06)}
-          rotation={[0, 0.4, 0]}
-        />
+        {!portrait && (
+          <>
+            <Buddy look="girl" outfit="white" seed={2} position={[width * 0.3, total / 2 - width * 0.045, -0.6]} scale={width * 0.1} rotation={[0, -0.25, 0]} />
+            <Buddy look="guy" outfit="black" seed={5} wave position={[-width * 0.5, -total / 2 - width * 0.02, 0.8]} scale={width * 0.06} rotation={[0, 0.4, 0]} />
+          </>
+        )}
       </group>
+      {/* phones: under the headline, the phone with its feed stopping on our post, the two of them either side on a patch of shade */}
+      {portrait && (
+        <group ref={stage}>
+          <group position={[0, -u * 0.72, -0.6]} rotation={[0.06, -0.18, 0.03]} scale={u * 1.19}>
+            <FeedPhone readyAt={readyAt} />
+          </group>
+          <Buddy look="guy" outfit="black" seed={5} wave position={[-u * 0.8, -u * 1.267, 0.4]} scale={u * 0.58} rotation={[0, 0.35, 0]} />
+          <Buddy look="girl" outfit="white" seed={2} position={[u * 0.82, -u * 1.303, 0.2]} scale={u * 0.55} rotation={[0, -0.35, 0]} />
+          <mesh position={[0, -u * 1.99, -0.9]} scale={[u * 2.9, u * 0.34, 1]}>
+            <planeGeometry />
+            <meshBasicMaterial map={getShadeMap()} transparent depthWrite={false} />
+          </mesh>
+        </group>
+      )}
       {items.map((it, i) => (
-        <Pop key={i + (portrait ? 'p' : 'd')} readyAt={readyAt} sp={sp} fly={fly} delay={it.d} position={[it.p[0] * vw * 0.5, it.p[1] * vh * 0.5, it.p[2]]} rotation={it.r} scale={it.s}>
+        <Pop key={i + (portrait ? 'p' : 'd')} readyAt={readyAt} sp={sp} fly={fly} delay={it.d} position={it.p} rotation={it.r} scale={it.s}>
           {it.el}
         </Pop>
       ))}
-      <Lens
-        radius={portrait ? 0.1 : 0.2}
-        sp={sp}
-        wander={{ y: textY / (vh / 2), ax: (width / vw) * 0.75, ay: (total / vh) * 0.7 }}
-      />
+      {/* the cursor lens is a desktop thing: on a phone it only wandered over the headline */}
+      {!portrait && <Lens radius={0.2} sp={sp} wander={{ y: textY / (vh / 2), ax: (width / vw) * 0.75, ay: (total / vh) * 0.7 }} />}
     </>
   )
 }

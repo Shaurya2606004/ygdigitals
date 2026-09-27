@@ -3,8 +3,7 @@ import { motion } from 'framer-motion'
 import { REDUCED, ScrollTrigger, gsap, listenTilt, scrollToId } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import HeroScene from '../three/HeroScene'
-import { waLink } from '../data'
-import { Arrow } from './ui'
+import { BookCall } from './ui'
 
 function Fallback({ onReady }) {
   useEffect(onReady, [onReady])
@@ -68,21 +67,22 @@ export default function Hero({ ready, onSceneReady }) {
             <span className="dot" /> Digital studio
           </motion.p>
           <motion.div className="hero-ctas" variants={rise} custom={1}>
-            <a className="btn btn-dark" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
-              Book a free call <Arrow />
-            </a>
+            <BookCall>
+              <span>
+                Book a <span className="hide-sm">free </span>call
+              </span>
+            </BookCall>
+            {/* phones get the call button alone: with the number on it there's no room for two */}
             <a
-              className="btn btn-glass"
-              href="#work"
+              className="btn btn-glass hide-sm"
+              href="#services"
               data-cursor="Peek"
               onClick={(e) => {
                 e.preventDefault()
-                scrollToId('work')
+                scrollToId('services')
               }}
             >
-              <span>
-                <span className="hide-sm">See the </span>work
-              </span>
+              What we do
             </a>
           </motion.div>
           <motion.div className="hero-scroll" variants={rise} custom={2} aria-hidden>

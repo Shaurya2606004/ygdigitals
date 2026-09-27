@@ -1,27 +1,26 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { REDUCED, gsap, listenTilt, scrollToId, smoothScroll } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
-import { EcosystemScene, ServicesScene } from '../three/MiniScenes'
-import { PAGES, SERVICES, pagePath, waLink } from '../data'
+import { ServicesScene } from '../three/MiniScenes'
+import { CONTACT, SERVICES, pagePath } from '../data'
 import Cursor from '../components/Cursor'
 import Nav from '../components/Nav'
 import { Contact, Footer, WhatsAppFab } from '../components/Contact'
-import { Arrow, Statement } from '../components/ui'
+import { Arrow, BookCall, Statement } from '../components/ui'
 import { CONTENT, WHY } from './content'
 
 // "E-commerce Handling", not the short "E-commerce" the home page chips use
-const fullName = (p) => (p.lines ? p.lines.join(' ') : p.title)
+const fullName = (p) => p.lines.join(' ')
 
 /*
- * /services/<slug>: the thought process behind one service (or the whole ecosystem).
- * Hero with the service's clay prop → belief → the steps we take → the small details → deliverables + why us → FAQ → next page.
+ * /services/<slug>: the thought process behind one service.
+ * Hero with the service's clay prop → belief → live projects → the steps we take → the small details → deliverables + why us → FAQ → next page.
  */
 export default function ServicePage({ page }) {
   const root = useRef()
   const c = CONTENT[page.id]
   const i = SERVICES.indexOf(page)
-  const next = PAGES[(PAGES.indexOf(page) + 1) % PAGES.length]
-  const book = waLink(`Hi YG Digitals! I'd like to talk about ${fullName(page).toLowerCase()} for my business.`)
+  const next = SERVICES[(i + 1) % SERVICES.length]
 
   useEffect(() => {
     history.scrollRestoration = 'auto'
@@ -51,17 +50,17 @@ export default function ServicePage({ page }) {
             <nav className="sp-crumbs" aria-label="Breadcrumb">
               <a href="/">Home</a> / <a href="/#services">Services</a> / <span aria-current="page">{fullName(page)}</span>
             </nav>
-            <p className="eyebrow">( {c.kicker || `Service ${page.no} / ${String(SERVICES.length).padStart(2, '0')}`} )</p>
+            <p className="eyebrow">
+              ( Service {page.no} / {String(SERVICES.length).padStart(2, '0')} )
+            </p>
             <h1 className="sp-title">
-              {(c.lines || page.lines).map((l) => (
+              {page.lines.map((l) => (
                 <span key={l}>{l}</span>
               ))}
             </h1>
             <p className="sp-lede">{c.lede}</p>
             <div className="sp-ctas">
-              <a className="btn btn-red" href={book} target="_blank" rel="noreferrer" data-cursor="Book">
-                Book a free call <Arrow />
-              </a>
+              <BookCall className="btn-red">Book a free call</BookCall>
               <a
                 className="btn btn-glass"
                 href="#approach"
@@ -78,7 +77,7 @@ export default function ServicePage({ page }) {
           <div className="sp-stage">
             <SafeGL>
               <Stage className="sp-canvas" camera={{ position: [0, 0, 6.5], fov: 35 }}>
-                {i < 0 ? <EcosystemScene /> : <ServicesScene index={i} buddy="black" />}
+                <ServicesScene index={i} buddy="black" />
               </Stage>
             </SafeGL>
           </div>
@@ -87,6 +86,51 @@ export default function ServicePage({ page }) {
         <section className="sp-belief" aria-label="What we believe">
           <p className="eyebrow">( What we believe )</p>
           <Statement text={c.belief} />
+        </section>
+
+        <section className="sp-live" aria-labelledby="live-title">
+          <header className="sp-head">
+            <p className="eyebrow">( Our work )</p>
+            <h2 id="live-title" className="h-xl">
+              Live <em>projects</em>
+            </h2>
+          </header>
+          <ul className="sp-live-grid">
+            {c.projects.map((w) => {
+              // a card links out only once it has a real address
+              const Card = w.url ? 'a' : 'div'
+              return (
+                <li key={w.title} className="sp-rise">
+                  <Card className="sp-proj" {...(w.url && { href: w.url, target: '_blank', rel: 'noreferrer', 'data-cursor': 'Visit' })}>
+                    {w.image && <img src={w.image} alt={`${w.title} for ${w.client}`} loading="lazy" />}
+                    <small>
+                      {w.client} · {w.year}
+                    </small>
+                    <b>{w.title}</b>
+                    <ul>
+                      {w.did.map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                    </ul>
+                    {w.url && (
+                      <span className="sp-proj-go">
+                        View live <Arrow />
+                      </span>
+                    )}
+                  </Card>
+                </li>
+              )
+            })}
+            <li className="sp-rise">
+              <a className="sp-proj sp-proj-next" href={CONTACT.tel} data-cursor="Call">
+                <small>Book a call</small>
+                <b>Your brand, live next.</b>
+                <span className="sp-proj-go">
+                  {CONTACT.phone} <Arrow />
+                </span>
+              </a>
+            </li>
+          </ul>
         </section>
 
         <section id="approach" className="sp-steps" aria-labelledby="approach-title">
@@ -113,29 +157,6 @@ export default function ServicePage({ page }) {
             ))}
           </ol>
         </section>
-
-        {c.roles && (
-          <section className="sp-system" aria-labelledby="system-title">
-            <header className="sp-head">
-              <p className="eyebrow">( Every service, one system )</p>
-              <h2 id="system-title" className="h-xl">
-                Every part <em>connects</em>
-              </h2>
-            </header>
-            <ul>
-              {SERVICES.map((s) => (
-                <li key={s.id} className="sp-rise">
-                  <a href={pagePath(s)} data-cursor="Open">
-                    <small>{s.no}</small>
-                    <b>{s.title}</b>
-                    <span>{c.roles[s.id]}</span>
-                    <Arrow />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
 
         <section className="sp-details" aria-labelledby="details-title">
           <header className="sp-head">
@@ -204,7 +225,7 @@ export default function ServicePage({ page }) {
             {fullName(next)} <Arrow />
           </a>
           <ul>
-            {PAGES.map((p) => (
+            {SERVICES.map((p) => (
               <li key={p.id}>
                 <a href={pagePath(p)} className={p === page ? 'on' : ''} aria-current={p === page ? 'page' : undefined}>
                   {p.title}
@@ -214,7 +235,7 @@ export default function ServicePage({ page }) {
           </ul>
         </nav>
 
-        <Contact service={i < 0 ? 'A bit of everything' : page.title} />
+        <Contact service={page.title} />
       </main>
       <Footer />
       <WhatsAppFab />

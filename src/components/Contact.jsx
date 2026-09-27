@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ScrollTrigger, scrollToId } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import { ContactScene } from '../three/MiniScenes'
-import { CONTACT, PAGES, SERVICES, pagePath, waLink } from '../data'
+import { CONTACT, SERVICES, pagePath, waLink } from '../data'
 import { Arrow, Chat } from './ui'
 
 /* No backend: the form composes a WhatsApp message to the studio — the channel their clients already use. */
@@ -110,7 +110,7 @@ export function Footer() {
         <div>
           <p className="eyebrow">Services</p>
           <ul>
-            {PAGES.map((p) => (
+            {SERVICES.map((p) => (
               <li key={p.id}>
                 <a href={pagePath(p)}>{p.title}</a>
               </li>
@@ -120,7 +120,7 @@ export function Footer() {
         <div>
           <p className="eyebrow">Studio</p>
           <ul>
-            {[['top', 'Home'], ['services', 'What we do'], ['work', 'Work'], ['process', 'Process']].map(([id, label]) => (
+            {[['top', 'Home'], ['services', 'What we do'], ['contact', 'Contact']].map(([id, label]) => (
               <li key={id}>
                 <a href={id === 'top' ? '/' : `/#${id}`} onClick={jump(id)}>
                   {label}
@@ -128,7 +128,7 @@ export function Footer() {
               </li>
             ))}
             <li>
-              <a href={CONTACT.tel}>Book a call</a>
+              <a href={CONTACT.tel}>Book a call · {CONTACT.phone}</a>
             </li>
           </ul>
         </div>

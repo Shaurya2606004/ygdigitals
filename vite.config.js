@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { PAGES, SITE, pagePath } from './src/data.js'
+import { SERVICES, SITE, pagePath } from './src/data.js'
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 
@@ -27,7 +27,7 @@ function pages() {
       fs.writeFileSync(path.join(dir, 'index.html'), withUrl(home, `${SITE}/`))
 
       fs.mkdirSync(path.join(dir, 'services'), { recursive: true })
-      for (const p of PAGES) {
+      for (const p of SERVICES) {
         let html = withUrl(home, SITE + pagePath(p))
         html = swap(html, /(<title>)[^<]*/, esc(p.meta.title))
         html = swap(html, /(property="og:title" content=")[^"]*/, esc(p.meta.title))
@@ -40,7 +40,7 @@ function pages() {
       }
 
       const today = new Date().toISOString().slice(0, 10)
-      const urls = ['/', ...PAGES.map(pagePath)].map((u) => `  <url>\n    <loc>${SITE}${u}</loc>\n    <lastmod>${today}</lastmod>\n  </url>`)
+      const urls = ['/', ...SERVICES.map(pagePath)].map((u) => `  <url>\n    <loc>${SITE}${u}</loc>\n    <lastmod>${today}</lastmod>\n  </url>`)
       fs.writeFileSync(path.join(dir, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`)
       fs.writeFileSync(path.join(dir, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${SITE}/sitemap.xml\n`)
     },

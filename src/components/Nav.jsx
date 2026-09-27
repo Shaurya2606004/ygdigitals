@@ -1,15 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ScrollTrigger, lockScroll, scrollToId } from '../lib/motion'
-import { CONTACT, ECOSYSTEM, PAGES, SERVICES, pagePath, waLink } from '../data'
-import { Arrow } from './ui'
+import { CONTACT, SERVICES, pagePath } from '../data'
+import { BookCall } from './ui'
 
 const LINKS = [
   ['services', 'Services'],
-  ['work', 'Work'],
-  ['process', 'Process'],
   ['contact', 'Contact'],
 ]
+
+// the glass takes its tone from the first solid page background behind its middle (overlays like the loader don't count):
+// light text over dark sections, dark text over light ones
+function darkBehind(nav) {
+  for (const el of document.elementsFromPoint(innerWidth / 2, nav.offsetTop + nav.offsetHeight / 2)) {
+    if (!el.closest('main, footer')) continue
+    const [r, g, b, a = 1] = getComputedStyle(el).backgroundColor.match(/[\d.]+/g).map(Number)
+    if (a > 0.5) return r * 0.299 + g * 0.587 + b * 0.114 < 140
+  }
+  return false
+}
 
 const ease = [0.76, 0, 0.24, 1]
 const HOME = typeof location !== 'undefined' && location.pathname === '/'
@@ -17,14 +26,27 @@ const HOME = typeof location !== 'undefined' && location.pathname === '/'
 export default function Nav() {
   const [open, setOpen] = useState(false)
   const [hidden, setHidden] = useState(false)
+  const [dark, setDark] = useState(false)
+  const bar = useRef()
 
   useEffect(() => {
+    const tone = () => setDark(darkBehind(bar.current))
     const st = ScrollTrigger.create({
       start: 0,
       end: 'max',
-      onUpdate: (s) => setHidden(s.direction === 1 && s.scroll() > 300),
+      onUpdate: (s) => {
+        setHidden(s.direction === 1 && s.scroll() > 300)
+        tone()
+      },
     })
-    return () => st.kill()
+    // the services section fades its background between themes, so look again once a fade has finished
+    const faded = (e) => e.propertyName === 'background-color' && tone()
+    tone()
+    document.addEventListener('transitionend', faded)
+    return () => {
+      st.kill()
+      document.removeEventListener('transitionend', faded)
+    }
   }, [])
 
   useEffect(() => {
@@ -49,7 +71,7 @@ export default function Nav() {
 
   return (
     <>
-      <header className={`nav ${hidden && !open ? 'is-hidden' : ''}`}>
+      <header ref={bar} className={`nav ${hidden && !open ? 'is-hidden' : ''} ${dark || open ? 'is-dark' : ''}`}>
         <a href={HOME ? '#top' : '/'} className="nav-logo" onClick={HOME ? go('top') : undefined} aria-label={HOME ? 'YG Digitals — back to top' : 'YG Digitals — home'}>
           <span className="nav-mark">YG</span>
           <span className="nav-word">digitals</span>
@@ -71,16 +93,12 @@ export default function Nav() {
               ))}
             </ul>
           </div>
-          {[['eco', 'Ecosystem', pagePath(ECOSYSTEM)], ...LINKS.slice(1)].map(([id, label, page]) => (
-            <a key={id} href={page || `/#${id}`} onClick={page ? undefined : go(id)}>
-              {label}
-            </a>
-          ))}
+          <a href="/#contact" onClick={go('contact')}>
+            Contact
+          </a>
         </nav>
         <div className="nav-right">
-          <a className="btn btn-light nav-cta" href={waLink()} target="_blank" rel="noreferrer" data-cursor="Book">
-            Book a call <Arrow />
-          </a>
+          <BookCall className="btn-red nav-cta" />
           <button className={`nav-burger ${open ? 'is-open' : ''}`} onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-controls="menu" aria-label={open ? 'Close menu' : 'Open menu'}>
             <i />
             <i />
@@ -118,7 +136,7 @@ export default function Nav() {
             <motion.nav className="menu-pages" aria-label="Service pages" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.5, duration: 0.6, ease } }} exit={{ opacity: 0 }}>
               <p>Service pages</p>
               <ul>
-                {PAGES.map((p) => (
+                {SERVICES.map((p) => (
                   <li key={p.id}>
                     <a href={pagePath(p)}>{p.title}</a>
                   </li>
