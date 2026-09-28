@@ -26,3 +26,6 @@ dist-ssr
 # local tooling
 .claude
 .vercel
+
+# raw files dropped in for processing (seller-dashboard screenshots, uncompressed clips) — never publish
+public/work/WhatsApp*

@@ -1314,13 +1314,49 @@ body::after {
 a.sp-proj:hover {
   transform: translateY(-6px);
 }
-.sp-proj img {
+.sp-proj img,
+.sp-proj video {
   width: calc(100% + 48px);
   max-width: none;
   height: auto;
   margin: -24px -24px 4px;
   aspect-ratio: 1;
   object-fit: cover;
+}
+/* an embedded Reel: header + 4:5 player + "View more on Instagram", the comment box below is cut off */
+.sp-proj {
+  container-type: inline-size;
+}
+.sp-proj iframe {
+  display: block;
+  width: calc(100% + 48px);
+  height: calc(1.25 * (100cqw + 48px) + 100px);
+  margin: -24px -24px 4px;
+  border: 0;
+  background: var(--white);
+}
+/* dashboard screenshots under the cards, each opens full size */
+.sp-proof {
+  margin-top: clamp(28px, 5vh, 48px);
+}
+.sp-proof ul {
+  display: grid;
+  gap: 14px;
+  margin-top: 14px;
+}
+.sp-proof img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--white);
+}
+.sp-proof span {
+  display: block;
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  opacity: 0.7;
 }
 /* a gallery: three across, and on phones a row you swipe through, edge to edge */
 .sp-live-grid.has-shots {

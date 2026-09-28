@@ -4,7 +4,7 @@
  *
  * PLACEHOLDER PROJECTS — every `projects` entry below except packaging's is a stand-in until the client sends real work.
  * For each real one add `url` (the live page, store or post; the card links to it) and optionally `image` (a square
- * picture in /public/work, 800×800 webp).
+ * picture in /public/work, 800×800 webp) or `video` (a short square muted loop, with `image` as its poster).
  */
 
 // the same on every page
@@ -20,9 +20,12 @@ export const CONTENT = {
     lede: 'Your Instagram and Facebook, run end to end — planned content, posts and Reels made in-house, daily replies and Meta ads that bring enquiries.',
     belief: 'Posting is easy. *Building a page people trust* — where every post has a job — is the work we love.',
     projects: [
-      { title: 'Festive Sale Blitz', client: 'Apparel label', year: '2025', did: ['12 Reels + ad creatives', 'Retargeting'] },
-      { title: 'Site-Visit Machine', client: 'Housing project', year: '2024', did: ['Lead-gen campaign', 'Weekly lead reports'] },
+      // Jindal's numbers are from its Meta Ads Manager, last 30 days to 27 Sep 2026
+      { title: 'Jindal Fasteners', client: 'Fastener manufacturer', url: 'https://www.instagram.com/jindal_fasteners/', image: '/work/social-jindal.webp', did: ['601 WhatsApp enquiries in 30 days', '₹16 per enquiry', 'Reels & posts'] },
+      { title: 'Eximkrishveda', client: 'Ayurvedic powders', url: 'https://www.instagram.com/eximkrishveda/', image: '/work/social-exim.webp', did: ['Product posts', 'Reels'] },
+      { title: 'Sphinx Healing & Wellness', client: 'Tarot & wellness coach', url: 'https://www.instagram.com/sphinxhealingandwellness/', image: '/work/social-sphinx.webp', did: ['11.9K followers', 'Reels & carousels'] },
     ],
+    proof: [{ src: '/work/proof-meta-ads.webp', w: 1400, h: 338, caption: 'Jindal Fasteners, Meta Ads: 601 WhatsApp enquiries at ₹16.28 each' }],
     steps: [
       { t: 'Know the business', d: 'Your buyers, best-sellers and what a lead is worth — before any content.', p: ['Goals set: enquiries, sales, real followers', 'Competitors and their ads studied'] },
       { t: 'Plan the month', d: 'A content calendar agreed a month ahead, with the ads planned alongside it.', p: ['Posts, Reels and Stories scheduled', 'Ad budget split by stage'] },
@@ -42,8 +45,16 @@ export const CONTENT = {
     lede: 'Your Amazon, Flipkart and Meesho stores, run end to end — listings that rank, images that convert and ads that pay their way.',
     belief: 'On a marketplace, *your listing is your salesman*. We make it the best-dressed one on the page.',
     projects: [
-      { title: 'Marketplace Launch', client: 'Home-décor seller', year: '2025', did: ['Amazon & Flipkart setup', 'Sponsored ads'] },
-      { title: 'Catalogue Glow-Up', client: 'Ethnic-wear seller', year: '2024', did: ['Meesho catalogue refresh', 'Listing images'] },
+      // numbers from the seller dashboards (28 Sep 2026): Flipkart = gross, 29 Aug–27 Sep; Amazon = units ordered, last 6 months.
+      // no links: the Amazon listings are rated 2.5–3.8★
+      { title: 'Savaria on Flipkart', client: 'Desi ghee brand', image: '/work/ecom-flipkart.webp', did: ['₹5.76L sales in 30 days', '+892 units vs the month before', '60 live listings'] },
+      { title: 'Savaria on Amazon', client: 'Desi ghee brand', image: '/work/ecom-amazon.webp', did: ['1,410 units in 6 months', '16.2% conversion', 'New store, 10+ ranges'] },
+    ],
+    // screenshots of the real dashboards, browser bars cropped off
+    proof: [
+      { src: '/work/proof-flipkart-30days.webp', w: 1532, h: 600, caption: 'Flipkart, last 30 days: ₹5.76L gross sales, +892 units' },
+      { src: '/work/proof-flipkart-today.webp', w: 1400, h: 186, caption: 'Flipkart, 28 Sep: 133 units and ₹61.6K in a day' },
+      { src: '/work/proof-amazon-6months.webp', w: 1284, h: 260, caption: 'Amazon, last 6 months: 1,410 units, 16.2% conversion' },
     ],
     steps: [
       { t: 'Audit store and category', d: 'Who ranks, what they charge and what buyers complain about.', p: ['Competitor listings benchmarked', 'Account health and returns checked'] },
@@ -119,8 +130,9 @@ export const CONTENT = {
     lede: 'Reels, ad films and product videos cut for the first three seconds — hooks, captions, motion graphics and sound.',
     belief: 'People decide in *three seconds* whether to keep watching. We edit every frame like it matters.',
     projects: [
-      { title: 'Inside the Factory', client: 'Manufacturer', year: '2024', did: ['Brand film edit', 'Reels cut-downs'] },
-      { title: 'Product Reels Pack', client: 'Skincare brand', year: '2025', did: ['20 product Reels', 'Captions & audio'] },
+      { title: 'Consistency over recognition', client: 'Jindal Fasteners · Reel', embed: 'https://www.instagram.com/reel/DdtySsqJorf/embed', did: ['Maruti Suzuki recognition', 'Logo motion graphics'] },
+      { title: 'Weak connections? Not on our watch', client: 'Jindal Fasteners · Reel', embed: 'https://www.instagram.com/reel/Ddjf3QDpQEl/embed', did: ['Product close-ups', 'Hook-first cut'] },
+      { title: 'Not always about the price', client: 'Jindal Fasteners · Reel', embed: 'https://www.instagram.com/reel/Dcd-M-4p02f/embed', did: ['Talking-head edit', 'Expo footage'] },
     ],
     steps: [
       { t: 'Purpose first', d: 'Stop the scroll, explain or sell — the goal sets the length and pace.', p: ['Platform and placement decided', 'Reference videos agreed'] },
@@ -141,8 +153,10 @@ export const CONTENT = {
     lede: 'Video ads and Reels planned on paper, lit well, framed for the phone and directed on the day — at your shop, factory or site.',
     belief: 'Great edits start with great footage. *A shoot planned on paper* is a shoot that works on the day.',
     projects: [
-      { title: 'Showroom Reel Day', client: 'Furniture store', year: '2025', did: ['On-location shoot', '8 Reels from one day'] },
-      { title: 'Factory Ad Shoot', client: 'Manufacturer', year: '2024', did: ['Scripted ad film', 'Staff on camera'] },
+      // behind-the-scenes clips from a factory shoot day; `video` plays muted in the card, `image` is its poster
+      { title: 'Quality lab', client: 'Factory shoot · behind the scenes', video: '/work/shoot-lab.mp4', image: '/work/shoot-lab.webp', did: ['Gimbal moves', 'Staff at work'] },
+      { title: 'Coil yard', client: 'Factory shoot · behind the scenes', video: '/work/shoot-yard.mp4', image: '/work/shoot-yard.webp', did: ['Forklift in action', 'Wide factory shots'] },
+      { title: 'Floor walk-through', client: 'Factory shoot · behind the scenes', video: '/work/shoot-floor.mp4', image: '/work/shoot-floor.webp', did: ['Team on camera', 'Follow shots'] },
     ],
     steps: [
       { t: 'Idea before camera', d: 'The goal and the hook are agreed before anyone presses record.', p: ['Scripts written for the first three seconds', 'Reference videos agreed'] },

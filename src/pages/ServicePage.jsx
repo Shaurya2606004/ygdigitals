@@ -98,14 +98,21 @@ export default function ServicePage({ page }) {
             </h2>
           </header>
           {/* with pictures it's a gallery: three across, a swipe row on phones */}
-          <ul className={`sp-live-grid ${c.projects.some((w) => w.image) ? 'has-shots' : ''}`}>
+          <ul className={`sp-live-grid ${c.projects.some((w) => w.image || w.embed) ? 'has-shots' : ''}`}>
             {c.projects.map((w) => {
               // a card links out only once it has a real address
               const Card = w.url ? 'a' : 'div'
               return (
                 <li key={w.title} className="sp-rise">
                   <Card className="sp-proj" {...(w.url && { href: w.url, target: '_blank', rel: 'noreferrer', 'data-cursor': 'Visit' })}>
-                    {w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading="lazy" />}
+                    {w.embed ? (
+                      // Instagram's own player: the Reel plays right here
+                      <iframe src={w.embed} title={`${w.title} — ${w.client}`} loading="lazy" scrolling="no" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                    ) : w.video ? (
+                      <video src={w.video} poster={w.image} aria-label={`${w.title} — ${w.client}`} width="800" height="800" autoPlay={!REDUCED} muted loop playsInline preload="none" />
+                    ) : (
+                      w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading="lazy" />
+                    )}
                     <small>{[w.client, w.year].filter(Boolean).join(' · ')}</small>
                     <b>{w.title}</b>
                     <ul>
@@ -132,6 +139,21 @@ export default function ServicePage({ page }) {
               </a>
             </li>
           </ul>
+          {c.proof && (
+            <div className="sp-proof">
+              <p className="eyebrow">( Straight from the dashboards )</p>
+              <ul>
+                {c.proof.map((p) => (
+                  <li key={p.src} className="sp-rise">
+                    <a href={p.src} target="_blank" rel="noreferrer" data-cursor="Zoom">
+                      <img src={p.src} alt={p.caption} width={p.w} height={p.h} loading="lazy" />
+                    </a>
+                    <span>{p.caption}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         <section id="approach" className="sp-steps" aria-labelledby="approach-title">
