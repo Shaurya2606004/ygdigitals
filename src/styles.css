@@ -1323,19 +1323,21 @@ a.sp-proj:hover {
   aspect-ratio: 1;
   object-fit: cover;
 }
-/* an embedded Reel: header + 4:5 player + "View more on Instagram", the comment box below is cut off */
-.sp-proj {
+/* an embedded Reel: header + 4:5 player + "View more on Instagram", the comment box below is cut off.
+   The wrapper is the size container, not the card: containment would stop the card lining up with its neighbours */
+.sp-embed {
   container-type: inline-size;
-}
-.sp-proj iframe {
-  display: block;
   width: calc(100% + 48px);
-  height: calc(1.25 * (100cqw + 48px) + 100px);
   margin: -24px -24px 4px;
+}
+.sp-embed iframe {
+  display: block;
+  width: 100%;
+  height: calc(1.25 * 100cqw + 100px);
   border: 0;
   background: var(--white);
 }
-/* dashboard screenshots under the cards, each opens full size */
+/* dashboard screenshots under the cards, each opens full size: the first across the top, the rest two to a row */
 .sp-proof {
   margin-top: clamp(28px, 5vh, 48px);
 }
@@ -1343,6 +1345,15 @@ a.sp-proj:hover {
   display: grid;
   gap: 14px;
   margin-top: 14px;
+}
+@media (min-width: 641px) {
+  .sp-proof ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .sp-proof li:first-child {
+    grid-column: 1 / -1;
+  }
 }
 .sp-proof img {
   width: 100%;
@@ -1377,6 +1388,36 @@ a.sp-proj:hover {
   .sp-live-grid.has-shots > li {
     scroll-snap-align: start;
   }
+}
+/* each card's rows are the grid's own rows, so a title that wraps pushes the whole row down, not just its card */
+.sp-live-grid.has-shots > li {
+  display: grid;
+  grid-row: span var(--rows);
+  grid-template-rows: subgrid;
+}
+.sp-live-grid.has-shots .sp-proj {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+  align-items: start;
+}
+.sp-live-grid.has-shots .sp-proj small {
+  grid-row: 2;
+}
+.sp-live-grid.has-shots .sp-proj b {
+  grid-row: 3;
+  margin-top: 0;
+}
+.sp-live-grid.has-shots .sp-proj ul {
+  grid-row: 4;
+}
+.sp-live-grid.has-shots .sp-proj-go {
+  grid-row: -2;
+}
+/* the red card has no picture: an empty top keeps it card-sized when it sits alone on a row */
+.sp-live-grid.has-shots .sp-proj-next::before {
+  content: '';
+  min-height: 90px;
 }
 .sp-proj small {
   font-weight: 700;

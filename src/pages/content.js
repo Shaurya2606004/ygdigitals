@@ -1,10 +1,10 @@
 /*
- * Copy for the service pages (/services/<slug>). Loaded only with those pages, never on the home page.
+ * Copy for the service pages (/services/<slug>).
  * *starred* words in `belief` are highlighted in brand red.
  *
- * PLACEHOLDER PROJECTS — every `projects` entry below except packaging's is a stand-in until the client sends real work.
- * For each real one add `url` (the live page, store or post; the card links to it) and optionally `image` (a square
- * picture in /public/work, 800×800 webp) or `video` (a short square muted loop, with `image` as its poster).
+ * `projects` are the client's real work. Each card takes `url` (the live page, store or post; the card links to it) and
+ * one picture: `image` (square, 800×800 webp in /public/work), `video` (a short square muted loop, `image` is its
+ * poster) or `embed` (an Instagram player). `proof` = dashboard screenshots shown under the cards.
  */
 
 // the same on every page
@@ -50,11 +50,13 @@ export const CONTENT = {
       { title: 'Savaria on Flipkart', client: 'Desi ghee brand', image: '/work/ecom-flipkart.webp', did: ['₹5.76L sales in 30 days', '+892 units vs the month before', '60 live listings'] },
       { title: 'Savaria on Amazon', client: 'Desi ghee brand', image: '/work/ecom-amazon.webp', did: ['1,410 units in 6 months', '16.2% conversion', 'New store, 10+ ranges'] },
     ],
-    // screenshots of the real dashboards, browser bars cropped off
+    // the whole dashboard screens, only the laptop's menu bar, browser tabs and address bar cropped off
     proof: [
-      { src: '/work/proof-flipkart-30days.webp', w: 1532, h: 600, caption: 'Flipkart, last 30 days: ₹5.76L gross sales, +892 units' },
-      { src: '/work/proof-flipkart-today.webp', w: 1400, h: 186, caption: 'Flipkart, 28 Sep: 133 units and ₹61.6K in a day' },
-      { src: '/work/proof-amazon-6months.webp', w: 1284, h: 260, caption: 'Amazon, last 6 months: 1,410 units, 16.2% conversion' },
+      { src: '/work/proof-flipkart-insights.webp', w: 1600, h: 806, caption: 'Flipkart, last 30 days: 1.2K units and ₹5.76L gross sales, +892 units on the month before' },
+      { src: '/work/proof-flipkart-home.webp', w: 1280, h: 644, caption: 'Flipkart, 28 Sep: 133 units and ₹61.6K in a day' },
+      { src: '/work/proof-flipkart-listings.webp', w: 1600, h: 802, caption: 'Flipkart, listings: 60 active' },
+      { src: '/work/proof-amazon-sales.webp', w: 1600, h: 802, caption: 'Amazon, last 6 months: 1,410 units, 16.2% conversion' },
+      { src: '/work/proof-amazon-inventory.webp', w: 1600, h: 802, caption: 'Amazon, inventory: 10+ Savaria ghee ranges listed' },
     ],
     steps: [
       { t: 'Audit store and category', d: 'Who ranks, what they charge and what buyers complain about.', p: ['Competitor listings benchmarked', 'Account health and returns checked'] },

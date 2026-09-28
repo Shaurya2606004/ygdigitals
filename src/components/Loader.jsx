@@ -1,6 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { REDUCED } from '../lib/motion'
+
+/*
+ * A page's loader state: progress follows real readiness — every font the page uses, then its 3D stage drawing
+ * (call onSceneReady). After 8 s it finishes anyway, so a stalled WebGL never traps anyone behind it.
+ */
+export function useLoader() {
+  const [fontsReady, setFontsReady] = useState(false)
+  const [sceneReady, setSceneReady] = useState(false)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    Promise.all([document.fonts.load('800 1em Unbounded'), document.fonts.load('400 1em Manrope'), document.fonts.ready]).finally(() => setFontsReady(true))
+    const t = setTimeout(() => setSceneReady(true), 8000)
+    return () => clearTimeout(t)
+  }, [])
+  const onSceneReady = useCallback(() => setSceneReady(true), [])
+  const done = useCallback(() => setLoading(false), [])
+  return { loading, progress: 0.15 + (fontsReady ? 0.35 : 0) + (sceneReady ? 0.5 : 0), onSceneReady, done }
+}
 
 const WORDS = ['Loading likes', 'Stacking boxes', 'Cutting reels', 'Listing products', 'Pushing pixels']
 

@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { REDUCED, gsap, listenTilt, scrollToId, smoothScroll } from '../lib/motion'
+import { AnimatePresence } from 'framer-motion'
+import { REDUCED, ScrollTrigger, gsap, listenTilt, lockScroll, scrollToId, smoothScroll } from '../lib/motion'
 import { SafeGL, Stage } from '../three/clay'
 import { ServicesScene } from '../three/MiniScenes'
 import { CONTACT, SERVICES, pagePath } from '../data'
+import Loader, { useLoader } from '../components/Loader'
 import Cursor from '../components/Cursor'
 import Nav from '../components/Nav'
 import { Contact, Footer, WhatsAppFab } from '../components/Contact'
@@ -11,6 +13,12 @@ import { CONTENT, WHY } from './content'
 
 // "E-commerce Handling", not the short "E-commerce" the home page chips use
 const fullName = (p) => p.lines.join(' ')
+
+// no WebGL: nothing for the loader to wait for
+function NoGL({ onReady }) {
+  useEffect(onReady, [onReady])
+  return null
+}
 
 /*
  * /services/<slug>: the thought process behind one service.
@@ -21,12 +29,27 @@ export default function ServicePage({ page }) {
   const c = CONTENT[page.id]
   const i = SERVICES.indexOf(page)
   const next = SERVICES[(i + 1) % SERVICES.length]
+  const { loading, progress, onSceneReady, done } = useLoader()
 
   useEffect(() => {
     history.scrollRestoration = 'auto'
     return smoothScroll()
   }, [])
   useEffect(() => listenTilt(), [])
+  // the page is built behind the loader and revealed all at once
+  useEffect(() => {
+    lockScroll(loading)
+    if (!loading) ScrollTrigger.refresh()
+  }, [loading])
+
+  // clips play only while on screen: nothing downloads before a card comes near (they held up the page as it
+  // loaded), and swiped-away ones stop
+  useEffect(() => {
+    if (REDUCED) return
+    const io = new IntersectionObserver((es) => es.forEach((e) => (e.isIntersecting ? e.target.play().catch(() => {}) : e.target.pause())), { rootMargin: '200px' })
+    root.current.querySelectorAll('.sp-proj video').forEach((v) => io.observe(v))
+    return () => io.disconnect()
+  }, [])
 
   // rows rise in as they enter; everything is visible from the start with reduced motion
   useLayoutEffect(() => {
@@ -35,13 +58,19 @@ export default function ServicePage({ page }) {
       gsap.utils.toArray('.sp-rise').forEach((el) =>
         gsap.from(el, { y: 50, autoAlpha: 0, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 88%', once: true } }),
       )
-      gsap.from('.sp-hero-copy > *', { y: 40, autoAlpha: 0, duration: 0.9, stagger: 0.08, ease: 'power3.out', delay: 0.1 })
     }, root)
     return () => ctx.revert()
   }, [])
+  // as the loader lifts: the hero copy rises in (the prop pops in and the mascot hops, via index below)
+  useLayoutEffect(() => {
+    if (REDUCED || loading) return
+    const ctx = gsap.context(() => gsap.from('.sp-hero-copy > *', { y: 40, autoAlpha: 0, duration: 0.9, stagger: 0.08, ease: 'power3.out' }), root)
+    return () => ctx.revert()
+  }, [loading])
 
   return (
     <>
+      <AnimatePresence>{loading && <Loader key="loader" progress={progress} onDone={done} />}</AnimatePresence>
       <Cursor />
       <Nav />
       <main ref={root} className="sp">
@@ -77,9 +106,9 @@ export default function ServicePage({ page }) {
             </div>
           </div>
           <div className="sp-stage">
-            <SafeGL>
-              <Stage className="sp-canvas" camera={{ position: [0, 0, 6.5], fov: 35 }}>
-                <ServicesScene index={i} buddy="black" />
+            <SafeGL fallback={<NoGL onReady={onSceneReady} />}>
+              <Stage className="sp-canvas" camera={{ position: [0, 0, 6.5], fov: 35 }} onReady={onSceneReady}>
+                <ServicesScene index={loading ? -1 : i} buddy="black" />
               </Stage>
             </SafeGL>
           </div>
@@ -97,8 +126,8 @@ export default function ServicePage({ page }) {
               Live <em>projects</em>
             </h2>
           </header>
-          {/* with pictures it's a gallery: three across, a swipe row on phones */}
-          <ul className={`sp-live-grid ${c.projects.some((w) => w.image || w.embed) ? 'has-shots' : ''}`}>
+          {/* with pictures it's a gallery: three across, a swipe row on phones. --rows: picture, client, title, chips (+ link), lined up across the cards */}
+          <ul className={`sp-live-grid ${c.projects.some((w) => w.image || w.embed) ? 'has-shots' : ''}`} style={{ '--rows': c.projects.some((w) => w.url) ? 5 : 4 }}>
             {c.projects.map((w) => {
               // a card links out only once it has a real address
               const Card = w.url ? 'a' : 'div'
@@ -107,9 +136,11 @@ export default function ServicePage({ page }) {
                   <Card className="sp-proj" {...(w.url && { href: w.url, target: '_blank', rel: 'noreferrer', 'data-cursor': 'Visit' })}>
                     {w.embed ? (
                       // Instagram's own player: the Reel plays right here
-                      <iframe src={w.embed} title={`${w.title} — ${w.client}`} loading="lazy" scrolling="no" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                      <div className="sp-embed">
+                        <iframe src={w.embed} title={`${w.title} — ${w.client}`} loading="lazy" scrolling="no" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                      </div>
                     ) : w.video ? (
-                      <video src={w.video} poster={w.image} aria-label={`${w.title} — ${w.client}`} width="800" height="800" autoPlay={!REDUCED} muted loop playsInline preload="none" />
+                      <video src={w.video} poster={w.image} aria-label={`${w.title} — ${w.client}`} width="800" height="800" muted loop playsInline preload="none" />
                     ) : (
                       w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading="lazy" />
                     )}

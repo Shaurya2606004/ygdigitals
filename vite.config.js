@@ -33,9 +33,6 @@ function pages() {
         html = swap(html, /(property="og:title" content=")[^"]*/, esc(p.meta.title))
         html = swap(html, /(name="description" content=")[^"]*/, esc(p.meta.description))
         html = swap(html, /(property="og:description" content=")[^"]*/, esc(p.meta.description))
-        // no loader on these pages: drop the red boot blob and start on the light backdrop
-        html = swap(html, /(<div id="root">)<div class="boot"[^]*?<\/div><\/div>/, '')
-        html = swap(html, /(html,\s*body\s*\{\s*background:\s*)#0d0d0d/, '#f2f1ee')
         fs.writeFileSync(path.join(dir, `${pagePath(p).slice(1)}.html`), html)
       }
 

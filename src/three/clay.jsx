@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Component, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber'
 import { PerformanceMonitor, RoundedBox, Text } from '@react-three/drei'
 import { mergeGeometries, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js'
@@ -556,13 +556,15 @@ function Warmup({ offscreen, onDone }) {
  * renders while on screen (and only after its shaders are compiled). If the device can't hold the frame
  * rate, it drops to 1x pixel density.
  */
-export function Stage({ children, className, camera = { position: [0, 0, 10], fov: 30 }, eventSource, warmOffscreen = false, ...rest }) {
+export function Stage({ children, className, camera = { position: [0, 0, 10], fov: 30 }, eventSource, warmOffscreen = false, onReady, ...rest }) {
   const wrap = useRef()
   const [near, setNear] = useState(false)
   const [visible, setVisible] = useState(false)
   const [compiled, setCompiled] = useState(false)
   const [lowDpr, setLowDpr] = useState(false)
   const onCompiled = useCallback(() => setCompiled(true), [])
+  // shaders compiled: real frames start now (a page's loader waits for this)
+  useEffect(() => void (compiled && onReady?.()), [compiled, onReady])
   useEffect(() => {
     const onScreen = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: '120px' })
     const ahead = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: '150% 0px' })
@@ -587,9 +589,13 @@ export function Stage({ children, className, camera = { position: [0, 0, 10], fo
           {...rest}
         >
           <PerformanceMonitor onDecline={() => setLowDpr(true)} />
-          <ClayLights />
-          {children}
-          <Warmup offscreen={warmOffscreen} onDone={onCompiled} />
+          {/* while the lighting and fonts load only this canvas waits; without a boundary here R3F hands the
+              suspense up to the page's, which hid the whole service page (a black screen) until they arrived */}
+          <Suspense fallback={null}>
+            <ClayLights />
+            {children}
+            <Warmup offscreen={warmOffscreen} onDone={onCompiled} />
+          </Suspense>
         </Canvas>
       )}
     </div>

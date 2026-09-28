@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { ScrollTrigger, lockScroll, scrollToId, smoothScroll } from './lib/motion'
-import Loader from './components/Loader'
+import Loader, { useLoader } from './components/Loader'
 import Cursor from './components/Cursor'
 import Nav from './components/Nav'
 import Hero from './components/Hero'
@@ -11,17 +11,11 @@ import Services from './components/Services'
 import { Contact, Footer, WhatsAppFab } from './components/Contact'
 
 export default function App() {
-  const [fontsReady, setFontsReady] = useState(false)
-  const [sceneReady, setSceneReady] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const { loading, progress, onSceneReady, done } = useLoader()
 
   useEffect(() => {
     history.scrollRestoration = 'manual'
     window.scrollTo(0, 0)
-    Promise.all([document.fonts.load('800 1em Unbounded'), document.fonts.load('400 1em Manrope')]).finally(() => setFontsReady(true))
-    // never trap a visitor behind the loader if WebGL stalls
-    const t = setTimeout(() => setSceneReady(true), 8000)
-    return () => clearTimeout(t)
   }, [])
 
   useEffect(smoothScroll, [])
@@ -34,12 +28,9 @@ export default function App() {
     if (location.hash) scrollToId(decodeURIComponent(location.hash.slice(1)), true)
   }, [loading])
 
-  const onSceneReady = useCallback(() => setSceneReady(true), [])
-  const progress = 0.15 + (fontsReady ? 0.35 : 0) + (sceneReady ? 0.5 : 0)
-
   return (
     <>
-      <AnimatePresence>{loading && <Loader key="loader" progress={progress} onDone={() => setLoading(false)} />}</AnimatePresence>
+      <AnimatePresence>{loading && <Loader key="loader" progress={progress} onDone={done} />}</AnimatePresence>
       <Cursor />
       <Nav />
       <main>
