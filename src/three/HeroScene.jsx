@@ -167,11 +167,6 @@ const LINES_WIDE = [
   { t: 'STOP', f: 1 },
   { t: 'THE SCROLL.', f: 1 },
 ]
-const LINES_PORTRAIT = [
-  { t: 'STOP', f: 1 },
-  { t: 'THE', f: 0.52 },
-  { t: 'SCROLL.', f: 1 },
-]
 
 export default function HeroScene({ ready, progress, onReady }) {
   const { viewport, size, clock, camera } = useThree()
@@ -188,7 +183,11 @@ export default function HeroScene({ ready, progress, onReady }) {
   const mid = (bandTop + bandBottom) / 2
   const u = Math.min(vw / 2.75, (bandTop - bandBottom) / 4.1)
   const width = portrait ? Math.min(u * 2.15, vw * 0.92) : Math.min(vw * 0.45, 6.2)
-  const lines = portrait ? LINES_PORTRAIT : LINES_WIDE
+  // phones drop the headline: the phone, the two of them and the props fill the band on their own
+  const lines = portrait ? [] : LINES_WIDE
+  // the portrait stage is drawn in units of u (about 2.3u wide, 3u tall), then blown up by S to fill the band and centred on it
+  const S = Math.min((vw / u) * 0.41, (bandTop - bandBottom) / u / 3)
+  const at = (x, y, z) => [x * S, mid + S * (y + u * 0.72), z]
   const [h, setH] = useState({})
   const readyAt = useRef(null)
   const sp = useRef(0)
@@ -210,9 +209,7 @@ export default function HeroScene({ ready, progress, onReady }) {
     return y
   })
   const total = -cursor - gap
-  const textY = portrait ? mid + u * 2 - total / 2 : vh * 0.04
-  // the middle of the short "THE" line: the Instagram slab and the Flipkart bag fill the gaps either side of it
-  const theY = textY + total / 2 + ys[1] - (h.THE || 0) / 2
+  const textY = vh * 0.04
 
   const framesSinceSync = useRef(0)
   useFrame((state, dt) => {
@@ -242,9 +239,9 @@ export default function HeroScene({ ready, progress, onReady }) {
 
   const items = portrait
     ? [
-        { el: <InstaCube />, p: [-u * 0.8, theY, 0.4], r: [0.3, 0.6, -0.15], s: u * 0.4, d: 0.25 },
-        { el: <FlipkartBag />, p: [u * 0.8, theY, 0.2], r: [0.15, -0.5, -0.1], s: u * 0.3, d: 0.2 },
-        { el: <AmazonBox />, p: [-u * 0.97, mid - u * 0.08, 0.4], r: [0.3, 0.45, 0.05], s: u * 0.26, d: 0.3 },
+        { el: <InstaCube />, p: at(-u * 0.78, u * 0.42, 0.4), r: [0.3, 0.6, -0.15], s: u * 0.4 * S, d: 0.25 },
+        { el: <FlipkartBag />, p: at(u * 0.8, u * 0.22, 0.2), r: [0.15, -0.5, -0.1], s: u * 0.3 * S, d: 0.2 },
+        { el: <AmazonBox />, p: at(u * 0.36, -u * 1.8, 0.9), r: [0.25, -0.5, 0.05], s: u * 0.22 * S, d: 0.3 },
       ]
     : DESKTOP.map((it) => ({ ...it, p: [it.p[0] * vw * 0.5, it.p[1] * vh * 0.5, it.p[2]] }))
   // on a narrow screen a sideways burst leaves it empty at once, so props swell toward the camera and rush past instead
@@ -266,18 +263,20 @@ export default function HeroScene({ ready, progress, onReady }) {
           </>
         )}
       </group>
-      {/* phones: under the headline, the phone with its feed stopping on our post, the two of them either side on a patch of shade */}
+      {/* phones: the phone with its feed stopping on our post, the two of them either side on a patch of shade */}
       {portrait && (
         <group ref={stage}>
-          <group position={[0, -u * 0.72, -0.6]} rotation={[0.06, -0.18, 0.03]} scale={u * 1.19}>
-            <FeedPhone readyAt={readyAt} />
+          <group position-y={u * 0.72 * S} scale={S}>
+            <group position={[0, -u * 0.72, -0.6]} rotation={[0.06, -0.18, 0.03]} scale={u * 1.19}>
+              <FeedPhone readyAt={readyAt} />
+            </group>
+            <Buddy look="guy" outfit="black" seed={5} wave position={[-u * 0.8, -u * 1.267, 0.4]} scale={u * 0.58} rotation={[0, 0.35, 0]} />
+            <Buddy look="girl" outfit="white" seed={2} position={[u * 0.82, -u * 1.303, 0.2]} scale={u * 0.55} rotation={[0, -0.35, 0]} />
+            <mesh position={[0, -u * 1.99, -0.9]} scale={[u * 2.9, u * 0.34, 1]}>
+              <planeGeometry />
+              <meshBasicMaterial map={getShadeMap()} transparent depthWrite={false} />
+            </mesh>
           </group>
-          <Buddy look="guy" outfit="black" seed={5} wave position={[-u * 0.8, -u * 1.267, 0.4]} scale={u * 0.58} rotation={[0, 0.35, 0]} />
-          <Buddy look="girl" outfit="white" seed={2} position={[u * 0.82, -u * 1.303, 0.2]} scale={u * 0.55} rotation={[0, -0.35, 0]} />
-          <mesh position={[0, -u * 1.99, -0.9]} scale={[u * 2.9, u * 0.34, 1]}>
-            <planeGeometry />
-            <meshBasicMaterial map={getShadeMap()} transparent depthWrite={false} />
-          </mesh>
         </group>
       )}
       {items.map((it, i) => (

@@ -1289,7 +1289,7 @@ body::after {
   margin-top: 14px;
   font-size: clamp(28px, 3.8vw, 60px);
 }
-/* live projects: dark cards (a screenshot on top once there is one), and a red one that books the call */
+/* live projects: dark cards (a square picture on top once there is one), and a red one that books the call */
 .sp-live {
   background: var(--mist);
 }
@@ -1317,9 +1317,30 @@ a.sp-proj:hover {
 .sp-proj img {
   width: calc(100% + 48px);
   max-width: none;
+  height: auto;
   margin: -24px -24px 4px;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 1;
   object-fit: cover;
+}
+/* a gallery: three across, and on phones a row you swipe through, edge to edge */
+.sp-live-grid.has-shots {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 640px) {
+  .sp-live-grid.has-shots {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 78%;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin-inline: calc(-1 * var(--gutter));
+    padding-inline: var(--gutter);
+    scroll-padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+  .sp-live-grid.has-shots > li {
+    scroll-snap-align: start;
+  }
 }
 .sp-proj small {
   font-weight: 700;

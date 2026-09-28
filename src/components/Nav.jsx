@@ -73,7 +73,7 @@ export default function Nav() {
     <>
       <header ref={bar} className={`nav ${hidden && !open ? 'is-hidden' : ''} ${dark || open ? 'is-dark' : ''}`}>
         <a href={HOME ? '#top' : '/'} className="nav-logo" onClick={HOME ? go('top') : undefined} aria-label={HOME ? 'YG Digitals — back to top' : 'YG Digitals — home'}>
-          <span className="nav-mark">YG</span>
+          <img className="nav-mark" src="/yg-logo.webp" alt="" width="44" height="44" />
           <span className="nav-word">digitals</span>
         </a>
         <nav className="nav-links" aria-label="Primary">

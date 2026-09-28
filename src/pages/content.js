@@ -2,8 +2,9 @@
  * Copy for the service pages (/services/<slug>). Loaded only with those pages, never on the home page.
  * *starred* words in `belief` are highlighted in brand red.
  *
- * PLACEHOLDER PROJECTS — every `projects` entry below is a stand-in until the client sends real work. For each real one
- * add `url` (the live page, store or post; the card links to it) and optionally `image` (a screenshot in /public).
+ * PLACEHOLDER PROJECTS — every `projects` entry below except packaging's is a stand-in until the client sends real work.
+ * For each real one add `url` (the live page, store or post; the card links to it) and optionally `image` (a square
+ * picture in /public/work, 800×800 webp).
  */
 
 // the same on every page
@@ -62,9 +63,16 @@ export const CONTENT = {
   pack: {
     lede: 'Boxes, labels and pouches that win the shelf and the thumbnail — premium on the outside, print-ready on the inside.',
     belief: 'Packaging is the *only ad your customer holds*. We design it to be picked up and remembered.',
+    // real work, from the client's portfolio (2026-09-28); the best 8 of 16
     projects: [
-      { title: 'Masala Box Series', client: 'Spice brand', year: '2025', did: ['6-SKU packaging system', 'Print-ready dielines'] },
-      { title: 'Pickle Jar Labels', client: 'Home-food brand', year: '2024', did: ['Label range', '3D mockups'] },
+      { title: 'Superfarmers', client: 'Veggie chips', image: '/work/pack-superfarmers.webp', did: ['3-flavour range', 'Colour-coded variants'] },
+      { title: 'Roohted', client: 'Vacuum-cooked chips', image: '/work/pack-roohted.webp', did: ['Front & back of pack', 'Nutrition panel'] },
+      { title: 'Your Fab', client: 'Indori sev', image: '/work/pack-yourfab.webp', did: ['Namkeen pouch', 'Bold shelf colours'] },
+      { title: 'FarmLane', client: 'Flavoured makhana', image: '/work/pack-farmlane.webp', did: ['Hand-drawn illustration', 'Premium pouch'] },
+      { title: 'Zaika Nuts', client: 'Dry fruits', image: '/work/pack-zaikanuts.webp', did: ['Anjeer pouch', 'Product-first front'] },
+      { title: 'Velvet Bean', client: 'Arabica coffee', image: '/work/pack-velvetbean.webp', did: ['Coffee bag', 'Full-wrap artwork'] },
+      { title: 'Chosenn', client: 'Energy bar', image: '/work/pack-chosenn.webp', did: ['Bar wrapper', 'Claim icons'] },
+      { title: 'Fermente', client: 'Protein chips', image: '/work/pack-fermente.webp', did: ['Chips pouch', 'Flavour & protein callouts'] },
     ],
     steps: [
       { t: 'Study shelf and screen', d: 'Where your product is seen decides what must read in three seconds.', p: ['Competitor packs compared side by side', 'Buyer and price point defined first'] },
@@ -85,8 +93,12 @@ export const CONTENT = {
     lede: 'Fast, mobile-first websites and landing pages that look expensive and turn visitors into calls — designed and built in-house.',
     belief: 'A website isn’t a brochure. It’s *your best salesperson, working 24 hours*.',
     projects: [
-      { title: 'Builder Showcase', client: 'Real-estate developer', year: '2024', did: ['Project website', 'Lead-capture pages'] },
-      { title: 'Factory Catalogue Site', client: 'Manufacturer', year: '2025', did: ['Product catalogue', 'WhatsApp enquiries'] },
+      { title: 'Silk and Sequence', client: "Men's kurta label", url: 'https://silkandsequence.com', image: '/work/web-silk.webp', did: ['Online store', 'Editorial look'] },
+      { title: 'Studio Agriya', client: 'Landscape architects', url: 'https://studio-agriya.vercel.app/', image: '/work/web-agriya.webp', did: ['Studio website', 'Project enquiries'] },
+      { title: 'Radha Madhav Textiles', client: 'Textile agency, Surat', url: 'https://radha-madhav-textiles.vercel.app/', image: '/work/web-radha.webp', did: ['Company website', 'Enquiry flow'] },
+      { title: 'S.R. Timbers', client: 'Timber importer', url: 'https://srtimbers.com', image: '/work/web-srt.webp', did: ['Business website', 'Call & WhatsApp buttons'] },
+      // the quiet flex: this very site
+      { title: 'YG Digitals', client: 'The site you’re on', url: '/', image: '/work/web-yg.webp', did: ['3D clay hero', 'Designed & built in-house'] },
     ],
     steps: [
       { t: 'Goals and visitors first', d: 'Who visits, from where — and the one thing each page should get them to do.', p: ['One main action per page', 'Competitor sites reviewed for gaps'] },

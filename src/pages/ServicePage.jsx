@@ -95,17 +95,16 @@ export default function ServicePage({ page }) {
               Live <em>projects</em>
             </h2>
           </header>
-          <ul className="sp-live-grid">
+          {/* with pictures it's a gallery: three across, a swipe row on phones */}
+          <ul className={`sp-live-grid ${c.projects.some((w) => w.image) ? 'has-shots' : ''}`}>
             {c.projects.map((w) => {
               // a card links out only once it has a real address
               const Card = w.url ? 'a' : 'div'
               return (
                 <li key={w.title} className="sp-rise">
                   <Card className="sp-proj" {...(w.url && { href: w.url, target: '_blank', rel: 'noreferrer', 'data-cursor': 'Visit' })}>
-                    {w.image && <img src={w.image} alt={`${w.title} for ${w.client}`} loading="lazy" />}
-                    <small>
-                      {w.client} · {w.year}
-                    </small>
+                    {w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading="lazy" />}
+                    <small>{[w.client, w.year].filter(Boolean).join(' · ')}</small>
                     <b>{w.title}</b>
                     <ul>
                       {w.did.map((d) => (
