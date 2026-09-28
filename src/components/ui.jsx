@@ -9,10 +9,10 @@ export const Arrow = () => (
 )
 
 // every "Book a call" dials the studio, with the number right on the button
-export const BookCall = ({ className = 'btn-dark', children = 'Book a call' }) => (
+export const BookCall = ({ className = 'btn-dark', children = 'Book a call', num = true }) => (
   <a className={`btn ${className}`} href={CONTACT.tel} data-cursor="Call">
     {children}
-    <span className="btn-num">{CONTACT.phone}</span>
+    {num && <span className="btn-num">{CONTACT.phone}</span>}
   </a>
 )
 

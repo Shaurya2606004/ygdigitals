@@ -60,7 +60,9 @@ export default function ServicePage({ page }) {
             </h1>
             <p className="sp-lede">{c.lede}</p>
             <div className="sp-ctas">
-              <BookCall className="btn-red">Book a free call</BookCall>
+              <BookCall className="btn-red" num={false}>
+                Book a free call
+              </BookCall>
               <a
                 className="btn btn-glass"
                 href="#approach"
