@@ -2,7 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
-import { SERVICES, SITE, pagePath } from './src/data.js'
+import { CONTACT, SERVICES, SITE, pagePath } from './src/data.js'
+import { CONTENT } from './src/pages/content.js'
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')
 
@@ -10,6 +11,46 @@ const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g
 function swap(html, re, value) {
   if (!re.test(html)) throw new Error(`pages: ${re} not found in index.html`)
   return html.replace(re, (_, head) => head + value)
+}
+
+// where the studio works: its town, the nearby cities people search from, then the whole country
+const AREAS = [...['Gohana', 'Sonipat', 'Panipat', 'Rohtak'].map((name) => ({ '@type': 'City', name })), { '@type': 'State', name: 'Haryana' }, { '@type': 'Country', name: 'India' }]
+
+// schema.org JSON-LD: the studio itself on every page; each service page adds the service, its breadcrumb and its FAQ
+const ORG = {
+  '@type': 'ProfessionalService',
+  '@id': `${SITE}/#org`,
+  name: 'YG Digitals',
+  url: `${SITE}/`,
+  logo: `${SITE}/apple-touch-icon.png`,
+  image: `${SITE}/og.png`,
+  telephone: CONTACT.tel.replace('tel:', ''),
+  email: CONTACT.email,
+  address: { '@type': 'PostalAddress', addressLocality: 'Gohana', addressRegion: 'Haryana', addressCountry: 'IN' },
+  description: 'Digital marketing agency in Gohana, Haryana — social media marketing, e-commerce account management, packaging design, website design, video editing and Reel shoots.',
+  areaServed: AREAS,
+  sameAs: [CONTACT.instagram],
+  knowsAbout: SERVICES.map((s) => s.title),
+}
+// `<` escaped so nothing in the data can close the script tag
+const ldJson = (graph) => `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }).replace(/</g, '\\u003c')}</script>`
+
+function serviceLd(p) {
+  const url = SITE + pagePath(p)
+  const name = p.lines.join(' ')
+  return [
+    ORG,
+    { '@type': 'Service', name, serviceType: p.title, description: p.meta.description, url, provider: { '@id': ORG['@id'] }, areaServed: AREAS },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Services', item: `${SITE}/#services` },
+        { '@type': 'ListItem', position: 3, name, item: url },
+      ],
+    },
+    { '@type': 'FAQPage', mainEntity: CONTENT[p.id].faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
+  ]
 }
 
 /*
@@ -24,7 +65,8 @@ function pages() {
     writeBundle({ dir }, bundle) {
       const home = bundle['index.html'].source
       const withUrl = (html, url) => swap(swap(html, /(rel="canonical" href=")[^"]*/, url), /(property="og:url" content=")[^"]*/, url)
-      fs.writeFileSync(path.join(dir, 'index.html'), withUrl(home, `${SITE}/`))
+      const withLd = (html, graph) => swap(html, /(\s*)<\/head>/, `${ldJson(graph)}\n  </head>`)
+      fs.writeFileSync(path.join(dir, 'index.html'), withLd(withUrl(home, `${SITE}/`), [ORG]))
 
       fs.mkdirSync(path.join(dir, 'services'), { recursive: true })
       for (const p of SERVICES) {
@@ -33,6 +75,7 @@ function pages() {
         html = swap(html, /(property="og:title" content=")[^"]*/, esc(p.meta.title))
         html = swap(html, /(name="description" content=")[^"]*/, esc(p.meta.description))
         html = swap(html, /(property="og:description" content=")[^"]*/, esc(p.meta.description))
+        html = withLd(html, serviceLd(p))
         fs.writeFileSync(path.join(dir, `${pagePath(p).slice(1)}.html`), html)
       }
 

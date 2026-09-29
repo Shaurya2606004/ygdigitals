@@ -5,7 +5,7 @@ export const CONTACT = {
   whatsapp: 'https://wa.me/919817458931',
   instagram: 'https://www.instagram.com/ygdigitals.marketing',
   city: 'Gohana, Haryana',
-  reach: 'Working with brands across India',
+  reach: 'Serving Sonipat, Panipat, Rohtak & all of India',
 }
 
 // the live address (the custom domain Search Console knows); canonical links, link previews, sitemap.xml and robots.txt are built from it
@@ -27,9 +27,9 @@ export const SERVICES = [
     theme: 'white',
     buddy: 'black',
     meta: {
-      title: 'Social Media Management in Gohana — Instagram & Facebook | YG Digitals',
+      title: 'Social Media Marketing Agency in Gohana, Haryana | YG Digitals',
       description:
-        'How YG Digitals runs Instagram & Facebook for brands in Gohana and across India — a planned content calendar, posts and Reels made in-house, comments and DMs handled daily, and Meta ads that bring enquiries.',
+        'Social media marketing agency in Gohana, Haryana — Instagram & Facebook management, posts and Reels made in-house, and Meta ads that bring enquiries. Serving Sonipat, Panipat, Rohtak & all of India.',
     },
   },
   {
@@ -43,9 +43,9 @@ export const SERVICES = [
     theme: 'black',
     buddy: 'white',
     meta: {
-      title: 'Video Ad & Reel Shoot in Gohana — Shot On Location | YG Digitals',
+      title: 'Reel & Video Ad Shoot Services in Gohana, Haryana | YG Digitals',
       description:
-        'Video ad and Reel shoots by YG Digitals: scripted, planned and shot at your shop, factory or site — lit well, framed for the phone screen and directed so your team looks natural on camera.',
+        'Reel shooting and video ad shoot services in Gohana, Haryana — factory, shop and product shoots, scripted, lit and directed on location. Serving Sonipat, Panipat, Rohtak & nearby.',
     },
   },
   {
@@ -59,9 +59,9 @@ export const SERVICES = [
     theme: 'white',
     buddy: 'black',
     meta: {
-      title: 'E-commerce Handling in Gohana — Amazon, Flipkart & Meesho | YG Digitals',
+      title: 'Amazon, Flipkart & Meesho Account Management, Gohana | YG Digitals',
       description:
-        'Marketplace store management by YG Digitals: keyword-researched listings, images that sell, sponsored ads and daily store care on Amazon, Flipkart and Meesho.',
+        'Amazon, Flipkart and Meesho seller account management services from Gohana, Haryana — listing services, product images, sponsored ads and daily store care for sellers across India.',
     },
   },
   {
@@ -75,9 +75,9 @@ export const SERVICES = [
     theme: 'black',
     buddy: 'white',
     meta: {
-      title: 'Packaging Design in Gohana — Boxes, Labels & Pouches | YG Digitals',
+      title: 'Packaging Design Company in Gohana, Haryana | YG Digitals',
       description:
-        'Packaging design by YG Digitals: boxes, labels and pouches designed for the shelf and the thumbnail, with print-ready dielines, correct legal text and photo-real 3D mockups.',
+        'Product packaging design company in Gohana, Haryana — pouch packaging, food labels and box design with print-ready dielines and 3D mockups, for FMCG and D2C brands across India.',
     },
   },
   {
@@ -91,9 +91,9 @@ export const SERVICES = [
     theme: 'white',
     buddy: 'black',
     meta: {
-      title: 'Website Design in Gohana — Fast, Mobile-First Websites | YG Digitals',
+      title: 'Website Design Company in Gohana, Haryana | YG Digitals',
       description:
-        'Website design by YG Digitals: fast, mobile-first business websites and landing pages built to turn visitors into calls and WhatsApp enquiries — SEO-ready and tracked.',
+        'Website design & development company in Gohana, Haryana — fast, mobile-first business websites that bring calls and WhatsApp enquiries. Serving Sonipat, Panipat, Rohtak & all of India.',
     },
   },
   {
@@ -107,9 +107,9 @@ export const SERVICES = [
     theme: 'black',
     buddy: 'white',
     meta: {
-      title: 'Video Editing in Gohana — Reels, Ad Films & Product Videos | YG Digitals',
+      title: 'Reels & Video Editing Services in Gohana, Haryana | YG Digitals',
       description:
-        'Video editing by YG Digitals: Reels, ad films and product videos cut hook-first for the first three seconds, with captions, motion graphics, sound and colour.',
+        'Reels editing and video editing services in Gohana, Haryana — Instagram Reels, YouTube videos and ad films cut hook-first, with captions, motion graphics, sound and colour.',
     },
   },
 ]

@@ -60,7 +60,7 @@ export default function Hero({ ready, onSceneReady }) {
             <HeroScene ready={ready} progress={progress} onReady={onSceneReady} />
           </Stage>
         </SafeGL>
-        <h1 className="sr-only">YG Digitals — stop the scroll. Social media management, e-commerce, packaging design, website design, video editing and video ad &amp; Reel shoots.</h1>
+        <h1 className="sr-only">YG Digitals — digital marketing agency in Gohana, Haryana. Social media marketing, Amazon &amp; Flipkart account management, packaging design, website design, video editing and Reel shoots.</h1>
 
         <motion.div className="hero-ui" initial="hide" animate={ready ? 'show' : 'hide'}>
           <motion.p className="hero-kicker" variants={rise} custom={0}>
