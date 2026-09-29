@@ -1,6 +1,6 @@
 /*
- * Copy for the service pages (/services/<slug>).
- * *starred* words in `belief` are highlighted in brand red.
+ * Copy for the service pages (/services/<slug>). Keep it short: people come for the work. Each step shows `t` and `d`;
+ * its `p` points and the `details` go into the folded "Every check we run" list.
  *
  * `projects` are the client's real work. Each card takes `url` (the live page, store or post; the card links to it) and
  * one picture: `image` (square, 800×800 webp in /public/work), `video` (a short square muted loop, `image` is its
@@ -18,7 +18,6 @@ export const WHY = [
 export const CONTENT = {
   ads: {
     lede: 'Your Instagram and Facebook, run end to end — planned content, posts and Reels made in-house, daily replies and Meta ads that bring enquiries.',
-    belief: 'Posting is easy. *Building a page people trust* — where every post has a job — is the work we love.',
     projects: [
       // Jindal's numbers are from its Meta Ads Manager, last 30 days to 27 Sep 2026
       { title: 'Jindal Fasteners', client: 'Fastener manufacturer', url: 'https://www.instagram.com/jindal_fasteners/', image: '/work/social-jindal.webp', did: ['601 WhatsApp enquiries in 30 days', '₹16 per enquiry', 'Reels & posts'] },
@@ -44,7 +43,6 @@ export const CONTENT = {
 
   ecom: {
     lede: 'Your Amazon, Flipkart and Meesho stores, run end to end — listings that rank, images that convert and ads that pay their way.',
-    belief: 'On a marketplace, *your listing is your salesman*. We make it the best-dressed one on the page.',
     projects: [
       // numbers from the seller dashboards (28 Sep 2026): Flipkart = gross, 29 Aug–27 Sep; Amazon = units ordered, last 6 months.
       // no links: the Amazon listings are rated 2.5–3.8★
@@ -77,7 +75,6 @@ export const CONTENT = {
 
   pack: {
     lede: 'Boxes, labels and pouches that win the shelf and the thumbnail — premium on the outside, print-ready on the inside.',
-    belief: 'Packaging is the *only ad your customer holds*. We design it to be picked up and remembered.',
     // real work, from the client's portfolio (2026-09-28); the best 8 of 16
     projects: [
       { title: 'Superfarmers', client: 'Veggie chips', image: '/work/pack-superfarmers.webp', did: ['3-flavour range', 'Colour-coded variants'] },
@@ -107,7 +104,6 @@ export const CONTENT = {
 
   web: {
     lede: 'Fast, mobile-first websites and landing pages that look expensive and turn visitors into calls — designed and built in-house.',
-    belief: 'A website isn’t a brochure. It’s *your best salesperson, working 24 hours*.',
     projects: [
       { title: 'Silk and Sequence', client: "Men's kurta label", url: 'https://silkandsequence.com', image: '/work/web-silk.webp', did: ['Online store', 'Editorial look'] },
       { title: 'Studio Agriya', client: 'Landscape architects', url: 'https://studio-agriya.vercel.app/', image: '/work/web-agriya.webp', did: ['Studio website', 'Project enquiries'] },
@@ -134,7 +130,6 @@ export const CONTENT = {
 
   video: {
     lede: 'Reels, ad films and product videos cut for the first three seconds — hooks, captions, motion graphics and sound.',
-    belief: 'People decide in *three seconds* whether to keep watching. We edit every frame like it matters.',
     projects: [
       { title: 'Consistency over recognition', client: 'Jindal Fasteners · Reel', embed: 'https://www.instagram.com/reel/DdtySsqJorf/embed', did: ['Maruti Suzuki recognition', 'Logo motion graphics'] },
       { title: 'Weak connections? Not on our watch', client: 'Jindal Fasteners · Reel', embed: 'https://www.instagram.com/reel/Ddjf3QDpQEl/embed', did: ['Product close-ups', 'Hook-first cut'] },
@@ -158,7 +153,6 @@ export const CONTENT = {
 
   shoot: {
     lede: 'Video ads and Reels planned on paper, lit well, framed for the phone and directed on the day — at your shop, factory or site.',
-    belief: 'Great edits start with great footage. *A shoot planned on paper* is a shoot that works on the day.',
     projects: [
       // behind-the-scenes clips from a factory shoot day; `video` plays muted in the card, `image` is its poster
       { title: 'Quality lab', client: 'Factory shoot · behind the scenes', video: '/work/shoot-lab.mp4', image: '/work/shoot-lab.webp', did: ['Gimbal moves', 'Staff at work'] },

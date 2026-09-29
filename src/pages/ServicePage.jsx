@@ -8,7 +8,7 @@ import Loader, { useLoader } from '../components/Loader'
 import Cursor from '../components/Cursor'
 import Nav from '../components/Nav'
 import { Contact, Footer, WhatsAppFab } from '../components/Contact'
-import { Arrow, BookCall, Statement } from '../components/ui'
+import { Arrow, BookCall } from '../components/ui'
 import { CONTENT, WHY } from './content'
 
 // "E-commerce Handling", not the short "E-commerce" the home page chips use
@@ -22,13 +22,16 @@ function NoGL({ onReady }) {
 
 /*
  * /services/<slug>: the thought process behind one service.
- * Hero with the service's clay prop → belief → live projects → the steps we take → the small details → deliverables + why us → FAQ → next page.
+ * The work comes first, the words stay short: hero → live projects → how we think (the full checklist folded away) →
+ * what you get + why us → FAQ → next page.
  */
 export default function ServicePage({ page }) {
   const root = useRef()
   const c = CONTENT[page.id]
   const i = SERVICES.indexOf(page)
   const next = SERVICES[(i + 1) % SERVICES.length]
+  // the fine print of the process, one list behind a toggle: still on the page for Google, out of the way for people
+  const checks = [...c.steps.flatMap((s) => s.p), ...c.details]
   const { loading, progress, onSceneReady, done } = useLoader()
 
   useEffect(() => {
@@ -51,12 +54,12 @@ export default function ServicePage({ page }) {
     return () => io.disconnect()
   }, [])
 
-  // rows rise in as they enter; everything is visible from the start with reduced motion
+  // rows rise in as soon as they peek in (the work below the hero shows on the first screen); all visible from the start with reduced motion
   useLayoutEffect(() => {
     if (REDUCED) return
     const ctx = gsap.context(() => {
       gsap.utils.toArray('.sp-rise').forEach((el) =>
-        gsap.from(el, { y: 50, autoAlpha: 0, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 88%', once: true } }),
+        gsap.from(el, { y: 50, autoAlpha: 0, duration: 0.9, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top bottom', once: true } }),
       )
     }, root)
     return () => ctx.revert()
@@ -94,14 +97,14 @@ export default function ServicePage({ page }) {
               </BookCall>
               <a
                 className="btn btn-glass"
-                href="#approach"
-                data-cursor="Read"
+                href="#work"
+                data-cursor="View"
                 onClick={(e) => {
                   e.preventDefault()
-                  scrollToId('approach')
+                  scrollToId('work')
                 }}
               >
-                How we think
+                See the work
               </a>
             </div>
           </div>
@@ -114,12 +117,7 @@ export default function ServicePage({ page }) {
           </div>
         </header>
 
-        <section className="sp-belief" aria-label="What we believe">
-          <p className="eyebrow">( What we believe )</p>
-          <Statement text={c.belief} />
-        </section>
-
-        <section className="sp-live" aria-labelledby="live-title">
+        <section id="work" className="sp-live" aria-labelledby="live-title">
           <header className="sp-head">
             <p className="eyebrow">( Our work )</p>
             <h2 id="live-title" className="h-xl">
@@ -195,51 +193,35 @@ export default function ServicePage({ page }) {
               How we <em>think</em>
             </h2>
           </header>
-          <ol>
+          <ol className="sp-step-list">
             {c.steps.map((s, k) => (
               <li key={s.t} className="sp-step sp-rise">
                 <span className="sp-step-no">{String(k + 1).padStart(2, '0')}</span>
-                <div>
-                  <h3>{s.t}</h3>
-                  <p>{s.d}</p>
-                </div>
-                <ul>
-                  {s.p.map((x) => (
-                    <li key={x}>{x}</li>
-                  ))}
-                </ul>
+                <h3>{s.t}</h3>
+                <p>{s.d}</p>
               </li>
             ))}
           </ol>
-        </section>
-
-        <section className="sp-details" aria-labelledby="details-title">
-          <header className="sp-head">
-            <p className="eyebrow">( The small stuff )</p>
-            <h2 id="details-title" className="h-xl">
-              Details we <em>never</em> skip
-            </h2>
-          </header>
-          <ul>
-            {c.details.map((d) => (
-              <li key={d} className="sp-rise">
-                {d}
-              </li>
-            ))}
-          </ul>
+          <details className="sp-checks sp-rise">
+            <summary>
+              Every check we run <small>{checks.length}</small>
+            </summary>
+            <ul>
+              {checks.map((x) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+          </details>
         </section>
 
         <section className="sp-deliver" aria-label="What you get and why YG">
           <div className="sp-rise">
             <p className="eyebrow">( What you get )</p>
-            <ol className="sp-get">
-              {c.deliver.map((d, k) => (
-                <li key={d}>
-                  <small>{String(k + 1).padStart(2, '0')}</small>
-                  {d}
-                </li>
+            <ul className="sp-get">
+              {c.deliver.map((d) => (
+                <li key={d}>{d}</li>
               ))}
-            </ol>
+            </ul>
           </div>
           <div className="sp-rise">
             <p className="eyebrow">( Why YG )</p>
@@ -279,15 +261,6 @@ export default function ServicePage({ page }) {
           <a className="sp-next-link" href={pagePath(next)} data-cursor="Next">
             {fullName(next)} <Arrow />
           </a>
-          <ul>
-            {SERVICES.map((p) => (
-              <li key={p.id}>
-                <a href={pagePath(p)} className={p === page ? 'on' : ''} aria-current={p === page ? 'page' : undefined}>
-                  {p.title}
-                </a>
-              </li>
-            ))}
-          </ul>
         </nav>
 
         <Contact service={page.title} />
