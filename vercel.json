@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "headers": [
+    { "source": "/work/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400" }] },
+    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] }
+  ],
   "redirects": [
     { "source": "/services/social-media-ads", "destination": "/services/social-media-management", "permanent": true },
     { "source": "/services/online-presence-ecosystem", "destination": "/", "permanent": true }

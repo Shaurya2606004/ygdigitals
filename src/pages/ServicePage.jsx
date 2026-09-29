@@ -89,7 +89,7 @@ export default function ServicePage({ page }) {
             </h1>
             <p className="sp-lede">{c.lede}</p>
             <div className="sp-ctas">
-              <BookCall className="btn-red" num={false}>
+              <BookCall className="btn-red">
                 Book a free call
               </BookCall>
               <a
@@ -142,7 +142,8 @@ export default function ServicePage({ page }) {
                     ) : w.video ? (
                       <video src={w.video} poster={w.image} aria-label={`${w.title} — ${w.client}`} width="800" height="800" muted loop playsInline preload="none" />
                     ) : (
-                      w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading="lazy" />
+                      // fetched right after the reveal, so swiping the gallery never lands on a blank card
+                      w.image && <img src={w.image} alt={`${w.title} — ${w.client}`} width="800" height="800" loading={loading ? 'lazy' : 'eager'} decoding="async" />
                     )}
                     <small>{[w.client, w.year].filter(Boolean).join(' · ')}</small>
                     <b>{w.title}</b>
@@ -165,7 +166,7 @@ export default function ServicePage({ page }) {
                 <small>Book a call</small>
                 <b>Your brand, live next.</b>
                 <span className="sp-proj-go">
-                  {CONTACT.phone} <Arrow />
+                  Call us <Arrow />
                 </span>
               </a>
             </li>

@@ -67,7 +67,7 @@ export default function Hero({ ready, onSceneReady }) {
             <span className="dot" /> Digital studio
           </motion.p>
           <motion.div className="hero-ctas" variants={rise} custom={1}>
-            <BookCall num={false}>
+            <BookCall>
               <span>
                 Book a <span className="hide-sm">free </span>call
               </span>

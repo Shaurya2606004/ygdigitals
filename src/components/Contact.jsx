@@ -128,7 +128,7 @@ export function Footer() {
               </li>
             ))}
             <li>
-              <a href={CONTACT.tel}>Book a call · {CONTACT.phone}</a>
+              <a href={CONTACT.tel}>Book a call</a>
             </li>
           </ul>
         </div>

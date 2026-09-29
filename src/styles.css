@@ -137,15 +137,6 @@ body::after {
 .btn:hover .arr {
   transform: translateX(3px) rotate(-45deg);
 }
-/* the phone number riding on every "Book a call" button */
-.btn-num {
-  padding-left: 0.75em;
-  border-left: 1.5px solid color-mix(in srgb, currentColor 35%, transparent);
-  font-family: var(--f-body);
-  font-weight: 800;
-  font-size: 1.08em;
-  letter-spacing: 0.02em;
-}
 .btn-dark {
   background: var(--black);
   color: var(--white);
@@ -1812,6 +1803,24 @@ a.sp-proj:hover {
   }
   .nav-word {
     display: none;
+  }
+  /* a compact pill (logo + burger), not a full-width bar */
+  .nav {
+    left: max(var(--gutter), calc(50% - 110px));
+    right: max(var(--gutter), calc(50% - 110px));
+    padding: 5px;
+  }
+  .nav-mark {
+    width: 36px;
+    height: 36px;
+  }
+  .nav-burger {
+    width: 38px;
+    height: 38px;
+  }
+  .nav-burger i {
+    left: 11px;
+    right: 11px;
   }
   .svc-title {
     font-size: clamp(28px, 8.4vw, 44px);

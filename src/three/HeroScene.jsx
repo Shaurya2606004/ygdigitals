@@ -185,8 +185,8 @@ export default function HeroScene({ ready, progress, onReady }) {
   const width = portrait ? Math.min(u * 2.15, vw * 0.92) : Math.min(vw * 0.45, 6.2)
   // phones drop the headline: the phone, the two of them and the props fill the band on their own
   const lines = portrait ? [] : LINES_WIDE
-  // the portrait stage is drawn in units of u (about 2.3u wide, 3u tall), then blown up by S to fill the band and centred on it
-  const S = Math.min((vw / u) * 0.41, (bandTop - bandBottom) / u / 3)
+  // the portrait stage is drawn in units of u (about 2.3u wide, 3u tall), then blown up by S to fill ~80% of the band and centred on it
+  const S = 0.8 * Math.min((vw / u) * 0.41, (bandTop - bandBottom) / u / 3)
   const at = (x, y, z) => [x * S, mid + S * (y + u * 0.72), z]
   const [h, setH] = useState({})
   const readyAt = useRef(null)
