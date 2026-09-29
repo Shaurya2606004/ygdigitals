@@ -35,7 +35,7 @@ export const CONTENT = {
     details: ['The hook is written before the design', 'Every post previewed on a real phone', 'Ad frequency watched, never overdone', 'Copy in English, Hindi or Hinglish'],
     deliver: ['Monthly content calendar', 'Posts, Reels and Stories', 'Captions, hashtags and covers', 'Comment and DM handling', 'Meta ads, managed daily', 'Monthly report and review call'],
     faq: [
-      { q: 'Who is the best social media marketing agency in Gohana?', a: 'We’d like to earn that. YG Digitals is a social media marketing agency in Gohana, Haryana, running Instagram and Facebook for brands in Sonipat, Panipat, Rohtak and across India.' },
+      { q: 'Who is the best social media marketing agency in Gohana?', a: 'We’d like to earn that. YG Digitals is a social media marketing agency in Gohana, Haryana, running Instagram and Facebook for brands across Delhi NCR — Delhi, Gurugram, Noida, Sonipat, Panipat, Rohtak — and all of India.' },
       { q: 'How many posts a month?', a: 'We agree a monthly plan of posts, Reels and Stories on the first call — and stick to it.' },
       { q: 'Do you make the content too?', a: 'Yes. Scripts, design, Reels and copy are all made in-house.' },
       { q: 'Will I own my pages and ad account?', a: 'Always. Everything stays in your name; we work as partners inside it.' },
@@ -98,7 +98,7 @@ export const CONTENT = {
     details: ['Barcodes contrast-checked before print', 'No text too small to read', 'Colours judged in CMYK, not on screen', 'Every pack tested at thumbnail size'],
     deliver: ['Concept and design directions', 'Boxes, labels, pouches and sleeves', 'Dielines and print-ready files', 'A system for all your variants', 'Photo-real 3D mockups', 'Support with your printer'],
     faq: [
-      { q: 'Looking for a packaging design company in Haryana?', a: 'We’re in Gohana. Pouch packaging, food labels and boxes for brands in Sonipat, Panipat, Rohtak and across India — files ready for your printer.' },
+      { q: 'Looking for a packaging design company in Haryana?', a: 'We’re in Gohana. Pouch packaging, food labels and boxes for brands across Delhi NCR and all of India — files ready for your printer.' },
       { q: 'Can you work with my printer?', a: 'Yes. We prepare files to their specs and can talk to them directly.' },
       { q: 'What do you need to start?', a: 'The product or its exact size, any current packaging, and the text it must carry.' },
       { q: 'Will regular customers still recognise it?', a: 'Yes. We keep what people know — colour, logo, shape — and upgrade the rest.' },
@@ -125,7 +125,7 @@ export const CONTENT = {
     details: ['Buttons big enough for thumbs', 'Phone fields open the number keypad', 'Tested on Android and iPhone', 'Readable in bright sunlight'],
     deliver: ['Business websites and landing pages', 'Structure, copy direction and design', 'Mobile-first build', 'SEO setup and Google indexing', 'Analytics and lead tracking', 'Launch support and fixes'],
     faq: [
-      { q: 'Who is the best website designer in Gohana?', a: 'We’d like to earn that. YG Digitals is a website design and development company in Gohana, Haryana, building sites for businesses in Sonipat, Panipat, Rohtak and across India.' },
+      { q: 'Who is the best website designer in Gohana?', a: 'We’d like to earn that. YG Digitals is a website design and development company in Gohana, Haryana, building sites for businesses across Delhi NCR — Delhi, Gurugram, Noida, Sonipat, Panipat, Rohtak — and all of India.' },
       { q: 'How long does a website take?', a: 'It depends on the pages and your content. You get a clear timeline after the first call.' },
       { q: 'Can I update it myself?', a: 'If you’ll change things often, we build it that way.' },
       { q: 'Do you handle domain and hosting?', a: 'Yes — domain, hosting and business email, or we work with yours.' },
@@ -174,7 +174,7 @@ export const CONTENT = {
     details: ['The hook is shot first, while energy is high', 'Background noise checked every take', 'Products cleaned, labels to camera', 'Kit packed from a checklist'],
     deliver: ['Concepts, hooks and scripts', 'Shot list and shoot-day plan', 'On-location shoot', 'Lighting, sound and direction', 'Sorted, backed-up footage', 'Edited ads and Reels'],
     faq: [
-      { q: 'Do you do Reel and video ad shoots near Gohana?', a: 'Yes — in Gohana and nearby, including Sonipat, Panipat and Rohtak. Factory, shop and product shoots are our everyday work.' },
+      { q: 'Do you do Reel and video ad shoots in Delhi NCR?', a: 'Yes — anywhere in Delhi NCR and nearby: Delhi, Gurugram, Noida, Faridabad, Sonipat, Panipat, Rohtak and beyond. Factory, shop and product shoots are our everyday work.' },
       { q: 'Do you shoot at our place?', a: 'Yes — shop, factory, site or office, planned around your team.' },
       { q: 'How many videos from one shoot?', a: 'Several ads and Reels from one day. The number is agreed up front.' },
       { q: 'Do we have to be on camera?', a: 'Only if you want to. We direct you so it feels easy.' },

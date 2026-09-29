@@ -5,7 +5,7 @@ export const CONTACT = {
   whatsapp: 'https://wa.me/919817458931',
   instagram: 'https://www.instagram.com/ygdigitals.marketing',
   city: 'Gohana, Haryana',
-  reach: 'Serving Sonipat, Panipat, Rohtak & all of India',
+  reach: 'Serving Delhi NCR & all of India',
 }
 
 // the live address (the custom domain Search Console knows); canonical links, link previews, sitemap.xml and robots.txt are built from it
@@ -29,7 +29,7 @@ export const SERVICES = [
     meta: {
       title: 'Social Media Marketing Agency in Gohana, Haryana | YG Digitals',
       description:
-        'Social media marketing agency in Gohana, Haryana — Instagram & Facebook management, posts and Reels made in-house, and Meta ads that bring enquiries. Serving Sonipat, Panipat, Rohtak & all of India.',
+        'Social media marketing agency in Gohana, Haryana — Instagram & Facebook management, posts and Reels made in-house, and Meta ads that bring enquiries. Serving Delhi NCR, Sonipat, Panipat, Rohtak & all of India.',
     },
   },
   {
@@ -45,7 +45,7 @@ export const SERVICES = [
     meta: {
       title: 'Reel & Video Ad Shoot Services in Gohana, Haryana | YG Digitals',
       description:
-        'Reel shooting and video ad shoot services in Gohana, Haryana — factory, shop and product shoots, scripted, lit and directed on location. Serving Sonipat, Panipat, Rohtak & nearby.',
+        'Reel shooting and video ad shoot services in Gohana, Haryana — factory, shop and product shoots, scripted, lit and directed on location. Anywhere in Delhi NCR and nearby — Sonipat, Panipat, Rohtak, Gurugram.',
     },
   },
   {
@@ -93,7 +93,7 @@ export const SERVICES = [
     meta: {
       title: 'Website Design Company in Gohana, Haryana | YG Digitals',
       description:
-        'Website design & development company in Gohana, Haryana — fast, mobile-first business websites that bring calls and WhatsApp enquiries. Serving Sonipat, Panipat, Rohtak & all of India.',
+        'Website design & development company in Gohana, Haryana — fast, mobile-first business websites that bring calls and WhatsApp enquiries. Serving Delhi NCR, Sonipat, Panipat, Rohtak & all of India.',
     },
   },
   {

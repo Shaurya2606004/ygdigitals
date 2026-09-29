@@ -13,8 +13,8 @@ function swap(html, re, value) {
   return html.replace(re, (_, head) => head + value)
 }
 
-// where the studio works: its town, the nearby cities people search from, then the whole country
-const AREAS = [...['Gohana', 'Sonipat', 'Panipat', 'Rohtak'].map((name) => ({ '@type': 'City', name })), { '@type': 'State', name: 'Haryana' }, { '@type': 'Country', name: 'India' }]
+// where the studio works: its town, Delhi NCR (in person) and its cities people search from, then the whole country
+const AREAS = [...['Gohana', 'Sonipat', 'Panipat', 'Rohtak', 'Delhi', 'Gurugram', 'Noida', 'Faridabad', 'Ghaziabad'].map((name) => ({ '@type': 'City', name })), { '@type': 'Place', name: 'Delhi NCR' }, { '@type': 'State', name: 'Haryana' }, { '@type': 'Country', name: 'India' }]
 
 // schema.org JSON-LD: the studio itself on every page; each service page adds the service, its breadcrumb and its FAQ
 const ORG = {
