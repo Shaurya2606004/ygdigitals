@@ -8,8 +8,8 @@ export const CONTACT = {
   reach: 'Working with brands across India',
 }
 
-// the live address; canonical links, link previews and sitemap.xml are built from it — switch to the custom domain once it's attached
-export const SITE = 'https://ygdigitals.vercel.app'
+// the live address (the custom domain Search Console knows); canonical links, link previews, sitemap.xml and robots.txt are built from it
+export const SITE = 'https://www.ygdigitals.com'
 
 export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
   `${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`
