@@ -7,6 +7,11 @@
   ],
   "redirects": [
     { "source": "/services/social-media-ads", "destination": "/services/social-media-management", "permanent": true },
-    { "source": "/services/online-presence-ecosystem", "destination": "/", "permanent": true }
+    { "source": "/services/online-presence-ecosystem", "destination": "/", "permanent": true },
+    { "source": "/services/instagram-meta", "destination": "/services/social-media-management", "permanent": true },
+    { "source": "/services/ai-websites", "destination": "/services/website-design", "permanent": true },
+    { "source": "/services/ai-automation", "destination": "/", "permanent": true },
+    { "source": "/contact", "destination": "/#contact", "permanent": true },
+    { "source": "/privacy-policy", "destination": "/", "permanent": true }
   ]
 }
