@@ -72,7 +72,7 @@ export default function Services() {
         <div className="svc-stage">
           <SafeGL>
             <Stage className="svc-canvas" camera={{ position: [0, 0, 6.5], fov: 35 }}>
-              <ServicesScene index={i} buddy={s.buddy} />
+              <ServicesScene index={i} />
             </Stage>
           </SafeGL>
         </div>

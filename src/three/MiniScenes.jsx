@@ -1,101 +1,15 @@
-import { useMemo, useRef } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { BLACK, Heart, RED, SERVICE_PROPS, WHITE } from './clay'
-import { Buddy } from './character'
-import { REDUCED, spring } from '../lib/motion'
+import { useThree } from '@react-three/fiber'
+import { Mascot } from './Mascot'
 import { SERVICES } from '../data'
 
-/*
- * "Clay squish" swap: x/z and y ride two springs of different stiffness, so an outgoing prop
- * flattens like a pressed lump of clay and the incoming one stretches up and wobbles into place.
- */
-function Swap({ active, scale, children }) {
-  const g = useRef()
-  const sx = useRef({ x: 0, v: 0 })
-  const sy = useRef({ x: 0, v: 0 })
-  useFrame((state, dt) => {
-    dt = Math.min(dt, 1 / 30)
-    spring(sx.current, active ? 1 : 0, dt, 130, 11)
-    spring(sy.current, active ? 1 : 0, dt, 260, 12)
-    const x = Math.max(0, sx.current.x)
-    const y = Math.max(0, sy.current.x)
-    g.current.visible = x > 0.002 && y > 0.002
-    g.current.scale.set(x * scale, y * scale, x * scale)
-    const t = state.clock.elapsedTime
-    g.current.rotation.set(-state.pointer.y * 0.25, (REDUCED ? 0 : Math.sin(t * 0.7) * 0.35) + state.pointer.x * 0.6, 0)
-    g.current.position.y = REDUCED ? 0 : Math.sin(t * 1.1) * 0.08
-  })
-  return (
-    <group ref={g} scale={0}>
-      {children}
-    </group>
-  )
-}
-
-/*
- * Laid out from the canvas shape (tall on desktop, wide on phones and tablets): the mascot stands in the
- * bottom-right corner, its waving hand (~0.9 s right of centre) well clear of the screen edge the canvas runs to,
- * and the prop is centred and sized in the space left of it.
- */
-export function ServicesScene({ index, buddy }) {
+// One pose per service, squished in as the service comes on screen; sized to the canvas (tall on desktop, wide on phones).
+export function ServicesScene({ index, near = index }) {
   const { size, camera } = useThree()
-  const hh = Math.tan((camera.fov * Math.PI) / 360) * (camera.position.z - 0.8) // visible half-height at the mascot's depth
+  const hh = Math.tan((camera.fov * Math.PI) / 360) * camera.position.z // visible half-height
   const hw = hh * (size.width / size.height)
-  const s = Math.min(0.6, hw * 0.3)
-  const bx = Math.min(hw - 1.25 * s - 0.15, 1.9)
-  const room = bx - 0.6 * s + hw // width left of the mascot
-  return (
-    <>
-      <group position={[Math.max((bx - 0.6 * s - hw) / 2, -0.6), 0.15, 0]}>
-        {SERVICES.map((x, i) => (
-          <Swap key={x.id} active={i === index} scale={Math.min(1.25, room / 2.4)}>
-            {SERVICE_PROPS[x.id]}
-          </Swap>
-        ))}
-      </group>
-      <Buddy outfit={buddy} hop={index + 1} seed={3} wave position={[bx, -hh + 0.25 + 1.23 * s, 0.8]} scale={s} rotation={[0, -0.45, 0]} />
-    </>
+  const h = Math.min(hh * 1.7, (hw * 1.7) / 0.71) // the widest pose is 0.68 of its height across, plus a little room
+  // only the poses around `near` are mounted (each is ~1MB): the next one is ready, the last one can squish out
+  return SERVICES.map(
+    (x, i) => Math.abs(i - near) <= 1 && <Mascot key={x.id} pose={x.id} show={i === index} seed={i} height={h} position={[0, -h / 2, 0]} />,
   )
 }
-
-// Live-stream style hearts drifting up behind the mascots.
-function HeartStream({ count }) {
-  const refs = useRef([])
-  const data = useMemo(
-    () =>
-      Array.from({ length: count }, (_, i) => ({
-        x: (Math.random() - 0.5) * 5,
-        off: Math.random() * 6,
-        speed: 0.45 + Math.random() * 0.45,
-        c: [BLACK, RED, WHITE][i % 3],
-        s: 0.16 + Math.random() * 0.16,
-      })),
-    [count],
-  )
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime
-    data.forEach((d, i) => {
-      const m = refs.current[i]
-      const y = ((t * d.speed + d.off) % 6) - 3
-      m.position.set(d.x + Math.sin(t + d.off) * 0.3, y, -1.2)
-      m.rotation.z = Math.sin(t * 2 + d.off) * 0.3
-      m.scale.setScalar(Math.max(1e-4, d.s * Math.sin(((y + 3) / 6) * Math.PI)))
-    })
-  })
-  return data.map((d, i) => (
-    <group key={i} ref={(el) => (refs.current[i] = el)}>
-      <Heart color={d.c} />
-    </group>
-  ))
-}
-
-export function ContactScene() {
-  return (
-    <>
-      {!REDUCED && <HeartStream count={6} />}
-      <Buddy look="girl" outfit="white" wave seed={7} follow={false} position={[-0.95, -0.05, 0]} scale={1.3} rotation={[0, 0.35, 0]} />
-      <Buddy look="guy" outfit="black" seed={11} follow={false} position={[1.1, -0.3, -0.4]} scale={1.15} rotation={[0, -0.35, 0]} />
-    </>
-  )
-}
-

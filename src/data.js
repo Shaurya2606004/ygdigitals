@@ -14,7 +14,7 @@ export const SITE = 'https://www.ygdigitals.com'
 export const waLink = (text = "Hi YG Digitals! I'd like to book a call.") =>
   `${CONTACT.whatsapp}?text=${encodeURIComponent(text)}`
 
-// theme = section background while this service is on screen; buddy = the mascot's outfit colour on that background
+// theme = section background while this service is on screen
 export const SERVICES = [
   {
     id: 'ads',
@@ -25,7 +25,6 @@ export const SERVICES = [
     desc: 'Your Instagram & Facebook, run for you — planned posts, Reels, replies and Meta ads that turn scrollers into enquiries, not just likes.',
     tags: ['Content calendar', 'Posts & Reels', 'Comments & DMs', 'Meta ads'],
     theme: 'white',
-    buddy: 'black',
     meta: {
       title: 'Social Media Marketing Agency in Gohana, Haryana | YG Digitals',
       description:
@@ -41,7 +40,6 @@ export const SERVICES = [
     desc: 'We script, plan and shoot your video ads and Reels — at your shop, factory or site — lit, framed for the phone and directed on the day.',
     tags: ['Ad shoots', 'Reel shoots', 'Scripts & shot lists', 'On location'],
     theme: 'black',
-    buddy: 'white',
     meta: {
       title: 'Reel & Video Ad Shoot Services in Gohana, Haryana | YG Digitals',
       description:
@@ -57,7 +55,6 @@ export const SERVICES = [
     desc: 'We run your marketplace stores end to end — listings, catalogue and sponsored ads on Amazon, Flipkart & Meesho.',
     tags: ['Amazon', 'Flipkart', 'Meesho', 'Listings', 'Marketplace ads'],
     theme: 'white',
-    buddy: 'black',
     meta: {
       title: 'Amazon, Flipkart & Meesho Account Management, Gohana | YG Digitals',
       description:
@@ -73,7 +70,6 @@ export const SERVICES = [
     desc: 'Boxes, labels and pouches that win the shelf and the thumbnail — premium on the outside, print-ready on the inside.',
     tags: ['Boxes & labels', 'Pouches', 'Print-ready files', '3D mockups'],
     theme: 'black',
-    buddy: 'white',
     meta: {
       title: 'Packaging Design Company in Gohana, Haryana | YG Digitals',
       description:
@@ -89,7 +85,6 @@ export const SERVICES = [
     desc: 'Fast, mobile-first websites and landing pages that look expensive and are built to turn visitors into calls.',
     tags: ['Business websites', 'Landing pages', 'Mobile-first', 'SEO-ready'],
     theme: 'white',
-    buddy: 'black',
     meta: {
       title: 'Website Design Company in Gohana, Haryana | YG Digitals',
       description:
@@ -105,7 +100,6 @@ export const SERVICES = [
     desc: 'Reels, ad films and product videos cut for the first three seconds — hooks, captions, motion graphics and sound.',
     tags: ['Reels & shorts', 'Ad films', 'Product videos', 'Motion graphics'],
     theme: 'black',
-    buddy: 'white',
     meta: {
       title: 'Reels & Video Editing Services in Gohana, Haryana | YG Digitals',
       description:

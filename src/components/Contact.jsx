@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ScrollTrigger, scrollToId } from '../lib/motion'
-import { SafeGL, Stage } from '../three/clay'
-import { ContactScene } from '../three/MiniScenes'
 import { CONTACT, SERVICES, pagePath, waLink } from '../data'
 import { Arrow, Chat } from './ui'
 
 /* No backend: the form composes a WhatsApp message to the studio — the channel their clients already use. */
 export function Contact({ service = SERVICES[0].title }) {
-  const root = useRef()
   const submit = (e) => {
     e.preventDefault()
     const f = new FormData(e.currentTarget)
@@ -21,7 +18,7 @@ export function Contact({ service = SERVICES[0].title }) {
   }
 
   return (
-    <section id="contact" className="contact" ref={root} aria-label="Contact">
+    <section id="contact" className="contact" aria-label="Contact">
       <div className="contact-copy">
         <p className="eyebrow">( Book a call )</p>
         <h2 className="contact-title">
@@ -50,14 +47,6 @@ export function Contact({ service = SERVICES[0].title }) {
             </a>
           </li>
         </ul>
-      </div>
-
-      <div className="contact-stage">
-        <SafeGL>
-          <Stage className="contact-canvas" eventSource={root} camera={{ position: [0, 0, 7], fov: 35 }}>
-            <ContactScene />
-          </Stage>
-        </SafeGL>
       </div>
 
       <form className="contact-form" onSubmit={submit}>

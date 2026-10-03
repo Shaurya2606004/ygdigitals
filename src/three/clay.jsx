@@ -84,30 +84,7 @@ const Rb = ({ color, args, radius = 0.08, ...props }) => (
   </RoundedBox>
 )
 
-const Ball = ({ color, r, ...props }) => (
-  <mesh {...props}>
-    <sphereGeometry args={[r, 24, 24]} />
-    <Clay color={color} />
-  </mesh>
-)
-
-// gentle independent float, so a group of props doesn't move as one rigid block
-function Bob({ phase = 0, children, ...props }) {
-  const g = useRef()
-  useFrame(({ clock }) => {
-    if (REDUCED) return
-    const t = clock.elapsedTime + phase
-    g.current.position.y = Math.sin(t * 1.3) * 0.05
-    g.current.rotation.z = Math.sin(t * 0.9) * 0.05
-  })
-  return (
-    <group {...props}>
-      <group ref={g}>{children}</group>
-    </group>
-  )
-}
-
-/* ---------- service props ---------- */
+/* ---------- props ---------- */
 
 /*
  * Instagram: the gradient squircle with the white camera glyph. One unit across, face on +z.
@@ -347,70 +324,6 @@ export function FlipkartBag() {
   )
 }
 
-// Meesho's lowercase wordmark, white on its pink
-export function MeeshoTag() {
-  return (
-    <group>
-      <Rb color="#f43397" args={[1.5, 0.66, 0.26]} radius={0.13} />
-      <Text font={displayFont} fontSize={0.27} letterSpacing={-0.04} position={[0, 0.03, 0.135]} color={WHITE} anchorX="center" anchorY="middle">
-        meesho
-      </Text>
-    </group>
-  )
-}
-
-export function Marketplaces() {
-  return (
-    <group>
-      <Bob phase={0} position={[-0.52, -0.38, -0.35]} rotation={[0.2, 0.5, 0]} scale={0.78}>
-        <AmazonBox />
-      </Bob>
-      <Bob phase={1.7} position={[0.6, -0.12, 0.3]} rotation={[0.05, -0.4, 0.04]} scale={0.72}>
-        <FlipkartBag />
-      </Bob>
-      <Bob phase={3.1} position={[-0.35, 0.82, -0.1]} rotation={[0.1, 0.35, 0]} scale={0.62}>
-        <MeeshoTag />
-      </Bob>
-    </group>
-  )
-}
-
-export function Box({ body = BLACK, tape = RED, label = WHITE }) {
-
-  return (
-    <group>
-      <Rb color={body} args={[1.4, 1.1, 1.4]} radius={0.08} />
-      <Rb color={tape} args={[0.3, 1.13, 1.43]} radius={0.03} />
-      <Rb color={tape} args={[1.43, 1.13, 0.3]} radius={0.03} />
-      <Rb color={label} args={[0.4, 0.26, 0.03]} radius={0.03} position={[0.42, -0.24, 0.71]} />
-      {/* bow */}
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[s * 0.2, 0.66, 0]} rotation={[Math.PI / 2, s * 0.5, 0]} scale={[1, 1, 0.6]}>
-          <torusGeometry args={[0.18, 0.07, 12, 24]} />
-          <Clay color={tape} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-export function Browser({ frame = WHITE, bar = BLACK, accent = RED, img = BLACK }) {
-  return (
-    <group>
-      <Rb color={frame} args={[2.1, 1.5, 0.16]} radius={0.1} />
-      <Rb color={bar} args={[2.1, 0.3, 0.18]} radius={0.08} position={[0, 0.6, 0.01]} />
-      {[-0.85, -0.7, -0.55].map((x, i) => (
-        <Ball key={x} color={i === 0 ? accent : frame} r={0.05} position={[x, 0.6, 0.11]} />
-      ))}
-      <Rb color={img} args={[0.85, 0.62, 0.06]} radius={0.06} position={[-0.47, 0.02, 0.1]} />
-      <Rb color={bar} args={[0.72, 0.1, 0.05]} radius={0.045} position={[0.46, 0.2, 0.1]} />
-      <Rb color={bar} args={[0.56, 0.1, 0.05]} radius={0.045} position={[0.38, 0.04, 0.1]} />
-      <Rb color={accent} args={[0.42, 0.17, 0.07]} radius={0.08} position={[0.31, -0.18, 0.1]} />
-      <Rb color={bar} args={[1.8, 0.14, 0.05]} radius={0.06} position={[0, -0.5, 0.1]} />
-    </group>
-  )
-}
-
 export function Clapper({ body = BLACK, a = WHITE, b = BLACK, play = RED }) {
   const arm = useRef()
   useFrame(({ clock }) => {
@@ -434,49 +347,6 @@ export function Clapper({ body = BLACK, a = WHITE, b = BLACK, play = RED }) {
       </group>
     </group>
   )
-}
-
-// a movie camera, side on, its lens toward the mascot; the film reels turn while it rolls
-export function Camera({ body = WHITE, reel = RED, dots = BLACK }) {
-  const reels = useRef([])
-  useFrame((_, dt) => {
-    if (REDUCED) return
-    for (const r of reels.current) r.rotation.z -= dt * 1.5
-  })
-  return (
-    <group>
-      <Rb color={body} args={[1.3, 0.78, 0.62]} radius={0.1} position={[-0.2, -0.3, 0]} />
-      <mesh position={[0.65, -0.3, 0]} rotation-z={-Math.PI / 2}>
-        <cylinderGeometry args={[0.32, 0.2, 0.4, 32]} />
-        <Clay color={body} />
-      </mesh>
-      <Ball color={reel} r={0.06} position={[0.26, -0.02, 0.3]} scale={[1, 1, 0.5]} />
-      {[
-        [-0.52, 0.39, 0.3],
-        [0.1, 0.33, 0.24],
-      ].map(([x, y, r], i) => (
-        <group key={i} ref={(el) => (reels.current[i] = el)} position={[x, y, 0]}>
-          <mesh rotation-x={Math.PI / 2}>
-            <cylinderGeometry args={[r, r, 0.14, 40]} />
-            <Clay color={reel} />
-          </mesh>
-          {[0, 1, 2].map((k) => (
-            <Ball key={k} color={dots} r={r * 0.2} position={[Math.cos(k * 2.09) * r * 0.55, Math.sin(k * 2.09) * r * 0.55, 0.07]} scale={[1, 1, 0.35]} />
-          ))}
-          <Ball color={body} r={r * 0.15} position-z={0.07} scale={[1, 1, 0.5]} />
-        </group>
-      ))}
-    </group>
-  )
-}
-
-export const SERVICE_PROPS = {
-  ads: <Phone />,
-  ecom: <Marketplaces />,
-  pack: <Box />,
-  web: <Browser />,
-  video: <Clapper />,
-  shoot: <Camera />,
 }
 
 /* ---------- canvas shell ---------- */

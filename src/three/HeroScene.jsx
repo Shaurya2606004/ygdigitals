@@ -1,9 +1,8 @@
-import * as THREE from 'three'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
 import { AmazonBox, BLACK, Clapper, FeedPhone, FlipkartBag, InstaCube, MIST, Phone, RED_DEEP, displayFont } from './clay'
-import { Buddy } from './character'
+import { Mascot, getShadeMap } from './Mascot'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
 /* Block-letter headline: stacked troika layers fake a chunky extrusion; each line is scaled to fit `width`. */
@@ -139,29 +138,15 @@ function Lens({ radius, sp, wander }) {
   )
 }
 
-// the brands the studio works on: an Instagram post on the phone, the Instagram cube, the Flipkart bag, the Amazon box — plus the video clapper
+// the brands the studio works on: an Instagram post on the phone, the Instagram cube, the Flipkart bag, the Amazon box — plus the video clapper.
+// The left edge is kept clear for the mascot.
 const DESKTOP = [
-  { el: <Phone />, p: [-0.8, 0.24, 0.8], r: [0.1, 0.45, 0.2], s: 0.62, d: 0.1 },
-  { el: <InstaCube />, p: [-0.72, -0.52, 0.6], r: [0.3, 0.6, -0.15], s: 0.5, d: 0.25 },
+  { el: <Phone />, p: [-0.44, 0.64, -0.4], r: [0.1, 0.45, 0.2], s: 0.5, d: 0.1 },
+  { el: <InstaCube />, p: [-0.16, -0.62, 0.6], r: [0.3, 0.6, -0.15], s: 0.4, d: 0.25 },
   { el: <FlipkartBag />, p: [0.82, 0.26, -0.6], r: [0.15, -0.5, -0.1], s: 0.76, d: 0.2 },
   { el: <AmazonBox />, p: [0.76, -0.32, 1.0], r: [0.3, -0.45, 0.05], s: 0.5, d: 0.3 },
   { el: <Clapper />, p: [0.02, 0.72, -1.8], r: [0.2, -0.3, 0.2], s: 0.5, d: 0.35 },
 ]
-
-// a soft oval of shade on the floor under the phone and the two of them
-let shadeMap
-function getShadeMap() {
-  if (shadeMap) return shadeMap
-  const c = document.createElement('canvas')
-  c.width = c.height = 64
-  const x = c.getContext('2d')
-  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32)
-  g.addColorStop(0, 'rgba(0,0,0,0.2)')
-  g.addColorStop(1, 'rgba(0,0,0,0)')
-  x.fillStyle = g
-  x.fillRect(0, 0, 64, 64)
-  return (shadeMap = new THREE.CanvasTexture(c))
-}
 
 const LINES_WIDE = [
   { t: 'STOP', f: 1 },
@@ -210,6 +195,8 @@ export default function HeroScene({ ready, progress, onReady }) {
   })
   const total = -cursor - gap
   const textY = vh * 0.04
+  // the mascot's width (0.68 of his height): the room left of the headline, at most 60% of the screen tall
+  const mw = Math.min(vh * 0.6 * 0.68, (vw - width) / 2 - 0.2)
 
   const framesSinceSync = useRef(0)
   useFrame((state, dt) => {
@@ -255,23 +242,17 @@ export default function HeroScene({ ready, progress, onReady }) {
             <FitLine key={l.t} text={l.t} width={width * l.f} y={ys[i]} onHeight={(v) => setH((o) => (o[l.t] === v ? o : { ...o, [l.t]: v }))} />
           ))}
         </group>
-        {/* she peeks over the top of STOP, he waves from the bottom corner */}
-        {!portrait && (
-          <>
-            <Buddy look="girl" outfit="white" seed={2} position={[width * 0.3, total / 2 - width * 0.045, -0.6]} scale={width * 0.1} rotation={[0, -0.25, 0]} />
-            <Buddy look="guy" outfit="black" seed={5} wave position={[-width * 0.5, -total / 2 - width * 0.02, 0.8]} scale={width * 0.06} rotation={[0, 0.4, 0]} />
-          </>
-        )}
+        {/* he stands left of the headline, feet near the bottom of the screen, pointing at it */}
+        {!portrait && <Mascot pose="hero" seed={5} height={mw / 0.68} position={[-width / 2 - mw * 0.42, -vh * 0.42 - textY, 0.4]} />}
       </group>
-      {/* phones: the phone with its feed stopping on our post, the two of them either side on a patch of shade */}
+      {/* phones: the phone with its feed stopping on our post, the mascot pointing at it, on a patch of shade */}
       {portrait && (
         <group ref={stage}>
           <group position-y={u * 0.72 * S} scale={S}>
             <group position={[0, -u * 0.72, -0.6]} rotation={[0.06, -0.18, 0.03]} scale={u * 1.19}>
               <FeedPhone readyAt={readyAt} />
             </group>
-            <Buddy look="guy" outfit="black" seed={5} wave position={[-u * 0.8, -u * 1.267, 0.4]} scale={u * 0.58} rotation={[0, 0.35, 0]} />
-            <Buddy look="girl" outfit="white" seed={2} position={[u * 0.82, -u * 1.303, 0.2]} scale={u * 0.55} rotation={[0, -0.35, 0]} />
+            <Mascot pose="hero" seed={5} shade={false} height={u * 1.5} position={[-u * 0.8, -u * 1.98, 0.4]} />
             <mesh position={[0, -u * 1.99, -0.9]} scale={[u * 2.9, u * 0.34, 1]}>
               <planeGeometry />
               <meshBasicMaterial map={getShadeMap()} transparent depthWrite={false} />

@@ -111,7 +111,7 @@ export default function ServicePage({ page }) {
           <div className="sp-stage">
             <SafeGL fallback={<NoGL onReady={onSceneReady} />}>
               <Stage className="sp-canvas" camera={{ position: [0, 0, 6.5], fov: 35 }} onReady={onSceneReady}>
-                <ServicesScene index={loading ? -1 : i} buddy="black" />
+                <ServicesScene index={loading ? -1 : i} near={i} />
               </Stage>
             </SafeGL>
           </div>
