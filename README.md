@@ -17,5 +17,6 @@ npm run build   # static output in dist/
 - Mascots (guy + girl): `src/three/character.jsx`
 - Hero scene + glass lens: `src/three/HeroScene.jsx`
 - One component per section: `src/components/`
+- Team & client dashboard (YG Hub) is a separate app in `dashboard/` — see `dashboard/README.md`
 
 Before launch: the live `projects` in `src/pages/content.js` and the "100+ projects" stat in `src/data.js` are placeholders — swap in real client work (with its live `url`) and numbers. The service-page copy describes how the studio works (daily checks, in-house team, what's delivered); have the client confirm every line matches reality.
