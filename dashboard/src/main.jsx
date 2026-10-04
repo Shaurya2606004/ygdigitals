@@ -35,6 +35,9 @@ const NAV = [
   { id: 'settings', label: 'Settings', icon: 'sliders', show: () => true, page: Settings },
 ]
 
+// on a phone these sit along the bottom, where a thumb reaches (the first four someone can open); "More" opens the rest
+const TABBAR = ['home', 'tasks', 'chat', 'calendar', 'projects']
+
 function useRoute() {
   const [hash, setHash] = useState(location.hash)
   useEffect(() => {
@@ -208,6 +211,9 @@ export function Shell({ me, signOut }) {
   const myOpen = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
   const leaveAsks = me.role === 'admin' ? d.leaves.filter((l) => l.status === 'pending' && l.userId !== me.id).length : 0
   const badge = { chat: unreadChat, tasks: myOpen, leave: leaveAsks }
+  const quick = TABBAR.map((id) => nav.find((n) => n.id === id)).filter(Boolean).slice(0, 4)
+  const rest = nav.filter((n) => !quick.includes(n))
+  const restBadge = rest.reduce((s, n) => s + (badge[n.id] || 0), 0)
   const client = byId(d.clients, me.clientId)
 
   return (
@@ -242,9 +248,9 @@ export function Shell({ me, signOut }) {
 
       <div className="main">
         <header className="top">
-          <button className="icon-btn only-sm" onClick={() => setNavOpen(true)} aria-label="Open menu">
-            <Icon name="menu" />
-          </button>
+          <a href="#/" className="top-logo only-sm" aria-label="YG Hub — Home">
+            YG<span>Hub</span>
+          </a>
           <div className="top-actions">
             <Menu
               className="btn primary"
@@ -305,6 +311,20 @@ export function Shell({ me, signOut }) {
           )}
         </main>
       </div>
+      <nav className="tabbar" aria-label="Main pages">
+        {quick.map((n) => (
+          <a key={n.id} href={`#/${n.id === 'home' ? '' : n.id}`} className={current?.id === n.id ? 'on' : ''} aria-current={current?.id === n.id ? 'page' : undefined}>
+            <Icon name={n.icon} size={22} />
+            <span>{n.label}</span>
+            {badge[n.id] > 0 && <span className={`badge ${n.id === 'chat' ? 'hot' : ''}`}>{badge[n.id]}</span>}
+          </a>
+        ))}
+        <button type="button" className={rest.includes(current) ? 'on' : ''} onClick={() => setNavOpen(true)} aria-label="More pages">
+          <Icon name="menu" size={22} />
+          <span>More</span>
+          {restBadge > 0 && <span className="badge">{restBadge}</span>}
+        </button>
+      </nav>
 
       {S.getNotice() && <Toast text={S.getNotice()} />}
       {modal === 'task' && <TaskForm onClose={() => setModal(null)} />}

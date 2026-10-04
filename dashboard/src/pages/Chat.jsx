@@ -1,10 +1,13 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import * as S from '../store.js'
 import { audience, byId, can, canDeleteMessage, channelName, firstName, isStaff, MAX_MESSAGE, seenBy, unread } from '../store.js'
-import { Avatar, Avatars, Empty, Err, Field, go, Icon, Modal, PeopleOptions, PeoplePicker, RichText, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Avatars, Confirm, Empty, Err, Field, go, Icon, Modal, PeopleOptions, PeoplePicker, RichText, useDb, useForm, useMe } from '../ui.jsx'
 import { ago, fmtLong, relDay, ymd } from '../util.js'
 
 const drafts = new Map() // what you'd typed in each conversation, kept while you hop between them
+
+// a phone keyboard's Enter adds a new line, like WhatsApp; you send with the button
+const touch = matchMedia('(pointer: coarse)').matches
 
 export default function Chat({ args }) {
   const me = useMe()
@@ -405,13 +408,13 @@ export function ChatPane({ channelId }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+              if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
                 e.preventDefault()
                 if (suggest.length && word !== undefined) setText(text.replace(/@\w*$/, `@${firstName(suggest[0])} `))
                 else send()
               }
             }}
-            placeholder={`Message ${ch.type === 'dm' ? channelName(d, ch, me) : `#${channelName(d, ch, me)}`} — Enter to send, Shift+Enter for a new line, @ to mention`}
+            placeholder={`Message ${ch.type === 'dm' ? channelName(d, ch, me) : `#${channelName(d, ch, me)}`}${touch ? '' : ' — Enter to send, Shift+Enter for a new line, @ to mention'}`}
             aria-label="Message"
           />
           {text.length > MAX_MESSAGE - 500 && (
@@ -433,11 +436,12 @@ export function ChatPane({ channelId }) {
         <Modal title="Edit group" onClose={() => setManage(false)}>
           <GroupForm group={ch} onDone={() => setManage(false)} />
           <div className="leave-row">
-            <button
-              type="button"
+            <Confirm
               className="btn danger sm"
-              onClick={() => {
-                if (!confirm(`Leave “${ch.name}”? You won’t see its messages any more unless someone adds you back.`)) return
+              ask={`Leave “${ch.name}”?`}
+              detail="You won’t see its messages any more unless someone adds you back."
+              yes="Leave group"
+              onYes={() => {
                 try {
                   S.leaveGroup(me, ch.id)
                   setManage(false)
@@ -448,7 +452,7 @@ export function ChatPane({ channelId }) {
               }}
             >
               Leave group
-            </button>
+            </Confirm>
           </div>
         </Modal>
       )}
@@ -473,7 +477,7 @@ function Message({ m, u, ch, grouped, editing, setEditing }) {
     }
   }
   return (
-    <div className={`msg ${grouped ? 'grouped' : ''} ${mentionsMe ? 'mention-me' : ''}`}>
+    <div className={`msg ${grouped ? 'grouped' : ''} ${mentionsMe ? 'mention-me' : ''}`} tabIndex={canEdit || canDelete ? -1 : undefined}>
       {!grouped && <Avatar user={u} size={34} />}
       <div className="msg-body">
         {!grouped && (
@@ -494,7 +498,7 @@ function Message({ m, u, ch, grouped, editing, setEditing }) {
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                if (e.key === 'Enter' && !e.shiftKey && !touch && !e.nativeEvent.isComposing) {
                   e.preventDefault()
                   save()
                 }
@@ -512,7 +516,7 @@ function Message({ m, u, ch, grouped, editing, setEditing }) {
               <button type="button" className="btn sm" onClick={() => setEditing(null)}>
                 Cancel
               </button>
-              <small className="muted">Enter to save · Esc to cancel</small>
+              {!touch && <small className="muted">Enter to save · Esc to cancel</small>}
             </div>
             <Err msg={err} />
           </div>
@@ -546,15 +550,16 @@ function Message({ m, u, ch, grouped, editing, setEditing }) {
             </button>
           )}
           {canDelete && (
-            <button
-              type="button"
+            <Confirm
               className="icon-btn"
               aria-label="Delete message"
               title="Delete"
-              onClick={() => confirm(mine ? 'Delete this message for everyone?' : `Delete ${u?.name ?? 'this person'}’s message for everyone?`) && S.deleteMessage(me, m.id)}
+              ask={mine ? 'Delete this message for everyone?' : `Delete ${u?.name ?? 'this person'}’s message for everyone?`}
+              yes="Delete"
+              onYes={() => S.deleteMessage(me, m.id)}
             >
               <Icon name="trash" size={15} />
-            </button>
+            </Confirm>
           )}
         </div>
       )}

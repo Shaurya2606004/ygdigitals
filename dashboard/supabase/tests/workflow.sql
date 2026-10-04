@@ -217,5 +217,76 @@ begin
   end;
   perform set_config('role', 'none', true);
 
+  /* ---------- the content plan and the tasks, in step ---------- */
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'imp1', 'clientId', 'desi', 'projectId', 'p-diwali', 'date', private.today() + 3, 'format', 'Reel',
+    'title', 'Navratri wishes', 'dept', 'video', 'assigneeId', vikas, 'brief', 'Festival: Navratri', 'quiet', true)::jsonb);
+  perform public.save_post(json_build_object('id', 'imp2', 'clientId', 'desi', 'projectId', 'p-diwali', 'date', private.today() + 20, 'format', 'Post',
+    'title', 'Later post', 'dept', 'design', 'quiet', true)::jsonb);
+  perform set_config('role', 'none', true);
+  select format('%s|%s|%s|%s|%s', k.project_id, k.status, k.due - private.today(), k.assignee_id = vikas, k.title) into s from public.tasks k where k.post_id = 'imp1';
+  out := out || format(E'\n%s a post in a project, a week away, gets its task (due the day before): %s', case when s = 'p-diwali|todo|2|t|Reel: Navratri wishes' then '✓' else '✗' end, s);
+  select "desc" into s from public.task_private where task_id = 'pt-imp1';
+  out := out || format(E'\n%s …with the post''s brief as its details: %s', case when s = 'Festival: Navratri' then '✓' else '✗' end, s);
+  select count(*) into n from public.tasks where post_id = 'imp2';
+  out := out || format(E'\n%s a post three weeks away has no task yet: %s', case when n = 0 then '✓' else '✗' end, n);
+  select count(*) into n from public.notifications where user_id = vikas and text like 'gave you “Reel: Navratri wishes” — it goes out %';
+  select n = 1 and not exists (select 1 from public.notifications where user_id = vikas and text like 'gave you the Reel “Navratri%') into ok;
+  out := out || format(E'\n%s an import tells the maker once, when the task lands in their To do: %s', case when ok then '✓' else '✗' end, n);
+
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task(json_build_object('id', 'pt-imp1', 'status', 'doing')::jsonb);
+  perform set_config('role', 'none', true);
+  select s2.status || '|' || (k.status_by = vikas) into s from public.posts s2, public.tasks k where s2.id = 'imp1' and k.id = 'pt-imp1';
+  out := out || format(E'\n%s starting the task puts the post in production, and marks who moved it: %s', case when s = 'production|true' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task(json_build_object('id', 'pt-imp1', 'status', 'done')::jsonb);
+  perform set_config('role', 'none', true);
+  select status into s from public.posts where id = 'imp1';
+  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and text = 'has a Reel ready for your approval: “Navratri wishes”';
+  out := out || format(E'\n%s finishing it makes the post ready, and the client is asked: %s, %s', case when s = 'ready' and n = 1 then '✓' else '✗' end, s, n);
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:rahul')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.decide_post(json_build_object('id', 'imp1', 'approve', false, 'note', 'Brighter, please')::jsonb);
+  perform set_config('role', 'none', true);
+  select s2.status || '|' || k.status into s from public.posts s2, public.tasks k where s2.id = 'imp1' and k.id = 'pt-imp1';
+  out := out || format(E'\n%s the client asks for changes: the task is back in To do: %s', case when s = 'production|todo' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'imp1', 'status', 'posted')::jsonb);
+  perform set_config('role', 'none', true);
+  select k.status || '|' || (k.status_by = priya) || '|' || (k.completed_at is not null) into s from public.tasks k where k.id = 'pt-imp1';
+  out := out || format(E'\n%s marking the post posted closes its task, marked as Priya''s: %s', case when s = 'done|true|true' then '✓' else '✗' end, s);
+
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'imp2', 'date', private.today() + 5)::jsonb);
+  perform public.save_post(json_build_object('id', 'imp2', 'date', private.today() + 6, 'title', 'Diwali post')::jsonb);
+  perform set_config('role', 'none', true);
+  select (k.due - private.today()) || '|' || k.title into s from public.tasks k where k.post_id = 'imp2';
+  out := out || format(E'\n%s a post moved into the week gets its task; its new day and title carry over: %s', case when s = '5|Post: Diwali post' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.delete_task(json_build_object('id', 'pt-imp2')::jsonb);
+  begin
+    perform public.save_post(json_build_object('id', 'imp4', 'clientId', 'desi', 'projectId', 'p-gv-month', 'date', private.today() + 2, 'title', 'Wrong one')::jsonb);
+    out := out || E'\n✗ a post went into another client''s project';
+  exception when others then
+    out := out || format(E'\n✓ a post only goes into its own client''s project (%s)', sqlerrm);
+  end;
+  perform set_config('role', 'none', true);
+
+  -- the morning job: next week's posts get their tasks; a deleted one doesn't come back
+  alter table public.posts disable trigger post_saved;
+  insert into public.posts (id, client_id, project_id, date, format, title, dept, assignee_id) values ('imp3', 'desi', 'p-diwali', private.today() + 6, 'Carousel', 'Box reveal', 'design', md5('yg-sample:ritika')::uuid);
+  alter table public.posts enable trigger post_saved;
+  delete from private.daily_runs where day = private.today();
+  perform private.daily();
+  select format('%s|%s', (k.created_by = priya), (select count(*) from public.tasks where post_id = 'imp2')) into s from public.tasks k where k.post_id = 'imp3';
+  out := out || format(E'\n%s the 9 am job puts next week''s posts in To do (given by the project lead); a deleted task stays deleted: %s', case when s = 't|0' then '✓' else '✗' end, s);
+
   raise exception E'RESULTS (rolled back)%', out;
 end $$;

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, DEPTS, isStaff, level, PERMISSIONS, PERSON_DEPTS, ROLES } from '../store.js'
-import { Avatar, Card, download, Empty, Err, Field, Icon, Modal, PageHead, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Card, Confirm, download, Empty, Err, Field, Icon, Modal, PageHead, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 
 export default function Settings({ args }) {
   const me = useMe()
@@ -184,15 +184,20 @@ function Team() {
                       Edit
                     </button>
                   )}
-                  {admin && u.id !== me.id && (
-                    <button
-                      className={`btn sm ${u.active ? 'danger' : ''}`}
-                      onClick={() => {
-                        if (!u.active || confirm(`Deactivate ${u.name}? They can’t sign in any more; their tasks stay with them until you hand them on.`))
-                          attempt(() => S.setActive(me, u.id, !u.active), setErr)
-                      }}
+                  {admin && u.id !== me.id && u.active && (
+                    <Confirm
+                      className="btn sm danger"
+                      ask={`Deactivate ${u.name}?`}
+                      detail="They can’t sign in any more. Their tasks stay with them until you hand them on."
+                      yes="Deactivate"
+                      onYes={() => attempt(() => S.setActive(me, u.id, false), setErr)}
                     >
-                      {u.active ? 'Deactivate' : 'Reactivate'}
+                      Deactivate
+                    </Confirm>
+                  )}
+                  {admin && u.id !== me.id && !u.active && (
+                    <button className="btn sm" onClick={() => attempt(() => S.setActive(me, u.id, true), setErr)}>
+                      Reactivate
                     </button>
                   )}
                 </td>
@@ -270,16 +275,15 @@ function Clients() {
                         <button type="button" className="link-btn" onClick={() => setLogin({ clientId: c.id, edit: u })}>
                           Edit
                         </button>
-                        <button
-                          type="button"
-                          className="link-btn"
-                          onClick={() => {
-                            if (!u.active || confirm(`Revoke ${u.name}’s login? They can’t sign in until you restore it.`))
-                              attempt(() => S.setActive(me, u.id, !u.active), setErr)
-                          }}
-                        >
-                          {u.active ? 'Revoke' : 'Restore'}
-                        </button>
+                        {u.active ? (
+                          <Confirm className="link-btn" ask={`Revoke ${u.name}’s login?`} detail="They can’t sign in until you restore it." yes="Revoke" onYes={() => attempt(() => S.setActive(me, u.id, false), setErr)}>
+                            Revoke
+                          </Confirm>
+                        ) : (
+                          <button type="button" className="link-btn" onClick={() => attempt(() => S.setActive(me, u.id, true), setErr)}>
+                            Restore
+                          </button>
+                        )}
                       </>
                     )}
                   </span>

@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, taskMark, team } from '../store.js'
-import { Avatar, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, useDb, useForm, useMe } from '../ui.jsx'
+import { byId, can, DEPTS, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, TASK_STATUS, taskMark, team } from '../store.js'
+import { Avatar, Confirm, Empty, Err, Field, go, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, useDb, useForm, useMe, usePhone } from '../ui.jsx'
 import { addDays, ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, today, ymd } from '../util.js'
-import { MonthGrid } from './Calendar.jsx'
+import { AgendaList, MonthGrid } from './Calendar.jsx'
 import { DeptSelect } from './Tasks.jsx'
 import { postsFromSheet, readSheet } from '../xlsx.js'
 
@@ -20,17 +20,24 @@ export default function Content({ args = [] }) {
   const d = useDb()
   const staffer = isStaff(me)
   const manage = can(me, 'content.manage')
-  const [month, setMonth] = useState(`${today().slice(0, 8)}01`)
+  // #/content/post/<id> opens that post (a task links to its post this way)
+  const linked = args[0] === 'post' ? byId(d.posts, args[1]) : null
+  const [month, setMonth] = useState(`${(linked?.date || today()).slice(0, 8)}01`)
   const [view, setView] = useState(args[0] === 'owed' && staffer ? 'owed' : 'month')
   const [making, setMaking] = useState(null) // compensation to note: {initial}
   const [client, setClient] = useState('')
   const [platform, setPlatform] = useState('')
-  const [open, setOpen] = useState(null)
+  const [open, setOpen] = useState(linked?.id ?? null)
   const [form, setForm] = useState(null)
   const [importing, setImporting] = useState(false)
+  const phone = usePhone()
   const posts = d.posts.filter((p) => can(me, 'content.view', p) && (!client || p.clientId === client) && (!platform || p.platform === platform))
   const inMonth = posts.filter((p) => p.date.slice(0, 7) === month.slice(0, 7))
-  const items = posts.map((p) => ({ key: p.id, kind: 'post', date: p.date, title: `${staffer && !client ? `${byId(d.clients, p.clientId)?.name.split(' ')[0]}: ` : ''}${p.format} · ${p.title}`, type: `ps-${p.status}`, post: p }))
+  const items = posts.map((p) => {
+    const who = staffer && !client ? byId(d.clients, p.clientId)?.name.split(' ')[0] : ''
+    // title is the month grid's chip; when / line / sub are the phone's day list
+    return { key: p.id, kind: 'post', date: p.date, title: `${who ? `${who}: ` : ''}${p.format} · ${p.title}`, type: `ps-${p.status}`, post: p, when: p.format, line: p.title, sub: [who, POST_STATUS[p.status], p.platform].filter(Boolean).join(' · ') }
+  })
   const waiting = posts.filter((p) => p.status === 'ready').length
   return (
     <div className="page">
@@ -101,7 +108,9 @@ export default function Content({ args = [] }) {
               </span>
             ))}
           </p>
-          {view === 'month' ? (
+          {view === 'month' && phone ? (
+            <AgendaList from={month} to={addDays(shiftMonth(month, 1), -1)} items={items} onItem={(it) => setOpen(it.post.id)} empty={`Nothing planned in ${fmtMonth(month)}`} />
+          ) : view === 'month' ? (
             <MonthGrid month={month} items={items} onItem={(it) => setOpen(it.post.id)} onDay={(day) => manage && setForm({ initial: { date: day, clientId: client || undefined } })} />
           ) : (
             <div className="board">
@@ -157,11 +166,7 @@ export default function Content({ args = [] }) {
           clientId={client}
           onClose={(added) => {
             setImporting(false)
-            if (!added) return
-            // show what just went in: that client, from the month of the first post
-            setClient(added.clientId)
-            setMonth(`${added.first.slice(0, 8)}01`)
-            setView('month')
+            if (added) go(`#/projects/${added.projectId}/tasks`) // the project, with this week's posts in its To do
           }}
         />
       )}
@@ -344,9 +349,9 @@ function Owed({ client, onNew, onEdit }) {
                     </button>
                   )}
                   {me.role === 'admin' && (
-                    <button className="icon-btn sm" aria-label="Remove" onClick={() => confirm('Remove this compensation?') && run(() => S.deleteCompensation(me, k.id))}>
+                    <Confirm className="icon-btn sm" aria-label="Remove" ask="Remove this compensation?" yes="Remove" onYes={() => run(() => S.deleteCompensation(me, k.id))}>
                       <Icon name="trash" size={14} />
-                    </button>
+                    </Confirm>
                   )}
                 </span>
               </li>
@@ -447,6 +452,7 @@ function PostView({ id, onClose, onEdit, onMissed }) {
             <Avatar user={byId(d.users, p.assigneeId)} size={22} /> Made by {S.userName(d, p.assigneeId)}
           </p>
         )}
+        <PostLinks p={p} />
         {d.compensations
           .filter((k) => k.postId === p.id && can(me, 'comp.view', k))
           .map((k) => (
@@ -519,9 +525,9 @@ function PostView({ id, onClose, onEdit, onMissed }) {
               ))}
             </select>
             <span className="grow" />
-            <button className="btn danger sm" onClick={() => confirm(`Delete “${p.title}”?`) && run(() => S.deletePost(me, p.id)) && onClose()}>
+            <Confirm className="btn danger sm" ask={`Delete “${p.title}”?`} detail="This can’t be undone." yes="Delete post" onYes={() => run(() => S.deletePost(me, p.id)) && onClose()}>
               <Icon name="trash" size={14} /> Delete
-            </button>
+            </Confirm>
             <button className="btn sm" onClick={onEdit}>
               <Icon name="edit" size={14} /> Edit
             </button>
@@ -532,13 +538,37 @@ function PostView({ id, onClose, onEdit, onMissed }) {
   )
 }
 
-// a content calendar made in Excel → posts in the plan, after a look at what was found
-function ImportForm({ clientId: chosen, onClose }) {
+// the post's project, and its task (or when the task will be made)
+function PostLinks({ p }) {
   const me = useMe()
+  const d = useDb()
+  const project = byId(d.projects, p.projectId)
+  if (!project || !isStaff(me)) return null
+  const task = d.tasks.find((t) => t.postId === p.id)
+  return (
+    <p className="small post-links">
+      Project: <a href={`#/projects/${project.id}/tasks`}>{project.name}</a>
+      {' · '}
+      {task ? (
+        <>
+          Task: <a href={`#/tasks/${task.id}`}>{TASK_STATUS[task.status]}</a>
+        </>
+      ) : p.taskMade || !['idea', 'production'].includes(p.status) ? (
+        'No task'
+      ) : (
+        `Goes into To do on ${fmtDay(addDays(p.date, -7))}`
+      )}
+    </p>
+  )
+}
+
+// a content calendar made in Excel → a look at what was found → its project and team → the posts, in that project
+function ImportForm({ clientId: chosen, onClose }) {
   const d = useDb()
   const [clientId, setClientId] = useState(chosen || d.clients[0]?.id || '')
   const [platform, setPlatform] = useState('Instagram')
   const [found, setFound] = useState(null) // { name, posts }
+  const [step, setStep] = useState('sheet') // sheet → project
   const [err, setErr] = useState('')
   const pick = async (e) => {
     const file = e.target.files[0]
@@ -554,14 +584,7 @@ function ImportForm({ clientId: chosen, onClose }) {
   // already in the plan (same client, day and title): left out, so importing the same sheet twice is harmless
   const planned = (p) => d.posts.some((x) => x.clientId === clientId && x.date === p.date && x.title.toLowerCase() === p.title.toLowerCase())
   const fresh = found ? found.posts.filter((p) => !planned(p)) : []
-  const add = () => {
-    try {
-      for (const p of fresh) S.savePost(me, { platform, ...p, clientId, time: '19:00' })
-      onClose({ clientId, first: fresh.map((p) => p.date).sort()[0] })
-    } catch (x) {
-      setErr(x.message)
-    }
-  }
+  if (step === 'project') return <ImportProject clientId={clientId} platform={platform} posts={fresh} onBack={() => setStep('sheet')} onClose={onClose} />
   return (
     <Modal title="Import a content calendar" onClose={() => onClose()} wide>
       <div className="form-grid">
@@ -629,8 +652,125 @@ function ImportForm({ clientId: chosen, onClose }) {
           <button type="button" className="btn ghost" onClick={() => onClose()}>
             Cancel
           </button>
-          <button type="button" className="btn primary" disabled={!fresh.length} onClick={add}>
-            {fresh.length ? `Add ${fresh.length} ${fresh.length === 1 ? 'post' : 'posts'} to the plan` : 'Add to the plan'}
+          <button type="button" className="btn primary" disabled={!fresh.length} onClick={() => setStep('project')}>
+            Next: the project and team <Icon name="right" size={16} />
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// step 2: which project the posts go into, which departments work on it (their people become its team) and who
+// makes the Reels and the posts
+function ImportProject({ clientId, platform, posts, onBack, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const client = byId(d.clients, clientId)
+  const open = d.projects.filter((p) => p.clientId === clientId && p.status !== 'done' && can(me, 'project.view', p))
+  const creates = can(me, 'project.create')
+  const days = posts.map((p) => p.date).sort()
+  const [first, last] = [days[0], days.at(-1)]
+  const months = fmtMonth(first) === fmtMonth(last) ? fmtMonth(first) : `${fmtMonth(first).split(' ')[0]} – ${fmtMonth(last)}`
+  // which departments make these posts (Reels and Shorts: Video; the rest: Design); Social media posts them all
+  const needed = [...new Set(posts.map((p) => postDept(p.format)))]
+  const people = (dept) => staff(d).filter((u) => u.dept === dept)
+  const { v, set, setV, err, run } = useForm({
+    mode: creates || !open.length ? 'new' : 'existing',
+    projectId: open[0]?.id || '',
+    name: `${client?.name} — Content, ${months}`,
+    managerId: me.id,
+    depts: [...needed, 'social'],
+    makers: Object.fromEntries(needed.map((k) => [k, people(k).length === 1 ? people(k)[0].id : ''])),
+  })
+  const existing = v.mode === 'existing' && byId(d.projects, v.projectId)
+  const editsTeam = !existing || can(me, 'project.edit', existing)
+  const joining = [...new Set([...v.depts.flatMap((k) => people(k).map((u) => u.id)), ...Object.values(v.makers).filter(Boolean)])]
+  const thisWeek = posts.filter((p) => p.date <= addDays(today(), 7) && ['idea', 'production'].includes(p.status)).length
+  const toggle = (k) => setV((s) => ({ ...s, depts: s.depts.includes(k) ? s.depts.filter((x) => x !== k) : [...s.depts, k] }))
+  const add = () => {
+    let id
+    const project = existing
+      ? { ...existing, memberIds: editsTeam ? [...new Set([...existing.memberIds, ...joining])].filter((x) => x !== existing.managerId) : existing.memberIds }
+      : { name: v.name, clientId, status: 'active', priority: 'normal', start: first, due: last, managerId: v.managerId, memberIds: joining.filter((x) => x !== v.managerId), brief: `Content plan imported from Excel: ${posts.length} posts.` }
+    const made = posts.map((p) => ({ platform, ...p, dept: postDept(p.format), assigneeId: v.makers[postDept(p.format)] || null }))
+    if (run(() => (id = S.importPlan(me, project, made)))) onClose({ projectId: id })
+  }
+  const ready = v.mode === 'new' ? creates && v.name.trim() : Boolean(existing)
+  return (
+    <Modal title="The project and its team" onClose={() => onClose()}>
+      <div className="form-grid one import-project">
+        <p className="muted small">
+          {posts.length} {posts.length === 1 ? 'post' : 'posts'} for {client?.name} go into one project. Each becomes a task there a week before it goes out.
+        </p>
+        <div className="field">
+          <span className="field-label">Project</span>
+          <div className="seg wide" role="group" aria-label="Project">
+            <button type="button" className={v.mode === 'new' ? 'on' : ''} aria-pressed={v.mode === 'new'} disabled={!creates} onClick={() => setV((s) => ({ ...s, mode: 'new' }))}>
+              New project
+            </button>
+            <button type="button" className={v.mode === 'existing' ? 'on' : ''} aria-pressed={v.mode === 'existing'} disabled={!open.length} onClick={() => setV((s) => ({ ...s, mode: 'existing' }))}>
+              One {client?.name.split(' ')[0]} already has
+            </button>
+          </div>
+        </div>
+        {v.mode === 'new' && !creates && <p className="warn-box">Only a supervisor can make a project. Ask one to make it, then import into it.</p>}
+        {v.mode === 'new' && creates && (
+          <>
+            <Field label="Name" hint={`Runs ${fmtDay(first)} – ${fmtDay(last)}, from the sheet.`}>
+              <input value={v.name} onChange={set('name')} />
+            </Field>
+            <Field label="Project lead">
+              <select value={v.managerId} onChange={set('managerId')}>
+                <PeopleOptions users={team(d)} />
+              </select>
+            </Field>
+          </>
+        )}
+        {v.mode === 'existing' && (
+          <Field label="Which project">
+            <select value={v.projectId} onChange={set('projectId')}>
+              {open.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <fieldset className="field">
+          <legend className="field-label">Departments working on it</legend>
+          <small>Everyone in them joins the project’s team.{!editsTeam && ` Only ${S.userName(d, existing.managerId).split(' ')[0]} or a supervisor can change this project’s team.`}</small>
+          <ul className="dept-picks">
+            {Object.entries(DEPTS).map(([k, label]) => (
+              <li key={k}>
+                <label className="check">
+                  <input type="checkbox" checked={v.depts.includes(k)} disabled={!editsTeam} onChange={() => toggle(k)} />
+                  {label}
+                </label>
+                <small className="muted">{people(k).map((u) => u.name.split(' ')[0]).join(', ') || 'no one yet'}</small>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+        {needed.map((k) => (
+          <Field key={k} label={k === 'video' ? 'Reels and Shorts are made by' : 'Posts, Carousels and Stories are made by'}>
+            <select value={v.makers[k]} onChange={(e) => setV((s) => ({ ...s, makers: { ...s.makers, [k]: e.target.value } }))}>
+              <option value="">Anyone in {DEPTS[k]} (not one person)</option>
+              <PeopleOptions users={staff(d)} />
+            </select>
+          </Field>
+        ))}
+        <p className="small">
+          {thisWeek > 0 ? `${thisWeek} going out in the next 7 days go into its To do now.` : 'None go out in the next 7 days.'} The rest are added a week before they go out.
+        </p>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onBack}>
+            Back
+          </button>
+          <button type="button" className="btn primary" disabled={!ready} onClick={add}>
+            {v.mode === 'new' ? `Make the project and add ${posts.length} posts` : `Add ${posts.length} posts to it`}
           </button>
         </div>
       </div>
@@ -642,26 +782,37 @@ export function PostForm({ onClose, initial = {}, edit }) {
   const me = useMe()
   const d = useDb()
   const { v, set, setV, err, run } = useForm(
-    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', brief: '', caption: '', status: 'idea', assigneeId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
+    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', brief: '', caption: '', status: 'idea', assigneeId: '', projectId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
   )
   const makers = team(d)
+  const projects = d.projects.filter((p) => p.clientId === v.clientId && (p.status !== 'done' || p.id === v.projectId) && can(me, 'project.view', p))
   return (
     <Modal title={edit ? 'Edit post' : 'Plan a post'} onClose={onClose}>
       <form
         className="form-grid"
         onSubmit={(e) => {
           e.preventDefault()
-          if (run(() => S.savePost(me, { ...v, assigneeId: v.assigneeId || null }))) onClose()
+          if (run(() => S.savePost(me, { ...v, assigneeId: v.assigneeId || null, projectId: v.projectId || null }))) onClose()
         }}
       >
         <Field label="Hook / working title" full>
           <input data-autofocus value={v.title} onChange={set('title')} placeholder="e.g. 3 mistakes people make buying a plot" />
         </Field>
         <Field label="Client">
-          <select value={v.clientId} onChange={set('clientId')}>
+          <select value={v.clientId} onChange={(e) => setV((s) => ({ ...s, clientId: e.target.value, projectId: '' }))}>
             {d.clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Project" hint="Its task goes into this project’s To do a week before it goes out.">
+          <select value={v.projectId || ''} onChange={set('projectId')}>
+            <option value="">No project (no task)</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>

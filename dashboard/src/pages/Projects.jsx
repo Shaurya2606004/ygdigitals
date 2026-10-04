@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, DELIV_STATUS, DELIV_TYPES, isOverdue, isStaff, occurrences, PRIORITY, PROJECT_STATUS, progress, projectTasks, staff } from '../store.js'
-import { Avatar, Avatars, Bar, Card, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Avatars, Bar, Card, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, PeoplePicker, Status, Tabs, useDb, useForm, useMe, usePhone } from '../ui.jsx'
 import { addDays, ago, fmtDay, fmtTime, relDay, today } from '../util.js'
 import { EventForm } from './Calendar.jsx'
 import { ChatPane } from './Chat.jsx'
@@ -298,17 +298,18 @@ function ProjectTasks({ p }) {
   const me = useMe()
   const d = useDb()
   const [adding, setAdding] = useState(false)
+  const phone = usePhone()
   return (
     <>
       <div className="toolbar">
-        <p className="muted">Drag cards between columns. The client sees these titles, owners and dates (not comments) in their Plan tab.</p>
+        <p className="muted">{phone ? 'Tap a task to open it.' : 'Drag cards between columns.'} The client sees these titles, owners and dates (not comments) in their Plan tab.</p>
         {can(me, 'task.create', { projectId: p.id }) && p.status !== 'done' && (
           <button className="btn primary" onClick={() => setAdding(true)}>
             <Icon name="plus" /> Add task
           </button>
         )}
       </div>
-      <Board tasks={projectTasks(d, p.id)} />
+      <Board tasks={projectTasks(d, p.id)} project={false} />
       {adding && <TaskForm onClose={() => setAdding(false)} initial={{ projectId: p.id }} />}
     </>
   )

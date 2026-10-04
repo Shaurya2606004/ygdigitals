@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, LEAVE_STATUS, leaveDays, openWork } from '../store.js'
-import { Avatar, Card, Empty, Err, Field, Icon, Modal, PageHead, Status, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Card, Confirm, Empty, Err, Field, Icon, Modal, PageHead, Status, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, ago, daysBetween, fmtDay, today } from '../util.js'
 
 const TONE = { pending: 'pending', approved: 'approved', declined: 'declined' }
@@ -103,10 +103,11 @@ function CancelButton({ l }) {
   const [err, setErr] = useState('')
   return (
     <>
-      <button
+      <Confirm
         className="btn sm ghost"
-        onClick={() => {
-          if (!confirm(`Cancel the leave ${leaveDays(l)}?`)) return
+        ask={`Cancel the leave ${leaveDays(l)}?`}
+        yes="Cancel the leave"
+        onYes={() => {
           try {
             S.cancelLeave(me, l.id)
           } catch (x) {
@@ -115,7 +116,7 @@ function CancelButton({ l }) {
         }}
       >
         Cancel
-      </button>
+      </Confirm>
       <Err msg={err} />
     </>
   )

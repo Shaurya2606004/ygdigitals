@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, conflicts, EVENT_TYPES, isStaff, occurrences, REPEAT } from '../store.js'
-import { Avatar, Empty, Err, Field, go, Icon, isUrl, Modal, PageHead, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Confirm, Empty, Err, Field, go, Icon, isUrl, Modal, PageHead, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, clockNow, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, startOfWeek, today, ymd } from '../util.js'
 
 const LAYERS = { meeting: 'Team meetings', client: 'Client calls', shoot: 'Shoots', review: 'Creative reviews', deadline: 'Deadlines', post: 'Content', leave: 'Leave' }
@@ -256,12 +256,12 @@ function DayList({ items, onItem }) {
       {items.map((it) => (
         <li key={it.key}>
           <button className={`row day-item ${it.declined ? 'declined' : ''}`} onClick={() => onItem(it)}>
-            <span className="time">{it.start ? fmtTime(it.start) : 'All day'}</span>
+            <span className="time">{it.start ? fmtTime(it.start) : (it.when ?? 'All day')}</span>
             <span className={`type-bar t-${it.type}`} aria-hidden="true" />
             <span className="grow">
-              <b>{it.title}</b>
+              <b>{it.line ?? it.title}</b>
               <small>
-                {it.kind === 'event' ? EVENT_TYPES[it.type] : LAYERS[it.type]}
+                {it.sub ?? (it.kind === 'event' ? EVENT_TYPES[it.type] : LAYERS[it.type])}
                 {it.declined ? ' · you declined' : ''}
               </small>
             </span>
@@ -272,10 +272,10 @@ function DayList({ items, onItem }) {
   )
 }
 
-function AgendaList({ from, to, items, onItem }) {
+export function AgendaList({ from, to, items, onItem, empty = 'Nothing in the next 30 days' }) {
   const days = []
   for (let day = from; day <= to; day = addDays(day, 1)) if (items.some((i) => i.date === day)) days.push(day)
-  if (!days.length) return <Empty icon="calendar" title="Nothing in the next 30 days" />
+  if (!days.length) return <Empty icon="calendar" title={empty} />
   return (
     <div className="agenda">
       {days.map((day) => (
@@ -409,17 +409,18 @@ function EventView({ ev, onClose, onEdit }) {
           <span className="grow" />
           {editable && (
             <>
-              <button
+              <Confirm
                 className="btn danger sm"
-                onClick={() => {
-                  if (confirm(`Cancel “${e.title}”${e.repeat !== 'none' ? ' and every repeat of it' : ''}? Everyone invited is notified.`)) {
-                    run(() => S.deleteEvent(me, e.id))
-                    onClose()
-                  }
+                ask={`Cancel “${e.title}”${e.repeat !== 'none' ? ' and every repeat of it' : ''}?`}
+                detail="Everyone invited is told."
+                yes="Cancel event"
+                onYes={() => {
+                  run(() => S.deleteEvent(me, e.id))
+                  onClose()
                 }}
               >
                 Cancel event
-              </button>
+              </Confirm>
               <button className="btn sm" onClick={onEdit}>
                 <Icon name="edit" size={15} /> Edit{e.repeat !== 'none' ? ' series' : ''}
               </button>

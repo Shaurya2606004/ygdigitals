@@ -66,3 +66,29 @@ Build order: delete-client → departments → overdue → urgent-home → leave
   - Columns are found by header: Date, plus Topic and/or Content Type; Festival, Script / Reference, Platform and Status are optional.
   - Posts already in the plan (same client, day and title) are skipped.
   - Script / reference / festival go into a new post field, `brief` ("What to make").
+
+## Phone first (2026-10-05)
+- **Deleting didn't work on phones.** Every 'are you sure?' was the browser's own confirm(), which browsers inside apps (WhatsApp, Instagram) silently answer 'no'. All 9 are now an in-app popup (`Confirm` in ui.jsx).
+- **Bottom bar on phones** (under 900px): the first four of Home, Tasks, Messages, Calendar, Projects someone can open, plus More for the full menu.
+- **Phones (under 720px) get lists, not boards or month grids:**
+  - Tasks and a project's Tasks tab are one list, most urgent first, with filters folded behind a Filter button.
+  - Content plan › Calendar is a day-by-day list.
+  - A task opens with status, who and the due date first, then details and comments.
+- **Touch:** buttons are at least 36px; text boxes are 16px so iPhones don't zoom; chat messages show edit / delete on a tap; Enter in chat adds a new line, and the button sends.
+
+## Content plan and tasks in step (2026-10-05, migration 16)
+- **Import makes the project first.** Step 2 of Import from Excel:
+  - Pick a new project (supervisors only; name and dates come from the sheet) or one the client already has.
+  - Pick the departments working on it; their people join its team.
+  - Pick who makes the Reels and Shorts (Video) and who makes the rest (Design).
+  - Afterwards it opens the project's Tasks tab.
+- **One task per post** in its project, due the day before the post goes out:
+  - Made once the post is a week away (on saving, or by the 9 am job).
+  - A task someone deletes stays deleted (`posts.task_made`).
+  - Plan a post has a Project field too.
+- **Sync** (database triggers; the store copies them so the screen updates instantly):
+  - task started → post In production; task done → post Ready for approval, and the client is asked
+  - post posted or undelivered → task done; client asks for changes → task back to To do
+  - the post's day, title and maker carry over to the task
+- **Anyone who can see a task can still change its status** (the user's call). Every task now shows who changed its status last and when (`tasks.status_by`, `status_at`).
+- A task links to its post (`#/content/post/<id>`); a post shows its project and task.

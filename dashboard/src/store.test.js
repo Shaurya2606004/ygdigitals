@@ -301,3 +301,38 @@ test('content calendar import: the header row finds the columns; days with nothi
   assert.equal(toDay('31/02/2026'), '') // no such day
   assert.throws(() => postsFromSheet([['Topic', 'Type']]), /Date/)
 })
+
+test('content plan ↔ tasks: an import makes the project first; this week’s posts land in its To do; each moves the other', () => {
+  const [aman, vikas, priya, rahul] = ['aman', 'vikas', 'priya', 'rahul'].map(u)
+  const posts = [
+    { date: addDays(today(), 3), format: 'Reel', title: 'Navratri wishes', brief: 'Festival: Navratri', status: 'idea', dept: 'video', assigneeId: 'vikas', platform: 'Instagram' },
+    { date: addDays(today(), 20), format: 'Post', title: 'Later post', brief: '', status: 'idea', dept: 'design', assigneeId: 'ritika', platform: 'Instagram' },
+  ]
+  const project = { name: 'Desi — Content', clientId: 'desi', status: 'active', start: posts[0].date, due: posts[1].date, managerId: 'priya', memberIds: ['vikas', 'ritika'] }
+  assert.throws(() => S.importPlan(priya, project, posts), /create projects/)
+  const pid = S.importPlan(aman, project, posts)
+  const [a, b] = S.getDb().posts.filter((p) => p.projectId === pid).map((p) => p.id)
+  const post = (id) => S.byId(S.getDb().posts, id)
+  const task = (id) => S.getDb().tasks.find((t) => t.postId === id)
+  const k = task(a)
+  assert.deepEqual([k.projectId, k.title, k.due, k.status, k.assigneeId, k.desc], [pid, 'Reel: Navratri wishes', addDays(today(), 2), 'todo', 'vikas', 'Festival: Navratri'])
+  assert.equal(task(b), undefined) // three weeks away: not yet
+  assert.equal(unreadFor('vikas').filter((n) => n.text.startsWith('gave you “Reel: Navratri wishes” — it goes out')).length, 1)
+  assert.ok(!unreadFor('vikas').some((n) => n.text.startsWith('gave you the Reel'))) // told once, when it's in their To do
+
+  S.moveTask(vikas, k.id, 'doing')
+  assert.deepEqual([post(a).status, task(a).statusBy], ['production', 'vikas'])
+  S.moveTask(vikas, k.id, 'done')
+  assert.equal(post(a).status, 'ready')
+  assert.ok(unreadFor('rahul').some((n) => n.text === 'has a Reel ready for your approval: “Navratri wishes”'))
+  S.decidePost(rahul, a, false, 'Brighter, please')
+  assert.deepEqual([post(a).status, task(a).status], ['production', 'todo'])
+  S.savePost(priya, { ...post(a), status: 'posted' })
+  assert.deepEqual([task(a).status, task(a).statusBy], ['done', 'priya'])
+
+  S.savePost(priya, { ...post(b), date: addDays(today(), 6), title: 'Diwali post' })
+  assert.deepEqual([task(b).due, task(b).title], [addDays(today(), 5), 'Post: Diwali post'])
+  assert.throws(() => S.savePost(priya, { ...post(b), projectId: 'p-gv-month' }), /this client’s projects/)
+  S.deletePost(priya, b)
+  assert.equal(task(b), undefined)
+})

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, DEPTS, isOverdue, PRIORITY, REPEATS, seesAll, setsDue, staff, TASK_STATUS, taskMark } from '../store.js'
-import { Avatar, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { byId, can, DEPTS, isOverdue, POST_STATUS, PRIORITY, REPEATS, seesAll, setsDue, staff, TASK_STATUS, taskMark } from '../store.js'
+import { Avatar, Confirm, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe, usePhone } from '../ui.jsx'
 import { addDays, ago, fmtDay, relDay, today } from '../util.js'
 
 // a finished task shows whether it was on time; an open one, when it's due
@@ -15,30 +15,49 @@ export const DueChip = ({ t }) =>
     </span>
   ) : null
 
-export function TaskRow({ t, project = true }) {
+// who last changed a task's status, and when ('' if no one has since it was made)
+export const movedBy = (d, t) => (t.statusAt ? `Moved by ${t.statusBy ? S.userName(d, t.statusBy).split(' ')[0] : 'YG Hub'} · ${ago(t.statusAt)}` : '')
+
+// open work first, soonest date first
+const urgentFirst = (a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9')
+
+// a link to the task page, or with onOpen a button that opens it where you are
+export function TaskRow({ t, project = true, onOpen }) {
   const d = useDb()
   const p = byId(d.projects, t.projectId)
+  const inner = (
+    <>
+      <Status s={t.status} label={TASK_STATUS[t.status]} />
+      <span className="grow">
+        <b>{t.title}</b>
+        {(project || t.statusAt) && <small>{[project && p?.name, movedBy(d, t)].filter(Boolean).join(' · ')}</small>}
+      </span>
+      <DueChip t={t} />
+      {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">Not given to anyone</span>}
+    </>
+  )
   return (
     <li>
-      <a href={`#/tasks/${t.id}`} className="row task-row">
-        <Status s={t.status} label={TASK_STATUS[t.status]} />
-        <span className="grow">
-          <b>{t.title}</b>
-          {project && <small>{p?.name}</small>}
-        </span>
-        <DueChip t={t} />
-        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">Not given to anyone</span>}
-      </a>
+      {onOpen ? (
+        <button type="button" className="row task-row" onClick={onOpen}>
+          {inner}
+        </button>
+      ) : (
+        <a href={`#/tasks/${t.id}`} className="row task-row">
+          {inner}
+        </a>
+      )}
     </li>
   )
 }
 
-export function Board({ tasks }) {
+export function Board({ tasks, project = true }) {
   const me = useMe()
   const d = useDb()
   const [open, setOpen] = useState(null)
   const [over, setOver] = useState(null)
   const [err, setErr] = useState('')
+  const phone = usePhone()
   const recent = addDays(today(), -14)
   const drop = (e, status) => {
     e.preventDefault()
@@ -49,6 +68,24 @@ export function Board({ tasks }) {
     } catch (x) {
       setErr(x.message)
     }
+  }
+  // a phone can't drag: one list, most urgent first, and finished work only from the last two weeks
+  if (phone) {
+    const list = tasks.filter((t) => t.status !== 'done' || (t.completedAt || '') >= recent).sort(urgentFirst)
+    return (
+      <>
+        {list.length ? (
+          <ul className="list card task-list">
+            {list.map((t) => (
+              <TaskRow key={t.id} t={t} project={project} onOpen={() => setOpen(t.id)} />
+            ))}
+          </ul>
+        ) : (
+          <Empty title="No tasks here">Tap “New task” to add one.</Empty>
+        )}
+        {open && <TaskModal id={open} onClose={() => setOpen(null)} />}
+      </>
+    )
   }
   return (
     <>
@@ -84,6 +121,7 @@ export function Board({ tasks }) {
                       )}
                       <b>{t.title}</b>
                       <small className="muted">{byId(d.projects, t.projectId)?.name}</small>
+                      {t.statusAt && <small className="muted">{movedBy(d, t)}</small>}
                       <span className="tcard-foot">
                         <DueChip t={t} />
                         {t.checklist.length > 0 && (
@@ -122,6 +160,8 @@ export default function Tasks({ args }) {
   const [view, setView] = useState('board')
   const [f, setF] = useState({ project: '', person: '', priority: '', q: '' })
   const [adding, setAdding] = useState(false)
+  const phone = usePhone()
+  const [filtering, setFiltering] = useState(false)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const q = f.q.trim().toLowerCase()
   const tasks = d.tasks.filter(
@@ -133,10 +173,11 @@ export default function Tasks({ args }) {
       (!q || t.title.toLowerCase().includes(q)),
   )
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const sorted = [...tasks].sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9'))
+  const sorted = [...tasks].sort(urgentFirst)
+  const filtered = Object.values(f).filter(Boolean).length
   return (
     <div className="page">
-      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. Drag a card to change where it’s at, or open it to change it.`}>
+      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. ${phone ? 'Tap a task to open it.' : 'Drag a card to change where it’s at, or open it to change it.'}`}>
         <button className="btn primary" onClick={() => setAdding(true)}>
           <Icon name="plus" /> New task
         </button>
@@ -151,42 +192,51 @@ export default function Tasks({ args }) {
             ['all', seesAll(me) ? 'Everyone' : DEPTS[me.dept] ? `${DEPTS[me.dept]} team` : 'Shared with me'],
           ]}
         />
-        <div className="filters">
-          <input type="search" placeholder="Filter by title" aria-label="Filter tasks by title" value={f.q} onChange={set('q')} />
-          <select aria-label="Project" value={f.project} onChange={set('project')}>
-            <option value="">All projects</option>
-            {d.projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          {scope === 'all' && (
-            <select aria-label="Given to" value={f.person} onChange={set('person')}>
-              <option value="">Anyone</option>
-              <option value="none">Not given to anyone</option>
-              <PeopleOptions users={staff(d)} />
+        {phone && (
+          <button className="btn" aria-expanded={filtering} onClick={() => setFiltering(!filtering)}>
+            <Icon name="sliders" size={16} /> Filter{filtered ? ` (${filtered})` : ''}
+          </button>
+        )}
+        {(!phone || filtering) && (
+          <div className="filters">
+            <input type="search" placeholder="Filter by title" aria-label="Filter tasks by title" value={f.q} onChange={set('q')} />
+            <select aria-label="Project" value={f.project} onChange={set('project')}>
+              <option value="">All projects</option>
+              {d.projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
             </select>
-          )}
-          <select aria-label="Priority" value={f.priority} onChange={set('priority')}>
-            <option value="">Any priority</option>
-            {Object.entries(PRIORITY).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <div className="seg" role="group" aria-label="View">
-            <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')} aria-pressed={view === 'board'}>
-              Board
-            </button>
-            <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')} aria-pressed={view === 'list'}>
-              List
-            </button>
+            {scope === 'all' && (
+              <select aria-label="Given to" value={f.person} onChange={set('person')}>
+                <option value="">Anyone</option>
+                <option value="none">Not given to anyone</option>
+                <PeopleOptions users={staff(d)} />
+              </select>
+            )}
+            <select aria-label="Priority" value={f.priority} onChange={set('priority')}>
+              <option value="">Any priority</option>
+              {Object.entries(PRIORITY).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+            {!phone && (
+              <div className="seg" role="group" aria-label="View">
+                <button className={view === 'board' ? 'on' : ''} onClick={() => setView('board')} aria-pressed={view === 'board'}>
+                  Board
+                </button>
+                <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')} aria-pressed={view === 'list'}>
+                  List
+                </button>
+              </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
-      {view === 'board' ? (
+      {phone || view === 'board' ? (
         <Board tasks={tasks} />
       ) : sorted.length ? (
         <TaskTable tasks={sorted} />
@@ -348,6 +398,7 @@ export function TaskModal({ id, onClose }) {
   const [item, setItem] = useState('')
   if (!t) return null
   const p = byId(d.projects, t.projectId)
+  const post = byId(d.posts, t.postId)
   const editable = can(me, 'task.edit', t)
   const run = (fn) => {
     try {
@@ -362,14 +413,15 @@ export function TaskModal({ id, onClose }) {
   const save = (patch) => run(() => S.saveTask(me, { ...t, ...patch }))
   return (
     <Modal title={`Task · ${p?.name ?? ''}`} onClose={onClose} wide>
+      {editable ? (
+        <input className="title-input" defaultValue={t.title} aria-label="Task title" onBlur={(e) => e.target.value.trim() !== t.title && save({ title: e.target.value })} />
+      ) : (
+        <h3 className="title-static">{t.title}</h3>
+      )}
+      <Err msg={err} />
+      {/* on a phone the side panel (status, who, when, delete) comes first, then details and comments */}
       <div className="task-modal">
         <div className="task-main">
-          {editable ? (
-            <input className="title-input" defaultValue={t.title} aria-label="Task title" onBlur={(e) => e.target.value.trim() !== t.title && save({ title: e.target.value })} />
-          ) : (
-            <h3 className="title-static">{t.title}</h3>
-          )}
-          <Err msg={err} />
           <h4>Details</h4>
           {editable ? (
             <textarea rows={4} defaultValue={t.desc} aria-label="Details" placeholder="Add a brief, links, references…" onBlur={(e) => e.target.value !== t.desc && save({ desc: e.target.value })} />
@@ -449,7 +501,7 @@ export function TaskModal({ id, onClose }) {
         <aside className="task-side">
           <dl className="props">
             <dt>Status</dt>
-            <dd>
+            <dd className="stack">
               <select value={t.status} disabled={!editable} onChange={(e) => save({ status: e.target.value })} aria-label="Status">
                 {Object.entries(TASK_STATUS).map(([k, l]) => (
                   <option key={k} value={k}>
@@ -457,6 +509,7 @@ export function TaskModal({ id, onClose }) {
                   </option>
                 ))}
               </select>
+              {t.statusAt && <small className="muted">{movedBy(d, t)}</small>}
             </dd>
             <dt>Given to</dt>
             <dd className="stack">
@@ -479,6 +532,19 @@ export function TaskModal({ id, onClose }) {
               <a href={`#/projects/${p?.id}`}>{p?.name}</a>
               <small className="muted block">{byId(d.clients, p?.clientId)?.name}</small>
             </dd>
+            {post && (
+              <>
+                <dt>Content plan</dt>
+                <dd>
+                  <a href={`#/content/post/${post.id}`}>
+                    {post.format} on {post.platform}
+                  </a>
+                  <small className="muted block">
+                    Goes out {fmtDay(post.date)} · {POST_STATUS[post.status]}
+                  </small>
+                </dd>
+              </>
+            )}
             <dt>Priority</dt>
             <dd>
               <select value={t.priority} disabled={!editable} onChange={(e) => save({ priority: e.target.value })} aria-label="Priority">
@@ -504,14 +570,15 @@ export function TaskModal({ id, onClose }) {
             </dd>
           </dl>
           {can(me, 'task.delete', t) && (
-            <button
+            <Confirm
               className="btn danger sm"
-              onClick={() => {
-                if (confirm(`Delete “${t.title}”? This can’t be undone.`) && run(() => S.deleteTask(me, t.id))) onClose()
-              }}
+              ask={`Delete “${t.title}”?`}
+              detail="It goes for everyone, with its checklist and comments. This can’t be undone."
+              yes="Delete task"
+              onYes={() => run(() => S.deleteTask(me, t.id)) && onClose()}
             >
               <Icon name="trash" size={14} /> Delete task
-            </button>
+            </Confirm>
           )}
         </aside>
       </div>

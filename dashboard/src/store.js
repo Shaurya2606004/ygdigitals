@@ -417,6 +417,8 @@ export function saveTask(me, t) {
     else d.tasks.push((task = { status: 'todo', priority: 'normal', dept: '', repeat: 'none', desc: '', checklist: [], comments: [], ...t, title: t.title.trim(), id: uid(), createdBy: me.id, createdAt: nowIso() }))
     if (task.status === 'done') task.completedAt ||= today()
     else task.completedAt = null
+    if (old && old.status !== task.status) Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
+    if (old) taskMoved(d, me, old, task)
     if (repeat) {
       task.repeat = 'none'
       const due = repeat === 'weekly' ? addDays(task.due, 7) : addMonth(task.due)
@@ -453,6 +455,8 @@ export function handoff(me, id, toId, note) {
     const from = task.assigneeId ? userName(d, task.assigneeId).split(' ')[0] : 'Unassigned'
     const to = userName(d, toId).split(' ')[0]
     Object.assign(task, { assigneeId: toId, status: 'todo', completedAt: null })
+    if (t.status !== 'todo') Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
+    taskMoved(d, me, t, task)
     task.comments.push({ id: commentId, userId: me.id, at: nowIso(), text: note || '', handoff: `${from} → ${to}` })
     const link = `#/tasks/${id}`
     notify(d, me, [toId], `handed you “${task.title}”${note ? `: ${note}` : ''}`, link)
@@ -739,24 +743,83 @@ export function leaveGroup(me, id) {
 
 /* ---------- content plan ---------- */
 
-export function savePost(me, p) {
+// A post in a project has one task there, made once it's a week away and due the day before it goes out; the task
+// moves the post and the post moves the task. The server does all of this itself (*_content_tasks.sql) — these are
+// its copies, so the screen changes at once.
+export const postTaskId = (postId) => `pt-${postId}`
+const postDue = (date) => (date > today() ? addDays(date, -1) : date)
+const setStatus = (me, k, status) => {
+  if (status === k.status) return
+  Object.assign(k, { status, statusBy: me.id, statusAt: nowIso(), completedAt: status === 'done' ? k.completedAt || today() : null })
+}
+function postTask(d, me, s) {
+  if (!s.projectId || s.taskMade || !['idea', 'production'].includes(s.status) || s.date > addDays(today(), 7)) return
+  const id = postTaskId(s.id)
+  if (!byId(d.tasks, id)) {
+    d.tasks.push({ id, projectId: s.projectId, postId: s.id, assigneeId: s.assigneeId || null, status: s.status === 'production' ? 'doing' : 'todo', priority: 'normal',
+      due: postDue(s.date), title: `${s.format}: ${s.title}`, dept: s.dept, repeat: 'none', desc: s.brief || '', checklist: [], comments: [], createdBy: me.id, createdAt: nowIso(), completedAt: null })
+    if (s.assigneeId) notify(d, me, [s.assigneeId], `gave you “${s.format}: ${s.title}” — it goes out ${fmtDay(s.date)}`, `#/tasks/${id}`)
+  }
+  s.taskMade = true
+}
+// the post changed (old → s): its task follows
+function postMoved(d, me, old, s) {
+  const k = d.tasks.find((t) => t.postId === s.id)
+  if (!k) return
+  if (s.title !== old.title || s.format !== old.format) k.title = `${s.format}: ${s.title}`
+  if (s.date !== old.date) k.due = postDue(s.date)
+  if ((s.assigneeId || null) !== (old.assigneeId || null)) k.assigneeId = s.assigneeId || null
+  if (s.status !== old.status && ['posted', 'missed'].includes(s.status)) setStatus(me, k, 'done')
+  else if (s.status === 'production' && ['ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(me, k, 'todo') // the client asked for changes
+}
+// the task changed (old → k): its post follows
+function taskMoved(d, me, old, k) {
+  const s = k.postId && byId(d.posts, k.postId)
+  if (!s) return
+  if ((k.assigneeId || null) !== (old.assigneeId || null)) s.assigneeId = k.assigneeId || null
+  if (k.status === old.status) return
+  if (k.status === 'done' && ['idea', 'production'].includes(s.status)) {
+    s.status = 'ready'
+    notify(d, me, clientUsers(d, s.clientId).map((u) => u.id), `has a ${s.format} ready for your approval: “${s.title}”`, '#/content')
+  } else if (['doing', 'review'].includes(k.status) && s.status === 'idea') s.status = 'production'
+}
+
+// quiet: an import — each maker hears when a post's task lands in their To do, not once per post
+export function savePost(me, p, { quiet = false } = {}) {
   must(can(me, 'content.manage'), 'plan content')
   need(p.title?.trim(), 'Give the post a working title or hook.')
   need(p.clientId && p.date, 'Pick the client and the day it goes out.')
   const old = p.id && byId(db.posts, p.id)
   if (old) must(can(me, 'content.view', old), 'change this post')
+  const project = p.projectId && byId(db.projects, p.projectId)
+  need(!p.projectId || project?.clientId === p.clientId, 'Pick one of this client’s projects.')
+  need(!p.projectId || p.projectId === old?.projectId || can(me, 'project.view', project), 'You can only add posts to a project you work in.')
   const id = commit((d) => {
     const cur = old && byId(d.posts, p.id)
-    if (cur) Object.assign(cur, p)
-    else d.posts.push({ status: 'idea', caption: '', brief: '', notes: [], dept: postDept(p.format), ...p, id: uid() })
+    if (cur) Object.assign(cur, p, { taskMade: cur.taskMade }) // only the server says a task was made
+    else d.posts.push({ status: 'idea', caption: '', brief: '', notes: [], dept: postDept(p.format), projectId: null, taskMade: false, ...p, id: uid() })
+    const s = cur || d.posts.at(-1)
+    if (!old || old.projectId !== s.projectId || old.date !== s.date || old.status !== s.status) postTask(d, me, s)
+    if (old) postMoved(d, me, old, s)
     const link = '#/content'
-    if (p.assigneeId && (!old || old.assigneeId !== p.assigneeId)) notify(d, me, [p.assigneeId], `gave you the ${p.format} “${p.title}” (${fmtDay(p.date)})`, link)
+    if (p.assigneeId && (!old || old.assigneeId !== p.assigneeId) && !quiet) notify(d, me, [p.assigneeId], `gave you the ${p.format} “${p.title}” (${fmtDay(p.date)})`, link)
     if (p.status === 'ready' && old?.status !== 'ready') notify(d, me, clientUsers(d, p.clientId).map((u) => u.id), `has a ${p.format} ready for your approval: “${p.title}”`, link)
     log(d, me, `${old ? 'updated' : 'planned'} the ${p.format} “${p.title}” for ${byId(d.clients, p.clientId)?.name}`, link)
     return old ? old.id : d.posts.at(-1).id
   })
-  send('save_post', old ? { id, ...changes(old, p) } : { ...p, id }, old ? [['posts', id]] : [])
+  send('save_post', { ...(old ? { id, ...changes(old, p) } : { ...p, id }), ...(quiet && { quiet }) }, old ? [['posts', id]] : [])
   return id
+}
+
+// a content calendar from Excel: first its project (a new one, or one the client has, with the departments working on
+// it as its team), then the posts in it. This week's posts land in the project's To do now, the rest a week ahead.
+export function importPlan(me, project, posts) {
+  need(posts.length, 'There are no new posts to add.')
+  const old = project.id && byId(db.projects, project.id)
+  const teamChanged = old && (old.managerId !== project.managerId || old.memberIds.join() !== project.memberIds.join())
+  const projectId = !old || teamChanged ? saveProject(me, project) : old.id
+  for (const p of posts) savePost(me, { time: '19:00', ...p, clientId: project.clientId, projectId }, { quiet: true })
+  return projectId
 }
 
 export function decidePost(me, id, approve, note) {
@@ -766,6 +829,7 @@ export function decidePost(me, id, approve, note) {
   commit((d) => {
     const t = byId(d.posts, id)
     t.status = approve ? 'scheduled' : 'production'
+    postMoved(d, me, p, t)
     t.notes = [...(t.notes || []), { userId: me.id, at: nowIso(), text: approve ? `Approved${note ? `: ${note}` : ''}` : `Changes: ${note}` }]
     notify(d, me, [t.assigneeId, ...admins(d)], approve ? `approved the ${t.format} “${t.title}”` : `asked for changes on “${t.title}”: ${note}`, '#/content')
     log(d, me, approve ? `approved the ${t.format} “${t.title}”` : `asked for changes on “${t.title}”`, '#/content')
@@ -775,7 +839,10 @@ export function decidePost(me, id, approve, note) {
 
 export function deletePost(me, id) {
   must(can(me, 'content.manage') && can(me, 'content.view', byId(db.posts, id)), 'delete posts')
-  commit((d) => (d.posts = d.posts.filter((x) => x.id !== id)))
+  commit((d) => {
+    d.posts = d.posts.filter((x) => x.id !== id)
+    d.tasks = d.tasks.filter((t) => t.postId !== id) // its task goes with it
+  })
   send('delete_post', { id })
 }
 

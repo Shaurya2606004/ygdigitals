@@ -10,6 +10,15 @@ export function useMe() {
 }
 export const go = (path) => (location.hash = path)
 
+// phone-sized screen: lists instead of boards and month grids (same width as the stylesheet's phone rules)
+const PHONE = '(max-width: 720px)'
+const onResize = (f) => {
+  const m = matchMedia(PHONE)
+  m.addEventListener('change', f)
+  return () => m.removeEventListener('change', f)
+}
+export const usePhone = () => useSyncExternalStore(onResize, () => matchMedia(PHONE).matches)
+
 // 24px stroke icons, one path each
 const ICONS = {
   home: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -105,6 +114,7 @@ export function Modal({ title, onClose, children, wide }) {
       aria-label={title}
       onCancel={(e) => {
         e.preventDefault()
+        e.stopPropagation() // Esc in a popup opened from another popup closes just that one
         onClose()
       }}
       onMouseDown={(e) => (downOnBackdrop.current = e.target === ref.current)}
@@ -120,6 +130,39 @@ export function Modal({ title, onClose, children, wide }) {
         {children}
       </div>
     </dialog>
+  )
+}
+
+// a button that asks first. Not window.confirm(): browsers inside apps (WhatsApp, Instagram) silently answer "no".
+export function Confirm({ ask, detail, yes, onYes, children, ...button }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button type="button" {...button} onClick={() => setOpen(true)}>
+        {children}
+      </button>
+      {open && (
+        <Modal title={ask} onClose={() => setOpen(false)}>
+          {detail && <p className="muted">{detail}</p>}
+          <div className="form-actions confirm-actions">
+            <button type="button" className="btn ghost" onClick={() => setOpen(false)}>
+              No, go back
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              data-autofocus
+              onClick={() => {
+                setOpen(false)
+                onYes()
+              }}
+            >
+              {yes}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
   )
 }
 

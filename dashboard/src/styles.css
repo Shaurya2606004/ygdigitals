@@ -1613,6 +1613,39 @@ dialog.modal::backdrop {
   max-height: 46vh;
   overflow: auto;
 }
+/* …then its project and team */
+.import-project fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.dept-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+}
+.dept-picks li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+.seg.wide {
+  display: flex;
+}
+.seg.wide button {
+  flex: 1;
+}
+.seg button:disabled {
+  opacity: 0.45;
+}
+.post-links {
+  margin: 4px 0 10px;
+}
 .import-preview .nowrap {
   white-space: nowrap;
 }
@@ -2632,4 +2665,160 @@ td.num.late {
 .leave-request input.grow {
   flex: 1 1 180px;
   min-width: 0;
+}
+
+/* ---------- phones and touch screens ---------- */
+:root {
+  --tab-h: 0px; /* the bottom bar's height, on phones */
+}
+.tabbar {
+  display: none;
+}
+.top-logo {
+  font-family: var(--f-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+.top-logo span {
+  color: var(--accent);
+  margin-left: 4px;
+}
+dialog.modal {
+  pointer-events: auto; /* an 'are you sure?' opened from a button that shows only on hover (chat) */
+}
+.confirm-actions {
+  margin-top: 18px;
+}
+.list.card {
+  padding: 4px 12px;
+}
+@media (max-width: 900px) {
+  :root {
+    --tab-h: calc(60px + env(safe-area-inset-bottom));
+  }
+  .tabbar {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    height: var(--tab-h);
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .tabbar a,
+  .tabbar button {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--ink-3);
+  }
+  .tabbar .on {
+    color: var(--accent-ink);
+  }
+  .tabbar .badge {
+    position: absolute;
+    top: 5px;
+    left: calc(50% + 5px);
+  }
+  .main {
+    padding-bottom: var(--tab-h);
+  }
+  .chat {
+    height: calc(100dvh - var(--top-h) - var(--tab-h));
+  }
+  .toast {
+    bottom: calc(20px + var(--tab-h));
+  }
+}
+@media (max-width: 720px) {
+  /* under 16px an iPhone zooms the whole page in whenever you tap into a box */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  .toolbar > .filters {
+    width: 100%;
+  }
+  .filters input,
+  .filters select {
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: none;
+  }
+  /* boards become one column, stage under stage */
+  .board {
+    grid-auto-flow: row;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+  .col {
+    min-height: 0;
+  }
+  /* a task on a phone: status, who and when first, then details and comments */
+  .task-side {
+    order: -1;
+  }
+  .row > .grow > b {
+    white-space: normal;
+  }
+  .task-row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .task-row > .grow {
+    flex: 1 1 100%;
+    order: -1;
+  }
+  .task-row > .av,
+  .task-row > .pill:last-child {
+    margin-left: auto;
+  }
+}
+@media (pointer: coarse) {
+  .btn {
+    height: 40px;
+  }
+  .btn.sm {
+    height: 36px;
+    padding: 0 12px;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+  .icon-btn.sm,
+  .msg-actions .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+  .seg button {
+    height: 40px;
+  }
+  .tabs button {
+    padding: 9px 14px;
+  }
+  .lchip {
+    height: 36px;
+  }
+  input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+  .card-head a {
+    padding: 10px 0;
+    margin: -10px 0;
+  }
+  .more-btn {
+    padding: 10px 0;
+  }
 }
