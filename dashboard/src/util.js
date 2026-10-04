@@ -50,9 +50,6 @@ export function ago(iso) {
   return fmtDay(ymd(new Date(iso)))
 }
 
-const inrFmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
-export const inr = (n) => inrFmt.format(n || 0)
-
 export const initials = (name) =>
   name
     .split(' ')
@@ -61,16 +58,3 @@ export const initials = (name) =>
     .map((w) => w[0].toUpperCase())
     .join('')
 
-// ₹ amount in words, Indian numbering (lakh, crore) — for invoices
-const ONES = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen']
-const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety']
-const two = (n) => (n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? `-${ONES[n % 10]}` : ''))
-const three = (n) => [n >= 100 && `${ONES[Math.floor(n / 100)]} hundred`, n % 100 && two(n % 100)].filter(Boolean).join(' ')
-export function inWords(n) {
-  n = Math.round(n)
-  if (!n) return 'zero'
-  const crore = Math.floor(n / 1e7)
-  const lakh = Math.floor((n % 1e7) / 1e5)
-  const thousand = Math.floor((n % 1e5) / 1000)
-  return [crore && `${inWords(crore)} crore`, lakh && `${two(lakh)} lakh`, thousand && `${two(thousand)} thousand`, n % 1000 && three(n % 1000)].filter(Boolean).join(' ')
-}

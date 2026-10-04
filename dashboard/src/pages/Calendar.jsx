@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, conflicts, EVENT_TYPES, firstName, isStaff, LEAVE_TYPES, occurrences, REPEAT } from '../store.js'
+import { byId, can, conflicts, EVENT_TYPES, isStaff, occurrences, REPEAT } from '../store.js'
 import { Avatar, Empty, Err, Field, go, Icon, isUrl, Modal, PageHead, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, clockNow, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, startOfWeek, today, ymd } from '../util.js'
 
-const LAYERS = { meeting: 'Team meetings', client: 'Client calls', shoot: 'Shoots', review: 'Creative reviews', deadline: 'Deadlines', leave: 'Leave', post: 'Content' }
+const LAYERS = { meeting: 'Team meetings', client: 'Client calls', shoot: 'Shoots', review: 'Creative reviews', deadline: 'Deadlines', post: 'Content' }
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
 const toMin = (hm) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3))
 function shiftMonth(s, n) {
@@ -17,8 +17,7 @@ function shiftMonth(s, n) {
 function useItems(me, from, to, scope, layers) {
   const d = useDb()
   const staffer = isStaff(me)
-  const teamOf = (id) => byId(d.users, id)?.teamId
-  const inScope = (ids) => scope === 'all' || (scope === 'mine' ? ids.includes(me.id) : ids.some((id) => teamOf(id) === me.teamId))
+  const inScope = (ids) => scope === 'all' || ids.includes(me.id)
   const items = []
   for (const o of occurrences(d, from, to))
     if (layers[o.type] && can(me, 'event.view', o) && inScope(o.attendeeIds))
@@ -26,19 +25,14 @@ function useItems(me, from, to, scope, layers) {
   if (layers.deadline) {
     if (staffer)
       for (const t of d.tasks)
-        if (t.due >= from && t.due <= to && t.status !== 'done' && (scope === 'all' || (scope === 'mine' ? t.assigneeId === me.id : t.teamId === me.teamId)))
+        if (t.due >= from && t.due <= to && t.status !== 'done' && inScope([t.assigneeId]))
           items.push({ key: `t${t.id}`, kind: 'task', date: t.due, title: t.title, type: 'deadline', href: `#/tasks/${t.id}` })
     for (const p of d.projects)
       if (p.due >= from && p.due <= to && p.status !== 'done' && can(me, 'project.view', p)) items.push({ key: `p${p.id}`, kind: 'project', date: p.due, title: `Due: ${p.name}`, type: 'deadline', href: `#/projects/${p.id}` })
   }
-  if (layers.leave && staffer)
-    for (const l of d.leaves)
-      if (l.status === 'approved' && l.to >= from && l.from <= to && inScope([l.userId]))
-        for (let day = l.from < from ? from : l.from; day <= l.to && day <= to; day = addDays(day, 1))
-          items.push({ key: `l${l.id}${day}`, kind: 'leave', date: day, title: `${firstName(byId(d.users, l.userId))} — ${LEAVE_TYPES[l.type]}`, type: 'leave', href: '#/people/leave' })
   if (layers.post)
     for (const p of d.posts)
-      if (p.date >= from && p.date <= to && can(me, 'content.view', p) && (scope !== 'mine' || !staffer || p.assigneeId === me.id))
+      if (p.date >= from && p.date <= to && can(me, 'content.view', p) && (!staffer || inScope([p.assigneeId])))
         items.push({ key: `s${p.id}`, kind: 'post', date: p.date, title: `${byId(d.clients, p.clientId)?.name}: ${p.title}`, type: 'post', href: '#/content' })
   return items.sort((a, b) => (a.start || '').localeCompare(b.start || ''))
 }
@@ -48,7 +42,7 @@ export default function Calendar() {
   const staffer = isStaff(me)
   const [cursor, setCursor] = useState(today())
   const [view, setView] = useState(() => (matchMedia('(max-width: 720px)').matches ? 'agenda' : 'month'))
-  const [scope, setScope] = useState(me.role === 'admin' || me.role === 'manager' ? 'all' : staffer ? 'team' : 'mine')
+  const [scope, setScope] = useState(staffer ? 'all' : 'mine')
   const [layers, setLayers] = useState(Object.fromEntries(Object.keys(LAYERS).map((k) => [k, true])))
   const [open, setOpen] = useState(null) // an event occurrence
   const [day, setDay] = useState(null)
@@ -64,7 +58,7 @@ export default function Calendar() {
 
   return (
     <div className="page">
-      <PageHead title="Calendar" sub="Stand-ups, client calls, shoots, reviews, deadlines, leave and posts — one calendar for the whole studio.">
+      <PageHead title="Calendar" sub="Stand-ups, client calls, shoots, reviews, deadlines and posts — one calendar for the whole studio.">
         <button className="btn primary" onClick={() => setForm({ initial: {} })}>
           <Icon name="plus" /> Schedule
         </button>
@@ -90,7 +84,6 @@ export default function Calendar() {
               onChange={setScope}
               tabs={[
                 ['mine', 'Mine'],
-                ['team', 'My team'],
                 ['all', 'Everyone'],
               ]}
             />
@@ -105,9 +98,7 @@ export default function Calendar() {
         </div>
       </div>
       <div className="layer-chips" role="group" aria-label="Show on calendar">
-        {Object.entries(LAYERS)
-          .filter(([k]) => staffer || !['leave'].includes(k))
-          .map(([k, l]) => (
+        {Object.entries(LAYERS).map(([k, l]) => (
             <button key={k} className={`lchip t-${k} ${layers[k] ? 'on' : ''}`} aria-pressed={layers[k]} onClick={() => setLayers({ ...layers, [k]: !layers[k] })}>
               <i aria-hidden="true" />
               {l}
@@ -492,7 +483,7 @@ export function EventForm({ onClose, initial = {}, edit }) {
         </div>
         <div className="field full">
           <span className="field-label">Who’s invited</span>
-          <PeoplePicker value={v.attendeeIds} onChange={(ids) => setV({ ...v, attendeeIds: ids })} options={options} label="Invite someone" teams={staffer} />
+          <PeoplePicker value={v.attendeeIds} onChange={(ids) => setV({ ...v, attendeeIds: ids })} options={options} label="Invite someone" />
           <small>You’re added automatically.</small>
         </div>
         {clash.length > 0 && (

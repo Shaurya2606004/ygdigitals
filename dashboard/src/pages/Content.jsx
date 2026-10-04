@@ -217,7 +217,7 @@ export function PostForm({ onClose, initial = {}, edit }) {
   const { v, set, err, run } = useForm(
     edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', title: '', caption: '', status: 'idea', assigneeId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
   )
-  const makers = staff(d).filter((u) => ['social', 'design', 'edit', 'shoot'].includes(u.teamId))
+  const makers = staff(d)
   return (
     <Modal title={edit ? 'Edit post' : 'Plan a post'} onClose={onClose}>
       <form

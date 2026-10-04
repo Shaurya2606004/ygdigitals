@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, DELIV_STATUS, DELIV_TYPES, isOverdue, isStaff, occurrences, PRIORITY, PROJECT_STATUS, progress, projectTasks, staff } from '../store.js'
-import { Avatar, Avatars, Bar, Card, Empty, Err, Field, go, Icon, Modal, PageHead, PeopleOptions, PeoplePicker, Status, Tabs, TeamTag, useDb, useForm, useMe } from '../ui.jsx'
-import { addDays, ago, fmtDay, fmtTime, inr, relDay, today } from '../util.js'
+import { Avatar, Avatars, Bar, Card, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { addDays, ago, fmtDay, fmtTime, relDay, today } from '../util.js'
 import { EventForm } from './Calendar.jsx'
 import { ChatPane } from './Chat.jsx'
 import { Activity } from './Home.jsx'
@@ -18,22 +18,16 @@ function ProjectList() {
   const me = useMe()
   const d = useDb()
   const [tab, setTab] = useState('open')
-  const [f, setF] = useState({ client: '', team: '', q: '' })
+  const [f, setF] = useState({ client: '', q: '' })
   const [adding, setAdding] = useState(false)
   const staffer = isStaff(me)
   const visible = d.projects.filter((p) => can(me, 'project.view', p))
   const q = f.q.trim().toLowerCase()
-  const list = visible.filter(
-    (p) =>
-      (tab === 'all' || (tab === 'open' ? OPEN.includes(p.status) : p.status === tab)) &&
-      (!f.client || p.clientId === f.client) &&
-      (!f.team || p.teamIds.includes(f.team)) &&
-      (!q || p.name.toLowerCase().includes(q)),
-  )
+  const list = visible.filter((p) => (tab === 'all' || (tab === 'open' ? OPEN.includes(p.status) : p.status === tab)) && (!f.client || p.clientId === f.client) && (!q || p.name.toLowerCase().includes(q)))
   const count = (s) => visible.filter((p) => (s === 'open' ? OPEN.includes(p.status) : p.status === s)).length
   return (
     <div className="page">
-      <PageHead title="Projects" sub={staffer ? 'Every client project, the teams on it and how far along it is.' : 'Everything YG Digitals is doing for you.'}>
+      <PageHead title="Projects" sub={staffer ? 'Every client project, who’s on it and how far along it is.' : 'Everything YG Digitals is doing for you.'}>
         {can(me, 'project.create') && (
           <button className="btn primary" onClick={() => setAdding(true)}>
             <Icon name="plus" /> New project
@@ -63,14 +57,6 @@ function ProjectList() {
                 </option>
               ))}
             </select>
-            <select aria-label="Team" value={f.team} onChange={(e) => setF({ ...f, team: e.target.value })}>
-              <option value="">All teams</option>
-              {d.teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
           </div>
         )}
       </div>
@@ -90,11 +76,6 @@ function ProjectList() {
                 </span>
                 <h3>{p.name}</h3>
                 <p className="muted">{byId(d.clients, p.clientId)?.name}</p>
-                <span className="tags">
-                  {p.teamIds.map((id) => (
-                    <TeamTag key={id} team={byId(d.teams, id)} />
-                  ))}
-                </span>
                 <span className="prog">
                   <Bar pct={progress(d, p.id)} label={`${p.name} progress`} />
                   <small>{progress(d, p.id)}%</small>
@@ -102,8 +83,8 @@ function ProjectList() {
                 <span className="pc-foot">
                   <Avatars ids={[p.managerId, ...p.memberIds]} max={5} size={24} />
                   <span className="grow" />
-                  {staffer && <small className="muted">{ts.filter((t) => t.status !== 'done').length} open</small>}
-                  {late > 0 && staffer && <small className="late">{late} late</small>}
+                  <small className="muted">{ts.filter((t) => t.status !== 'done').length} open</small>
+                  {late > 0 && <small className="late">{late} late</small>}
                   {waiting > 0 && <small className="pill amber">{waiting} to approve</small>}
                 </span>
               </a>
@@ -124,18 +105,25 @@ function ProjectPage({ id, tab }) {
   const [editing, setEditing] = useState(false)
   const [err, setErr] = useState('')
   const p = byId(d.projects, id)
-  if (!p || !can(me, 'project.view', p)) return <div className="page"><Empty icon="lock" title="Project not found">Either it doesn’t exist or you don’t have access.</Empty></div>
+  if (!p || !can(me, 'project.view', p))
+    return (
+      <div className="page">
+        <Empty icon="lock" title="Project not found">
+          Either it doesn’t exist or you don’t have access.
+        </Empty>
+      </div>
+    )
   const staffer = isStaff(me)
-  const client = byId(d.clients, p.clientId)
+  if (!staffer && tab === 'tasks') tab = 'plan' // clients get the read-only plan instead of the board
   const editable = can(me, 'project.edit', p)
   const delivs = d.deliverables.filter((x) => x.projectId === id && can(me, 'deliverable.view', x))
   const tabs = [
     ['overview', 'Overview'],
-    staffer && ['tasks', 'Tasks', projectTasks(d, id).filter((t) => t.status !== 'done').length],
-    ['deliverables', 'Deliverables', delivs.filter((x) => (staffer ? ['internal', 'client'] : ['client']).includes(x.status)).length],
+    staffer ? ['tasks', 'Tasks', projectTasks(d, id).filter((t) => t.status !== 'done').length] : ['plan', 'Plan'],
+    ['deliverables', 'Approvals', delivs.filter((x) => (staffer ? ['internal', 'client'] : ['client']).includes(x.status)).length],
     ['discussion', 'Discussion'],
     ['meetings', 'Meetings'],
-  ].filter(Boolean)
+  ]
   return (
     <div className="page">
       <a href="#/projects" className="back">
@@ -143,12 +131,7 @@ function ProjectPage({ id, tab }) {
       </a>
       <PageHead
         title={p.name}
-        sub={
-          <>
-            {staffer ? <a href={`#/clients/${client?.id}`}>{client?.name}</a> : client?.name} · {p.start ? `${fmtDay(p.start)} → ` : ''}
-            {fmtDay(p.due)} · Managed by {S.userName(d, p.managerId)}
-          </>
-        }
+        sub={`${byId(d.clients, p.clientId)?.name} · ${p.start ? `${fmtDay(p.start)} → ` : ''}${fmtDay(p.due)} · Lead: ${S.userName(d, p.managerId)}`}
       >
         {editable ? (
           <select
@@ -180,10 +163,11 @@ function ProjectPage({ id, tab }) {
         )}
       </PageHead>
       <Err msg={err} />
-      <Tabs label="Project sections" value={tab} onChange={(t) => go(`#/projects/${id}/${t}`)} tabs={tabs} />
+      <Tabs label="Project sections" value={tab} onChange={(t) => (location.hash = `#/projects/${id}/${t}`)} tabs={tabs} />
       <div className="tab-body">
         {tab === 'overview' && <Overview p={p} />}
         {tab === 'tasks' && staffer && <ProjectTasks p={p} />}
+        {tab === 'plan' && <Plan tasks={projectTasks(d, id)} />}
         {tab === 'deliverables' && <Deliverables p={p} />}
         {tab === 'discussion' && (
           <div className="card flush">
@@ -202,7 +186,6 @@ function Overview({ p }) {
   const d = useDb()
   const staffer = isStaff(me)
   const ts = projectTasks(d, p.id)
-  const hours = ts.flatMap((t) => t.time).reduce((s, x) => s + x.hours, 0)
   const taskIds = new Set(ts.map((t) => t.id))
   const mine = (a) => a.link?.includes(`/projects/${p.id}`) || taskIds.has(a.link?.split('/').pop())
   return (
@@ -220,42 +203,13 @@ function Overview({ p }) {
             <span className="kpi-label">Overdue tasks</span>
             <span className={`kpi-value ${ts.some(isOverdue) ? 'late' : ''}`}>{ts.filter(isOverdue).length}</span>
           </div>
-          {staffer && (
-            <div className="kpi">
-              <span className="kpi-label">Hours logged</span>
-              <span className="kpi-value">{hours}h</span>
-            </div>
-          )}
-          {staffer && p.budget > 0 && (
-            <div className="kpi">
-              <span className="kpi-label">Budget</span>
-              <span className="kpi-value">{inr(p.budget)}</span>
-            </div>
-          )}
+          <div className="kpi">
+            <span className="kpi-label">Due</span>
+            <span className="kpi-value">{p.status === 'done' ? 'Done' : relDay(p.due)}</span>
+          </div>
         </div>
         <Card title="Brief">
           <p className="prewrap">{p.brief || <span className="muted">No brief yet.</span>}</p>
-        </Card>
-        <Card title="Progress by team">
-          <ul className="list">
-            {p.teamIds.map((tid) => {
-              const team = byId(d.teams, tid)
-              const list = ts.filter((t) => t.teamId === tid)
-              const done = list.filter((t) => t.status === 'done').length
-              return (
-                <li key={tid} className="row">
-                  <TeamTag team={team} />
-                  <span className="grow muted small">
-                    {list.length ? `${done} of ${list.length} done` : 'No tasks yet'}
-                    {list.some(isOverdue) && <span className="late"> · {list.filter(isOverdue).length} late</span>}
-                  </span>
-                  <span className="prog">
-                    <Bar pct={list.length ? Math.round((done / list.length) * 100) : 0} label={`${team?.name} progress`} />
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
         </Card>
         {staffer && (
           <Card title="Activity">
@@ -271,12 +225,11 @@ function Overview({ p }) {
               return (
                 u && (
                   <li key={uid} className="row">
-                    <Avatar user={u} size={30} dot={staffer} />
+                    <Avatar user={u} size={30} />
                     <span className="grow">
                       <b>{u.name}</b>
-                      <small>{uid === p.managerId ? 'Project manager' : u.title}</small>
+                      <small>{uid === p.managerId ? `Project lead · ${u.title}` : u.title}</small>
                     </span>
-                    {staffer && <TeamTag team={byId(d.teams, u.teamId)} />}
                   </li>
                 )
               )
@@ -284,7 +237,7 @@ function Overview({ p }) {
           </ul>
         </Card>
         {staffer && (
-          <Card title="Client contacts">
+          <Card title="Client logins">
             <ul className="list">
               {S.clientUsers(d, p.clientId).map((u) => (
                 <li key={u.id} className="row">
@@ -295,11 +248,47 @@ function Overview({ p }) {
                   </span>
                 </li>
               ))}
-              {!S.clientUsers(d, p.clientId).length && <li className="muted small">No client login yet — add one from the client’s page.</li>}
+              {!S.clientUsers(d, p.clientId).length && <li className="muted small">No client login yet — add one in Settings › Clients.</li>}
             </ul>
           </Card>
         )}
       </div>
+    </div>
+  )
+}
+
+// the client's read-only view of what's planned: no comments, no internal detail
+const PLAN_GROUPS = [
+  ['doing', 'In progress'],
+  ['review', 'Being checked'],
+  ['todo', 'Coming up'],
+  ['done', 'Done'],
+]
+function Plan({ tasks }) {
+  const d = useDb()
+  if (!tasks.length) return <Empty icon="check" title="Nothing planned yet" />
+  return (
+    <div className="plan">
+      {PLAN_GROUPS.map(([s, label]) => {
+        const list = tasks.filter((t) => t.status === s).sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))
+        return (
+          list.length > 0 && (
+            <Card key={s} title={`${label} (${list.length})`}>
+              <ul className="list">
+                {list.map((t) => (
+                  <li key={t.id} className="row">
+                    <span className="grow">
+                      <b>{t.title}</b>
+                      {t.assigneeId && <small>{S.userName(d, t.assigneeId)}</small>}
+                    </span>
+                    {t.due && <span className={`due ${isOverdue(t) ? 'late' : ''}`}>{s === 'done' ? fmtDay(t.completedAt || t.due) : relDay(t.due)}</span>}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )
+        )
+      })}
     </div>
   )
 }
@@ -311,8 +300,8 @@ function ProjectTasks({ p }) {
   return (
     <>
       <div className="toolbar">
-        <p className="muted">Drag cards between columns. Use “Hand off” on a task to pass it to the next team.</p>
-        {can(me, 'task.create') && p.status !== 'done' && (
+        <p className="muted">Drag cards between columns. The client sees these titles, owners and dates (not comments) in their Plan tab.</p>
+        {can(me, 'task.edit') && p.status !== 'done' && (
           <button className="btn primary" onClick={() => setAdding(true)}>
             <Icon name="plus" /> Add task
           </button>
@@ -365,17 +354,12 @@ function ProjectMeetings({ p }) {
           </Card>
         )}
       </div>
-      {adding && (
-        <EventForm
-          onClose={() => setAdding(false)}
-          initial={{ projectId: p.id, title: `${p.name} — `, type: isStaff(me) ? 'meeting' : 'client', attendeeIds: [p.managerId] }}
-        />
-      )}
+      {adding && <EventForm onClose={() => setAdding(false)} initial={{ projectId: p.id, title: `${p.name} — `, type: isStaff(me) ? 'meeting' : 'client', attendeeIds: [p.managerId] }} />}
     </div>
   )
 }
 
-/* ---------- deliverables ---------- */
+/* ---------- approvals ---------- */
 
 function Deliverables({ p }) {
   const me = useMe()
@@ -387,14 +371,14 @@ function Deliverables({ p }) {
   return (
     <>
       <div className="toolbar">
-        <p className="muted">{staffer ? 'Work goes: submitted → lead signs off and sends to the client → client approves or asks for changes.' : 'Open each file, then approve it or tell the team what to change.'}</p>
+        <p className="muted">{staffer ? 'Work goes: submitted → Admin checks and sends it to the client → client approves or asks for changes.' : 'Open each file, then approve it or tell the team what to change.'}</p>
         {can(me, 'deliverable.submit') && (
           <button className="btn primary" onClick={() => setSubmitting({})}>
             <Icon name="plus" /> Submit work
           </button>
         )}
       </div>
-      {!list.length && <Empty icon="eye" title="Nothing here yet">{staffer ? 'Submit the first file for review.' : 'When the team sends you work it shows up here.'}</Empty>}
+      {!list.length && <Empty icon="eye" title="Nothing here yet">{staffer ? 'Submit the first file for a check.' : 'When the team sends you work it shows up here.'}</Empty>}
       <div className="deliv-list">
         {list.map((x) => {
           const reviewer = x.status === 'internal' && can(me, 'deliverable.review', x)
@@ -419,10 +403,10 @@ function Deliverables({ p }) {
                 {reviewer && (
                   <>
                     <button className="btn sm primary" onClick={() => setActing({ x, kind: 'send' })}>
-                      Sign off & send to client
+                      Looks good — send to client
                     </button>
                     <button className="btn sm" onClick={() => setActing({ x, kind: 'rework' })}>
-                      Request changes
+                      Needs changes
                     </button>
                   </>
                 )}
@@ -470,7 +454,7 @@ function SubmitForm({ p, again, onClose }) {
   const me = useMe()
   const { v, set, err, run } = useForm({ title: '', type: DELIV_TYPES[0], link: '', note: '' })
   return (
-    <Modal title={again.id ? `New version of “${again.title}”` : 'Submit work for review'} onClose={onClose}>
+    <Modal title={again.id ? `New version of “${again.title}”` : 'Submit work for a check'} onClose={onClose}>
       <form
         className="form-grid"
         onSubmit={(e) => {
@@ -495,15 +479,15 @@ function SubmitForm({ p, again, onClose }) {
         <Field label="Link to the file" hint="Google Drive, Frame.io, Figma, a staging site… anyone with the link must be able to view it." full>
           <input type="url" value={v.link} onChange={set('link')} placeholder="https://drive.google.com/…" data-autofocus={again.id ? '' : undefined} />
         </Field>
-        <Field label="Note for the reviewer" full>
-          <textarea rows={3} value={v.note} onChange={set('note')} placeholder={again.id ? 'What changed in this version?' : 'Anything they should look at closely?'} />
+        <Field label="Note" full>
+          <textarea rows={3} value={v.note} onChange={set('note')} placeholder={again.id ? 'What changed in this version?' : 'Anything to look at closely?'} />
         </Field>
         <Err msg={err} />
         <div className="form-actions">
           <button type="button" className="btn ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn primary">Submit for review</button>
+          <button className="btn primary">Submit</button>
         </div>
       </form>
     </Modal>
@@ -511,7 +495,7 @@ function SubmitForm({ p, again, onClose }) {
 }
 
 const DECISIONS = {
-  send: ['Sign off & send to client', 'Optional note for the client', true],
+  send: ['Send to client', 'Optional note for the client', true],
   rework: ['Send back for changes', 'What needs to change before the client sees it?', false],
   approve: ['Approve', 'Optional — anything to add?', true],
   changes: ['Request changes', 'What should the team change?', false],
@@ -554,15 +538,12 @@ function DecisionForm({ x, kind, onClose }) {
 export function ProjectForm({ onClose, edit, initial = {} }) {
   const me = useMe()
   const d = useDb()
-  const { v, set, setV, err, run } = useForm(
-    edit || { name: '', clientId: d.clients[0]?.id ?? '', teamIds: me.teamId && me.teamId !== 'mgmt' ? [me.teamId] : [], managerId: me.id, memberIds: [], status: 'planning', priority: 'normal', start: today(), due: addDays(today(), 30), budget: '', brief: '', ...initial },
-  )
-  const toggleTeam = (id) => setV({ ...v, teamIds: v.teamIds.includes(id) ? v.teamIds.filter((x) => x !== id) : [...v.teamIds, id] })
+  const { v, set, setV, err, run } = useForm(edit || { name: '', clientId: d.clients[0]?.id ?? '', managerId: me.id, memberIds: [], status: 'planning', priority: 'normal', start: today(), due: addDays(today(), 30), brief: '', ...initial })
   const submit = (e) => {
     e.preventDefault()
     const ok = run(() => {
-      const id = S.saveProject(me, { ...v, budget: Number(v.budget) || 0 })
-      if (!edit) go(`#/projects/${id}`)
+      const id = S.saveProject(me, v)
+      if (!edit) location.hash = `#/projects/${id}`
     })
     if (ok) onClose()
   }
@@ -581,25 +562,14 @@ export function ProjectForm({ onClose, edit, initial = {} }) {
             ))}
           </select>
         </Field>
-        <Field label="Project manager">
+        <Field label="Project lead" hint="The client’s point of contact. They can edit this project.">
           <select value={v.managerId} onChange={set('managerId')}>
-            <PeopleOptions users={staff(d).filter((u) => u.role !== 'member')} />
+            <PeopleOptions users={staff(d)} />
           </select>
         </Field>
         <div className="field full">
-          <span className="field-label">Teams on it</span>
-          <div className="team-checks">
-            {d.teams.map((t) => (
-              <label key={t.id} className={`team-check ${v.teamIds.includes(t.id) ? 'on' : ''}`} style={{ '--c': t.color }}>
-                <input type="checkbox" checked={v.teamIds.includes(t.id)} onChange={() => toggleTeam(t.id)} />
-                {t.name}
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="field full">
-          <span className="field-label">People</span>
-          <PeoplePicker value={v.memberIds} onChange={(ids) => setV({ ...v, memberIds: ids })} options={staff(d).filter((u) => !v.teamIds.length || v.teamIds.includes(u.teamId))} label="Add a person" teams />
+          <span className="field-label">Also working on it</span>
+          <PeoplePicker value={v.memberIds} onChange={(ids) => setV({ ...v, memberIds: ids.filter((id) => id !== v.managerId) })} options={staff(d).filter((u) => u.id !== v.managerId)} />
         </div>
         <Field label="Status">
           <select value={v.status} onChange={set('status')}>
@@ -625,10 +595,7 @@ export function ProjectForm({ onClose, edit, initial = {} }) {
         <Field label="Due">
           <input type="date" value={v.due} onChange={set('due')} />
         </Field>
-        <Field label="Budget (₹)" hint="Only YG staff see this.">
-          <input type="number" min="0" step="500" value={v.budget} onChange={set('budget')} />
-        </Field>
-        <Field label="Brief" full>
+        <Field label="Brief" hint="The client can read this." full>
           <textarea rows={4} value={v.brief} onChange={set('brief')} placeholder="Goal, deliverables, tone, references, deadlines that can’t move…" />
         </Field>
         <Err msg={err} />

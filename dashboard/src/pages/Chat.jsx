@@ -13,7 +13,6 @@ export default function Chat({ args }) {
   const current = args[0] && visible.some((c) => c.id === args[0]) ? args[0] : null
   const groups = [
     ['Company', visible.filter((c) => c.type === 'public')],
-    ['Teams', visible.filter((c) => c.type === 'team')],
     ['Projects', visible.filter((c) => c.type === 'project' && byId(d.projects, c.projectId)?.status !== 'done')],
     ['Direct messages', visible.filter((c) => c.type === 'dm')],
   ]
@@ -35,10 +34,9 @@ export default function Chat({ args }) {
                 {(label === 'Direct messages' ? [...list].sort((a, b) => last(b).localeCompare(last(a))) : list).map((c) => {
                   const n = unread(d, me, c)
                   const other = c.type === 'dm' && byId(d.users, c.memberIds.find((x) => x !== me.id))
-                  const team = c.type === 'team' && byId(d.teams, c.teamId)
                   return (
                     <a key={c.id} href={`#/chat/${c.id}`} className={`chat-item ${(current || fallback) === c.id ? 'on' : ''} ${n ? 'unread' : ''}`}>
-                      {other ? <Avatar user={other} size={22} dot={isStaff(me)} /> : team ? <i className="team-dot" style={{ '--c': team.color }} /> : <Icon name="hash" size={16} />}
+                      {other ? <Avatar user={other} size={22} /> : <Icon name="hash" size={16} />}
                       <span className="grow">{channelName(d, c, me)}</span>
                       {c.type === 'project' && c.clientVisible && isStaff(me) && <Icon name="eye" size={14} />}
                       {n > 0 && <span className="badge hot">{n}</span>}
@@ -133,13 +131,12 @@ export function ChatPane({ channelId }) {
   return (
     <div className="pane">
       <header className="pane-head">
-        {other ? <Avatar user={other} size={34} dot={isStaff(me)} /> : <span className="pane-icon">#</span>}
+        {other ? <Avatar user={other} size={34} /> : <span className="pane-icon">#</span>}
         <div className="grow">
           <h2>{channelName(d, ch, me)}</h2>
           <p className="muted small">
             {ch.type === 'dm' && other?.title}
-            {ch.type === 'team' && `${members.filter((u) => u.teamId === ch.teamId).length} people in ${byId(d.teams, ch.teamId)?.name}, plus leadership`}
-            {ch.type === 'public' && (ch.readOnly ? 'Company news — only leadership can post here' : 'Everyone at YG')}
+            {ch.type === 'public' && (ch.readOnly ? 'Studio news — only the admin posts here' : 'Everyone at YG')}
             {project && (
               <>
                 <a href={`#/projects/${project.id}`}>{project.name}</a> · {members.length} people
@@ -236,7 +233,7 @@ export function ChatPane({ channelId }) {
           </button>
         </form>
       ) : (
-        <p className="composer muted small">Only leadership can post here.</p>
+        <p className="composer muted small">Only the admin can post here.</p>
       )}
       <Err msg={err} />
     </div>

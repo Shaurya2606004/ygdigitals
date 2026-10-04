@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { byId, getDb, presence, subscribe } from './store.js'
+import { byId, getDb, subscribe } from './store.js'
 import { initials } from './util.js'
 
 export const useDb = () => useSyncExternalStore(subscribe, getDb)
@@ -18,13 +18,9 @@ const ICONS = {
   calendar: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M8 3v4M16 3v4',
   chat: 'M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z',
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
-  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
   briefcase: 'M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M3 13h18',
-  receipt: 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM9 8h6M9 12h6M9 16h3',
-  chart: 'M3 21h18M6 17v-6M12 17V5M18 17v-4',
   sliders: 'M4 7h10M18 7h2M4 17h4M12 17h8M16 4v6M10 14v6',
   bell: 'M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0',
-  search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM21 21l-4.3-4.3',
   plus: 'M12 5v14M5 12h14',
   x: 'M18 6 6 18M6 6l12 12',
   menu: 'M4 6h16M4 12h16M4 18h16',
@@ -38,7 +34,6 @@ const ICONS = {
   hash: 'M4 9h16M4 15h16M10 3 8 21M16 3l-2 18',
   download: 'M12 3v12M7 10l5 5 5-5M5 21h14',
   swap: 'M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16',
-  printer: 'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
   trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
   edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
   pin: 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12zM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
@@ -46,8 +41,6 @@ const ICONS = {
   moon: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
   lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
   eye: 'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
-  phone: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z',
-  mail: 'M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l9 6 9-6',
 }
 export const Icon = ({ name, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="ico">
@@ -55,18 +48,11 @@ export const Icon = ({ name, size = 18 }) => (
   </svg>
 )
 
-export const PRESENCE = { available: 'Available', meeting: 'In a meeting', leave: 'On leave', wfh: 'Working from home' }
-
-export function Avatar({ user, size = 28, dot }) {
-  const d = useDb()
-  const p = dot && user ? presence(d, user) : null
-  return (
-    <span className={`av ${user && !user.active ? 'off' : ''}`} style={{ '--c': user?.color ?? '#999', '--s': `${size}px` }} title={user ? `${user.name}${p ? ` — ${PRESENCE[p]}` : ''}` : ''}>
-      {user ? initials(user.name) : '?'}
-      {p && <i className={`dot ${p}`} />}
-    </span>
-  )
-}
+export const Avatar = ({ user, size = 28 }) => (
+  <span className={`av ${user && !user.active ? 'off' : ''}`} style={{ '--c': user?.color ?? '#999', '--s': `${size}px` }} title={user?.name ?? ''}>
+    {user ? initials(user.name) : '?'}
+  </span>
+)
 
 export function Avatars({ ids, max = 4, size = 24 }) {
   const d = useDb()
@@ -92,13 +78,6 @@ const TONES = {
 }
 export const Pill = ({ tone = 'grey', children }) => <span className={`pill ${tone}`}>{children}</span>
 export const Status = ({ s, label }) => <Pill tone={TONES[s]}>{label}</Pill>
-
-export const TeamTag = ({ team }) =>
-  team ? (
-    <span className="team-tag" style={{ '--c': team.color }}>
-      {team.name}
-    </span>
-  ) : null
 
 export const Bar = ({ pct, label }) => (
   <span className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
@@ -182,10 +161,12 @@ export function useForm(init) {
   return { v, setV, set, err, setErr, run }
 }
 
-// people as <optgroup>s by team (+ clients), for any <select>
+// the team first, then client logins, for any <select>
 export function PeopleOptions({ users }) {
-  const d = useDb()
-  const groups = [...d.teams.map((t) => [t.name, users.filter((u) => u.teamId === t.id)]), ['Clients', users.filter((u) => u.role === 'client')]]
+  const groups = [
+    ['YG team', users.filter((u) => u.role !== 'client')],
+    ['Clients', users.filter((u) => u.role === 'client')],
+  ]
   return groups
     .filter(([, list]) => list.length)
     .map(([name, list]) => (
@@ -200,9 +181,9 @@ export function PeopleOptions({ users }) {
     ))
 }
 
-export function PeoplePicker({ value, onChange, options, label = 'Add a person', teams }) {
+export function PeoplePicker({ value, onChange, options, label = 'Add a person' }) {
   const d = useDb()
-  const add = (ids) => onChange([...new Set([...value, ...ids])])
+  const team = options.filter((u) => u.role !== 'client' && !value.includes(u.id))
   return (
     <div className="picker">
       {value.length > 0 && (
@@ -224,19 +205,14 @@ export function PeoplePicker({ value, onChange, options, label = 'Add a person',
         </div>
       )}
       <div className="picker-row">
-        <select aria-label={label} value="" onChange={(e) => e.target.value && add([e.target.value])}>
+        <select aria-label={label} value="" onChange={(e) => e.target.value && onChange([...value, e.target.value])}>
           <option value="">+ {label}…</option>
           <PeopleOptions users={options.filter((u) => !value.includes(u.id))} />
         </select>
-        {teams && (
-          <select aria-label="Add a whole team" value="" onChange={(e) => e.target.value && add(options.filter((u) => u.teamId === e.target.value).map((u) => u.id))}>
-            <option value="">+ Whole team…</option>
-            {d.teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+        {team.length > 1 && (
+          <button type="button" className="btn sm" onClick={() => onChange([...value, ...team.map((u) => u.id)])}>
+            + Whole team
+          </button>
         )}
       </div>
     </div>

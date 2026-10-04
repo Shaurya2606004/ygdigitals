@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, isOverdue, PRIORITY, staff, TASK_STATUS } from '../store.js'
-import { Avatar, Empty, Err, Field, go, Icon, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, TeamTag, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, ago, fmtDay, relDay, today } from '../util.js'
 
 export const DueChip = ({ t }) =>
@@ -24,7 +24,7 @@ export function TaskRow({ t, project = true }) {
           {project && <small>{p?.name}</small>}
         </span>
         <DueChip t={t} />
-        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill grey">Unassigned</span>}
+        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">No owner</span>}
       </a>
     </li>
   )
@@ -71,16 +71,16 @@ export function Board({ tasks }) {
               </header>
               <div className="cards">
                 {col.map((t) => {
-                  const p = byId(d.projects, t.projectId)
                   const done = t.checklist.filter((c) => c.done).length
                   return (
                     <button key={t.id} type="button" className="tcard" draggable={can(me, 'task.edit', t)} onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)} onClick={() => setOpen(t.id)}>
-                      <span className="tcard-top">
-                        <TeamTag team={byId(d.teams, t.teamId)} />
-                        {t.priority !== 'normal' && <Status s={t.priority} label={PRIORITY[t.priority]} />}
-                      </span>
+                      {t.priority !== 'normal' && (
+                        <span className="tcard-top">
+                          <Status s={t.priority} label={PRIORITY[t.priority]} />
+                        </span>
+                      )}
                       <b>{t.title}</b>
-                      <small className="muted">{p?.name}</small>
+                      <small className="muted">{byId(d.projects, t.projectId)?.name}</small>
                       <span className="tcard-foot">
                         <DueChip t={t} />
                         {t.checklist.length > 0 && (
@@ -96,7 +96,7 @@ export function Board({ tasks }) {
                           </span>
                         )}
                         <span className="grow" />
-                        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={22} /> : <span className="pill grey">Queue</span>}
+                        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={22} /> : <span className="pill amber">No owner</span>}
                       </span>
                     </button>
                   )
@@ -115,28 +115,25 @@ export function Board({ tasks }) {
 export default function Tasks({ args }) {
   const me = useMe()
   const d = useDb()
-  const boss = me.role === 'admin' || me.role === 'manager'
-  const [scope, setScope] = useState(boss ? 'all' : me.role === 'lead' ? 'team' : 'mine')
+  const [scope, setScope] = useState(me.role === 'admin' ? 'all' : 'mine')
   const [view, setView] = useState('board')
-  const [f, setF] = useState({ project: '', team: '', person: '', priority: '', q: '' })
+  const [f, setF] = useState({ project: '', person: '', priority: '', q: '' })
   const [adding, setAdding] = useState(false)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const q = f.q.trim().toLowerCase()
   const tasks = d.tasks.filter(
     (t) =>
-      (scope === 'all' || (scope === 'mine' ? t.assigneeId === me.id || (!t.assigneeId && t.createdBy === me.id) : t.teamId === me.teamId)) &&
+      (scope === 'all' || t.assigneeId === me.id || (!t.assigneeId && t.createdBy === me.id)) &&
       (!f.project || t.projectId === f.project) &&
-      (!f.team || t.teamId === f.team) &&
       (!f.person || (f.person === 'none' ? !t.assigneeId : t.assigneeId === f.person)) &&
       (!f.priority || t.priority === f.priority) &&
       (!q || t.title.toLowerCase().includes(q)),
   )
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const teamQueue = d.tasks.filter((t) => t.teamId === me.teamId && !t.assigneeId && t.status !== 'done').length
   const sorted = [...tasks].sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9'))
   return (
     <div className="page">
-      <PageHead title="Tasks" sub="Everything every team is working on. Drag a card to change its status.">
+      <PageHead title="Tasks" sub="Everything the studio is working on. Drag a card to change its status; use Hand off to pass work on.">
         <button className="btn primary" onClick={() => setAdding(true)}>
           <Icon name="plus" /> New task
         </button>
@@ -148,7 +145,6 @@ export default function Tasks({ args }) {
           onChange={setScope}
           tabs={[
             ['mine', 'My tasks', mine],
-            ['team', `My team${teamQueue ? ` · ${teamQueue} in queue` : ''}`],
             ['all', 'Everyone'],
           ]}
         />
@@ -163,20 +159,10 @@ export default function Tasks({ args }) {
             ))}
           </select>
           {scope === 'all' && (
-            <select aria-label="Team" value={f.team} onChange={set('team')}>
-              <option value="">All teams</option>
-              {d.teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {scope !== 'mine' && (
-            <select aria-label="Assignee" value={f.person} onChange={set('person')}>
+            <select aria-label="Owner" value={f.person} onChange={set('person')}>
               <option value="">Anyone</option>
-              <option value="none">Unassigned (queue)</option>
-              <PeopleOptions users={staff(d).filter((u) => scope === 'all' || u.teamId === me.teamId)} />
+              <option value="none">No owner yet</option>
+              <PeopleOptions users={staff(d)} />
             </select>
           )}
           <select aria-label="Priority" value={f.priority} onChange={set('priority')}>
@@ -205,7 +191,7 @@ export default function Tasks({ args }) {
         <Empty title="No tasks match">Try another filter, or create a task.</Empty>
       )}
       {adding && <TaskForm onClose={() => setAdding(false)} />}
-      {args[0] && byId(d.tasks, args[0]) && <TaskModal id={args[0]} onClose={() => go('#/tasks')} />}
+      {args[0] && byId(d.tasks, args[0]) && <TaskModal id={args[0]} onClose={() => (location.hash = '#/tasks')} />}
     </div>
   )
 }
@@ -219,12 +205,10 @@ function TaskTable({ tasks }) {
           <tr>
             <th>Task</th>
             <th>Project</th>
-            <th>Team</th>
             <th>Owner</th>
             <th>Status</th>
             <th>Priority</th>
             <th>Due</th>
-            <th className="num">Logged</th>
           </tr>
         </thead>
         <tbody>
@@ -236,10 +220,7 @@ function TaskTable({ tasks }) {
                 </a>
               </td>
               <td className="muted">{byId(d.projects, t.projectId)?.name}</td>
-              <td>
-                <TeamTag team={byId(d.teams, t.teamId)} />
-              </td>
-              <td>{t.assigneeId ? S.userName(d, t.assigneeId) : <span className="muted">Queue</span>}</td>
+              <td>{t.assigneeId ? S.userName(d, t.assigneeId) : <span className="muted">No owner</span>}</td>
               <td>
                 <Status s={t.status} label={TASK_STATUS[t.status]} />
               </td>
@@ -249,7 +230,6 @@ function TaskTable({ tasks }) {
               <td>
                 <DueChip t={t} />
               </td>
-              <td className="num">{t.time.reduce((s, x) => s + x.hours, 0)}h</td>
             </tr>
           ))}
         </tbody>
@@ -262,37 +242,15 @@ export function TaskForm({ onClose, initial = {} }) {
   const me = useMe()
   const d = useDb()
   const projects = d.projects.filter((p) => p.status !== 'done')
-  const p0 = byId(d.projects, initial.projectId) || projects[0]
-  const { v, set, setV, err, run } = useForm({
-    title: '',
-    projectId: p0?.id ?? '',
-    teamId: p0?.teamIds.includes(me.teamId) ? me.teamId : (p0?.teamIds[0] ?? me.teamId),
-    assigneeId: '',
-    priority: 'normal',
-    due: '',
-    estimate: '',
-    desc: '',
-    checklist: '',
-    status: 'todo',
-    ...initial,
-  })
-  const canAssign = can(me, 'task.assign', { teamId: v.teamId })
-  const options = canAssign ? staff(d).filter((u) => u.teamId === v.teamId) : me.teamId === v.teamId ? [me] : []
+  const { v, set, err, run } = useForm({ title: '', projectId: projects[0]?.id ?? '', assigneeId: me.id, priority: 'normal', due: '', desc: '', checklist: '', status: 'todo', ...initial })
   const submit = (e) => {
     e.preventDefault()
-    const ok = run(() =>
-      S.saveTask(me, {
-        ...v,
-        assigneeId: v.assigneeId || null,
-        estimate: Number(v.estimate) || 0,
-        checklist: v.checklist
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map((text, i) => ({ id: `c${Date.now()}${i}`, text, done: false })),
-      }),
-    )
-    if (ok) onClose()
+    const checklist = v.checklist
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((text, i) => ({ id: `c${Date.now()}${i}`, text, done: false }))
+    if (run(() => S.saveTask(me, { ...v, assigneeId: v.assigneeId || null, checklist }))) onClose()
   }
   return (
     <Modal title="New task" onClose={onClose}>
@@ -300,14 +258,8 @@ export function TaskForm({ onClose, initial = {} }) {
         <Field label="What needs doing?" full>
           <input data-autofocus value={v.title} onChange={set('title')} placeholder="e.g. Edit Reel 3 — gift box unboxing (30s)" />
         </Field>
-        <Field label="Project">
-          <select
-            value={v.projectId}
-            onChange={(e) => {
-              const p = byId(d.projects, e.target.value)
-              setV({ ...v, projectId: p.id, teamId: p.teamIds.includes(v.teamId) ? v.teamId : p.teamIds[0], assigneeId: '' })
-            }}
-          >
+        <Field label="Project" full>
+          <select value={v.projectId} onChange={set('projectId')}>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name} — {byId(d.clients, p.clientId)?.name}
@@ -315,24 +267,14 @@ export function TaskForm({ onClose, initial = {} }) {
             ))}
           </select>
         </Field>
-        <Field label="Team doing it" hint={canAssign ? '' : v.teamId !== me.teamId ? 'Goes into this team’s queue — their lead assigns it.' : ''}>
-          <select value={v.teamId} onChange={(e) => setV({ ...v, teamId: e.target.value, assigneeId: '' })}>
-            {d.teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
+        <Field label="Owner">
+          <select value={v.assigneeId || ''} onChange={set('assigneeId')}>
+            <option value="">No owner yet</option>
+            <PeopleOptions users={staff(d)} />
           </select>
         </Field>
-        <Field label="Owner">
-          <select value={v.assigneeId} onChange={set('assigneeId')}>
-            <option value="">Unassigned (team queue)</option>
-            {options.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.id === me.id ? `Me (${u.name})` : u.name}
-              </option>
-            ))}
-          </select>
+        <Field label="Due">
+          <input type="date" value={v.due} onChange={set('due')} />
         </Field>
         <Field label="Priority">
           <select value={v.priority} onChange={set('priority')}>
@@ -342,12 +284,6 @@ export function TaskForm({ onClose, initial = {} }) {
               </option>
             ))}
           </select>
-        </Field>
-        <Field label="Due">
-          <input type="date" value={v.due} onChange={set('due')} />
-        </Field>
-        <Field label="Estimate (hours)">
-          <input type="number" min="0" step="0.5" value={v.estimate} onChange={set('estimate')} />
         </Field>
         <Field label="Details" full>
           <textarea rows={3} value={v.desc} onChange={set('desc')} placeholder="Brief, links, references…" />
@@ -375,11 +311,9 @@ export function TaskModal({ id, onClose }) {
   const [handing, setHanding] = useState(false)
   const [comment, setComment] = useState('')
   const [item, setItem] = useState('')
-  const [time, setTime] = useState({ hours: '', date: today(), note: '' })
   if (!t) return null
   const p = byId(d.projects, t.projectId)
   const editable = can(me, 'task.edit', t)
-  const assignable = can(me, 'task.assign', t)
   const run = (fn) => {
     try {
       fn()
@@ -391,9 +325,8 @@ export function TaskModal({ id, onClose }) {
     }
   }
   const save = (patch) => run(() => S.saveTask(me, { ...t, ...patch }))
-  const logged = t.time.reduce((s, x) => s + x.hours, 0)
   return (
-    <Modal title={`Task · ${p?.name ?? ""}`} onClose={onClose} wide>
+    <Modal title={`Task · ${p?.name ?? ''}`} onClose={onClose} wide>
       <div className="task-modal">
         <div className="task-main">
           {editable ? (
@@ -491,33 +424,11 @@ export function TaskModal({ id, onClose }) {
               </select>
             </dd>
             <dt>Owner</dt>
-            <dd>
-              {assignable ? (
-                <select value={t.assigneeId || ''} onChange={(e) => save({ assigneeId: e.target.value || null })} aria-label="Owner">
-                  <option value="">Unassigned (queue)</option>
-                  {staff(d)
-                    .filter((u) => u.teamId === t.teamId)
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                </select>
-              ) : t.assigneeId ? (
-                <span className="who">
-                  <Avatar user={byId(d.users, t.assigneeId)} size={22} /> {S.userName(d, t.assigneeId)}
-                </span>
-              ) : me.teamId === t.teamId ? (
-                <button className="btn sm" onClick={() => run(() => S.claimTask(me, t.id))}>
-                  Pick it up
-                </button>
-              ) : (
-                <span className="muted">In the team queue</span>
-              )}
-            </dd>
-            <dt>Team</dt>
             <dd className="stack">
-              <TeamTag team={byId(d.teams, t.teamId)} />
+              <select value={t.assigneeId || ''} disabled={!editable} onChange={(e) => save({ assigneeId: e.target.value || null })} aria-label="Owner">
+                <option value="">No owner yet</option>
+                <PeopleOptions users={staff(d)} />
+              </select>
               {editable && (
                 <button className="btn sm" onClick={() => setHanding(true)}>
                   <Icon name="swap" size={14} /> Hand off
@@ -544,49 +455,11 @@ export function TaskModal({ id, onClose }) {
               {editable ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
               {isOverdue(t) && <small className="late block">Overdue</small>}
             </dd>
-            <dt>Time</dt>
-            <dd>
-              <b>{logged}h</b> logged{t.estimate ? ` of ${t.estimate}h` : ''}
-            </dd>
             <dt>Created</dt>
             <dd className="muted">
               {S.userName(d, t.createdBy)}, {ago(t.createdAt)}
             </dd>
           </dl>
-
-          {S.isStaff(me) && (
-            <form
-              className="log-time"
-              onSubmit={(e) => {
-                e.preventDefault()
-                if (run(() => S.logTime(me, t.id, time.hours, time.date, time.note))) setTime({ ...time, hours: '', note: '' })
-              }}
-            >
-              <h4>Log time</h4>
-              <div className="row-2">
-                <input type="number" min="0.25" max="16" step="0.25" placeholder="Hours" aria-label="Hours" value={time.hours} onChange={(e) => setTime({ ...time, hours: e.target.value })} />
-                <input type="date" max={today()} aria-label="Day" value={time.date} onChange={(e) => setTime({ ...time, date: e.target.value })} />
-              </div>
-              <input placeholder="What did you do? (optional)" aria-label="Note" value={time.note} onChange={(e) => setTime({ ...time, note: e.target.value })} />
-              <button className="btn sm" disabled={!time.hours}>
-                Log
-              </button>
-              {t.time.length > 0 && (
-                <ul className="time-list">
-                  {[...t.time]
-                    .sort((a, b) => b.date.localeCompare(a.date))
-                    .slice(0, 6)
-                    .map((x) => (
-                      <li key={x.id}>
-                        <span>{S.userName(d, x.userId).split(' ')[0]}</span>
-                        <span className="muted">{fmtDay(x.date)}</span>
-                        <b>{x.hours}h</b>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </form>
-          )}
           {can(me, 'task.delete', t) && (
             <button
               className="btn danger sm"
@@ -607,45 +480,29 @@ export function TaskModal({ id, onClose }) {
 function HandoffForm({ t, onClose }) {
   const me = useMe()
   const d = useDb()
-  // default to the next team on the same project
-  const next = byId(d.projects, t.projectId)?.teamIds.find((id) => id !== t.teamId) ?? d.teams.find((x) => x.id !== t.teamId && x.id !== 'mgmt')?.id
-  const { v, set, setV, err, run } = useForm({ teamId: next, assigneeId: '', note: '' })
-  const canPick = can(me, 'task.assign', { teamId: v.teamId })
+  const people = staff(d).filter((u) => u.id !== t.assigneeId)
+  const { v, set, err, run } = useForm({ toId: people.find((u) => u.id !== me.id)?.id ?? '', note: '' })
   return (
-    <Modal title="Hand off to another team" onClose={onClose}>
+    <Modal title="Hand off" onClose={onClose}>
       <form
-        className="form-grid"
+        className="form-grid one"
         onSubmit={(e) => {
           e.preventDefault()
-          if (run(() => S.handoff(me, t.id, v.teamId, v.assigneeId || null, v.note.trim()))) onClose()
+          if (run(() => S.handoff(me, t.id, v.toId, v.note.trim()))) onClose()
         }}
       >
-        <p className="full muted">“{t.title}” moves to the other team and back to To do. Everything on it — checklist, comments, time — goes with it.</p>
+        <p className="muted">“{t.title}” becomes theirs and goes back to To do. The checklist and comments go with it, and they get your note.</p>
         <Field label="Hand to">
-          <select value={v.teamId} onChange={(e) => setV({ ...v, teamId: e.target.value, assigneeId: '' })}>
-            {d.teams
-              .filter((x) => x.id !== t.teamId)
-              .map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
+          <select data-autofocus value={v.toId} onChange={set('toId')}>
+            {people.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+                {u.title ? ` — ${u.title}` : ''}
+              </option>
+            ))}
           </select>
         </Field>
-        <Field label="Person" hint={canPick ? '' : 'Their team lead gets notified and assigns it.'}>
-          <select value={v.assigneeId} onChange={set('assigneeId')} disabled={!canPick}>
-            <option value="">Team queue</option>
-            {canPick &&
-              staff(d)
-                .filter((u) => u.teamId === v.teamId)
-                .map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-          </select>
-        </Field>
-        <Field label="Note for them" full>
+        <Field label="Note for them">
           <textarea rows={3} value={v.note} onChange={set('note')} placeholder="Where the files are, what’s done, what you need back and by when" />
         </Field>
         <Err msg={err} />
