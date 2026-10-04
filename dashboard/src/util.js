@@ -8,6 +8,15 @@ export function addDays(s, n) {
   d.setDate(d.getDate() + n)
   return ymd(d)
 }
+// one calendar month on, kept to the month's last day (31 Jan → 28 Feb), like Postgres' date + interval '1 month'
+export function addMonth(s) {
+  const d = parseDay(s)
+  const day = d.getDate()
+  d.setDate(1)
+  d.setMonth(d.getMonth() + 1)
+  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()))
+  return ymd(d)
+}
 export const weekday = (s) => parseDay(s).getDay()
 export const startOfWeek = (s) => addDays(s, -((weekday(s) + 6) % 7)) // Monday
 export const clockNow = () => {

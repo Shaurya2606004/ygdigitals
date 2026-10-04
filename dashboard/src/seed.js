@@ -13,6 +13,7 @@ export function seed() {
 
   let n = 0
   const person = (id, name, role, title, color, extra = {}) => ({
+    dept: '',
     id,
     name,
     email: `${id}@ygdigitals.com`,
@@ -28,10 +29,10 @@ export function seed() {
 
   const users = [
     person('aman', 'Aman Verma', 'admin', 'Founder · strategy & client servicing', '#9f1239'),
-    person('priya', 'Priya Kadian', 'member', 'Social media & content', '#e04c5c'),
-    person('vikas', 'Vikas Rathee', 'member', 'Shoots & video editing', '#d97706'),
-    person('ritika', 'Ritika Arora', 'member', 'Design — packaging & creatives', '#7c3aed'),
-    person('arjun', 'Arjun Mehta', 'member', 'Websites & e-commerce', '#0d9488'),
+    person('priya', 'Priya Kadian', 'member', 'Social media & content', '#e04c5c', { dept: 'social' }),
+    person('vikas', 'Vikas Rathee', 'member', 'Shoots & video editing', '#d97706', { dept: 'video' }),
+    person('ritika', 'Ritika Arora', 'member', 'Design — packaging & creatives', '#7c3aed', { dept: 'design' }),
+    person('arjun', 'Arjun Mehta', 'member', 'Websites & e-commerce', '#0d9488', { dept: 'website' }),
     client('rahul', 'Rahul Gupta', 'desi', 'Founder, Desi Crunch Snacks', 'rahul@desicrunch.in', '#b45309'),
     client('sunita', 'Sunita Malhotra', 'greenvalley', 'Marketing Head, Green Valley Realty', 'sunita@greenvalleyrealty.in', '#15803d'),
     client('vikram', 'Vikram Jindal', 'steel', 'Director, Haryana Steel Works', 'vikram@haryanasteel.in', '#334155'),
@@ -65,13 +66,17 @@ export function seed() {
       id,
       projectId,
       assigneeId,
+      dept: users.find((u) => u.id === assigneeId)?.dept ?? 'video', // the department doing it (unowned work: video)
       status,
       priority,
       due: day(due),
       title,
+      repeat: 'none',
       desc: '',
       checklist: [],
       comments: [],
+      ask: null,
+      extensions: [],
       createdBy: projects.find((p) => p.id === projectId).managerId,
       createdAt: ago(12 * D),
       completedAt: status === 'done' ? day(Math.min(due, -1)) : null,
@@ -85,6 +90,7 @@ export function seed() {
     task('p-diwali', 'priya', 'done', 'high', -6, 'Festive content calendar — 12 posts', { checklist: [['Theme & hooks', true], ['12 post slots with formats', true], ['Client sign-off', true]] }),
     task('p-diwali', 'priya', 'done', 'normal', -4, 'Scripts for 3 Diwali Reels', { desc: 'Hinglish, 30 seconds each, hook in the first 2 seconds. Reel 1: grandma reveal. Reel 2: office Diwali. Reel 3: gift box unboxing.' }),
     task('p-diwali', 'vikas', 'doing', 'high', 2, 'Shoot day: family Reels + product macros at the Sonipat unit', {
+      ask: { due: day(4), reason: 'Rahul moved the packing-area slot to Thursday.', by: 'vikas', at: ago(3 * H) },
       desc: 'Full day at the Desi Crunch unit. Packing area free 10–1 (confirmed by Rahul). Talent: Rahul’s family + 2 staff.',
       checklist: [['Shot list', true], ['Book lights & gimbal', true], ['Props: diyas, gift boxes, rangoli', false], ['Talent release forms', false]],
       comments: [c('priya', 20 * H, 'Hook for Reel 1 is the grandma reveal — get at least 3 takes of it.'), c('vikas', 19 * H, 'Noted. Will also grab slow-mo of the bhujia pour for the end cards @Ritika.')],
@@ -103,10 +109,10 @@ export function seed() {
     task('p-gv-month', 'priya', 'doing', 'normal', 0, 'Reply to comments & DMs (within 2 hours)', { desc: 'Daily. Hot leads go to Sunita on WhatsApp the same hour.' }),
     task('p-gv-month', 'vikas', 'review', 'high', 0, 'Edit walkthrough Reel — Villa 12'),
     task('p-gv-month', 'priya', 'doing', 'high', 3, 'Lead form ads — refresh creatives'),
-    task('p-gv-month', 'priya', 'todo', 'normal', -2, 'Send last week’s lead sheet to Sunita'),
+    task('p-gv-month', 'priya', 'todo', 'normal', -2, 'Send last week’s lead sheet to Sunita', { repeat: 'weekly' }),
     task('p-steel-web', 'arjun', 'done', 'high', -12, 'Sitemap & wireframes'),
     task('p-steel-web', 'arjun', 'doing', 'high', 2, 'Homepage design v2 — machines first, WhatsApp button', { comments: [c('aman', 2 * D, 'Vikram wants the CNC machines above the fold. Keep the hero video slot for the plant film.')] }),
-    task('p-steel-web', 'vikas', 'todo', 'high', 6, 'Factory shoot — machines, welding, team portraits', { checklist: [['Shot list from Arjun', true], ['Safety gear for crew', false], ['Drone permission', false]] }),
+    task('p-steel-web', 'vikas', 'todo', 'high', -1, 'Factory shoot — machines, welding, team portraits', { checklist: [['Shot list from Arjun', true], ['Safety gear for crew', false], ['Drone permission', false]] }),
     task('p-steel-web', 'arjun', 'todo', 'normal', 14, 'Build product catalogue pages (8 categories)'),
     task('p-steel-web', 'priya', 'doing', 'normal', 3, 'Write copy: About, Capabilities, Export'),
     task('p-steel-web', 'arjun', 'todo', 'normal', 20, 'SEO, Search Console and speed check before launch'),
@@ -196,7 +202,7 @@ export function seed() {
   const seen = ago(6 * H)
   const reads = Object.fromEntries(users.map((u) => [u.id, Object.fromEntries(channels.map((ch) => [ch.id, seen]))]))
 
-  const post = (id, clientId, date, platform, format, title, status, assigneeId, caption = '') => ({ id, clientId, date, time: '19:00', platform, format, title, status, assigneeId, caption, notes: [] })
+  const post = (id, clientId, date, platform, format, title, status, assigneeId, caption = '') => ({ id, clientId, date, time: '19:00', platform, format, title, status, assigneeId, caption, notes: [], dept: ['Reel', 'Short'].includes(format) ? 'video' : 'design' })
   const posts = [
     post('s1', 'desi', day(-6), 'Instagram', 'Reel', 'Behind the scenes: how our bhujia is made', 'posted', 'vikas'),
     post('s2', 'desi', day(-3), 'Instagram', 'Post', 'Festive offer teaser', 'posted', 'ritika'),
@@ -210,6 +216,17 @@ export function seed() {
     post('s10', 'greenvalley', day(5), 'Instagram', 'Post', 'Handover day: the Sharma family', 'idea', 'priya'),
     post('s11', 'glow', day(4), 'Instagram', 'Reel', 'Now on Amazon: 3 hero products', 'idea', 'priya'),
     post('s12', 'glow', day(8), 'Instagram', 'Carousel', 'Ingredients we never use', 'production', 'ritika'),
+  ]
+
+  // a Navratri Reel that never went out: the studio owes Desi Crunch one extra, and has told Rahul
+  const compensations = [
+    { id: 'k-navratri', clientId: 'desi', postId: null, missed: 'Reel — Navratri wishes (1 Oct)', offer: '1 extra Reel this week', due: day(2), ownerId: 'vikas', status: 'open', shared: true, createdBy: 'aman', createdAt: ago(3 * D), givenAt: null },
+  ]
+
+  // Ritika's days off are approved; Arjun's request waits for the admin
+  const leaves = [
+    { id: 'l-ritika', userId: 'ritika', start: day(10), end: day(11), status: 'approved', decidedBy: 'aman', note: 'Cousin’s wedding in Jaipur', reply: 'Enjoy!', createdAt: ago(2 * D) },
+    { id: 'l-arjun', userId: 'arjun', start: day(15), end: day(15), status: 'pending', decidedBy: null, note: 'Bank and passport work', reply: '', createdAt: ago(5 * H) },
   ]
 
   let a = 0
@@ -240,5 +257,5 @@ export function seed() {
     note('vikram', 'arjun', 1 * D, 'invited you to “Homepage feedback call”', '#/calendar'),
   ]
 
-  return { version: 2, users, clients, projects, tasks, deliverables, events, channels, messages, reads, posts, activity, notifications }
+  return { version: 2, users, clients, projects, tasks, deliverables, events, channels, messages, reads, posts, leaves, compensations, activity, notifications }
 }

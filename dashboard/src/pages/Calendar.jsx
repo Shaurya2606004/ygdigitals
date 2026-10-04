@@ -4,7 +4,7 @@ import { byId, can, conflicts, EVENT_TYPES, isStaff, occurrences, REPEAT } from 
 import { Avatar, Empty, Err, Field, go, Icon, isUrl, Modal, PageHead, PeoplePicker, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, clockNow, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, startOfWeek, today, ymd } from '../util.js'
 
-const LAYERS = { meeting: 'Team meetings', client: 'Client calls', shoot: 'Shoots', review: 'Creative reviews', deadline: 'Deadlines', post: 'Content' }
+const LAYERS = { meeting: 'Team meetings', client: 'Client calls', shoot: 'Shoots', review: 'Creative reviews', deadline: 'Deadlines', post: 'Content', leave: 'Leave' }
 const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
 const toMin = (hm) => Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3))
 function shiftMonth(s, n) {
@@ -34,6 +34,12 @@ function useItems(me, from, to, scope, layers) {
     for (const p of d.posts)
       if (p.date >= from && p.date <= to && can(me, 'content.view', p) && (!staffer || inScope([p.assigneeId])))
         items.push({ key: `s${p.id}`, kind: 'post', date: p.date, title: `${byId(d.clients, p.clientId)?.name}: ${p.title}`, type: 'post', href: '#/content' })
+  // approved leave: one all-day item per day away
+  if (layers.leave && staffer)
+    for (const l of d.leaves)
+      if (l.status === 'approved' && l.end >= from && l.start <= to && can(me, 'leave.view', l))
+        for (let day = l.start > from ? l.start : from; day <= l.end && day <= to; day = addDays(day, 1))
+          items.push({ key: `l${l.id}${day}`, kind: 'leave', date: day, title: `${S.userName(d, l.userId).split(' ')[0]} on leave`, type: 'leave', href: '#/leave' })
   return items.sort((a, b) => (a.start || '').localeCompare(b.start || ''))
 }
 

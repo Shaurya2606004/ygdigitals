@@ -4,10 +4,10 @@
 // can() mirrors the server's read rules (*_access.sql). Without Supabase config (npm test) it runs on the
 // in-memory sample studio that the tests hand it (setData).
 import { supabase } from './supabase.js'
-import { addDays, fmtDay, fmtTime, nowIso, overlaps, today, uid, weekday } from './util.js'
+import { addDays, addMonth, fmtDay, fmtTime, nowIso, overlaps, today, uid, weekday } from './util.js'
 
 export const live = Boolean(supabase)
-const empty = () => ({ users: [], clients: [], projects: [], tasks: [], deliverables: [], events: [], channels: [], messages: [], reads: {}, posts: [], activity: [], notifications: [] })
+const empty = () => ({ users: [], clients: [], projects: [], tasks: [], deliverables: [], events: [], channels: [], messages: [], reads: {}, posts: [], leaves: [], compensations: [], activity: [], notifications: [] })
 
 let db = empty()
 const subs = new Set()
@@ -35,7 +35,7 @@ export function setData(data) {
 
 export const ROLES = {
   admin: { label: 'Admin', blurb: 'Runs the studio: adds people and clients, creates projects, and checks work before it goes to a client.' },
-  member: { label: 'Team member', blurb: 'Does the work: tasks, handing work to each other, submitting work for a check, planning content, meetings and chat.' },
+  member: { label: 'Team member', blurb: 'Does the work in their department: tasks, handing work to each other, submitting work for a check, planning content, meetings and chat. Sees their department’s work, not the whole studio.' },
   freelancer: { label: 'Freelancer', blurb: 'Works on the projects they’re put on and sees only those: their tasks, work, discussions and chats — not the rest of the studio.' },
   client: { label: 'Client', blurb: 'Sees only their own projects and plan, approves work and posts, chats with the team and books meetings.' },
 }
@@ -46,16 +46,37 @@ export const DELIV_STATUS = { internal: 'Waiting for check', changes: 'Changes r
 export const DELIV_TYPES = ['Video', 'Design', 'Website', 'Copy', 'Listing', 'Photos', 'Other']
 export const EVENT_TYPES = { meeting: 'Team meeting', client: 'Client call', shoot: 'Shoot', review: 'Creative review' }
 export const REPEAT = { none: 'Does not repeat', weekdays: 'Every weekday', weekly: 'Every week' }
-export const POST_STATUS = { idea: 'Idea', production: 'In production', ready: 'Ready for approval', scheduled: 'Scheduled', posted: 'Posted' }
+export const POST_STATUS = { idea: 'Idea', production: 'In production', ready: 'Ready for approval', scheduled: 'Scheduled', posted: 'Posted', missed: 'Undelivered' }
+export const REPEATS = { none: 'Does not repeat', weekly: 'Every week', monthly: 'Every month' }
+// one mark for every piece of work: where it stands against its date
+export const MARKS = { due: 'Due', today: 'Due today', overdue: 'Overdue', done: 'Done', late: 'Done late', delivered: 'Delivered', undelivered: 'Undelivered' }
+export function taskMark(t) {
+  if (t.status === 'done') return t.due && (t.completedAt || '') > t.due ? 'late' : 'done'
+  if (!t.due) return ''
+  return t.due < today() ? 'overdue' : t.due === today() ? 'today' : 'due'
+}
+export function postMark(p) {
+  if (p.status === 'posted') return 'delivered'
+  if (p.status === 'missed') return 'undelivered'
+  return p.date < today() ? 'overdue' : p.date === today() ? 'today' : 'due'
+}
 export const PLATFORMS = ['Instagram', 'Facebook', 'YouTube', 'LinkedIn', 'Google']
 export const FORMATS = ['Reel', 'Post', 'Carousel', 'Story', 'Ad', 'Short']
 export const COLORS = ['#e04c5c', '#d97706', '#2563eb', '#0d9488', '#7c3aed', '#16a34a', '#db2777', '#475569', '#0891b2', '#ca8a04']
+// who does a piece of work. A team member sees their department's work (plus their own); "all" is the office (PA),
+// who sees everything like the admin. Same lists as the checks in *_departments.sql.
+export const DEPTS = { video: 'Video', design: 'Design', social: 'Social media', website: 'Websites', packaging: 'Packaging' }
+export const PERSON_DEPTS = { ...DEPTS, all: 'All departments (office)' }
+// the department a kind of work for approval belongs to ('' = everyone on the project), like private.type_dept()
+const TYPE_DEPT = { Video: 'video', Photos: 'video', Design: 'design', Website: 'website', Listing: 'website', Copy: 'social' }
+export const postDept = (format) => (['Reel', 'Short'].includes(format) ? 'video' : 'design')
 
 // what each role can do, in words (Settings › Roles). Keep in step with can() below.
 export const PERMISSIONS = [
-  ['See every project, task and the whole calendar', ['admin', 'member']],
+  ['See every project, task and post, the whole calendar and the activity log', ['admin']],
+  ['See their department’s work, plus anything they own, made or lead (the “All departments” office sees everything)', ['member']],
   ['See only the projects they’re on, and tasks handed to them', ['freelancer']],
-  ['Create, edit and hand off tasks, submit work for a check', ['admin', 'member', 'freelancer']],
+  ['Create, edit and hand off the tasks they can see, submit work for a check', ['admin', 'member', 'freelancer']],
   ['Plan content posts', ['admin', 'member']],
   ['Check work and send it to the client', ['admin']],
   ['Create projects (a project’s lead can edit it)', ['admin']],
@@ -76,6 +97,8 @@ export const staff = (d) => d.users.filter((u) => u.active && isStaff(u))
 // the studio's own team, who see everything (not freelancers or clients)
 export const isTeam = (u) => u.role === 'admin' || u.role === 'member'
 export const team = (d) => d.users.filter((u) => u.active && isTeam(u))
+// the whole studio in view: the admins and the office ("All departments")
+export const seesAll = (u) => u.role === 'admin' || (u.role === 'member' && u.dept === 'all')
 const admins = (d) => d.users.filter((u) => u.active && u.role === 'admin').map((u) => u.id)
 export const clientUsers = (d, clientId) => d.users.filter((u) => u.active && u.role === 'client' && u.clientId === clientId)
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -86,6 +109,10 @@ export function progress(d, pid) {
   return ts.length ? Math.round((ts.filter((t) => t.status === 'done').length / ts.length) * 100) : 0
 }
 export const isOverdue = (t) => t.status !== 'done' && t.due && t.due < today()
+// who may set a task's due date (private.sets_due): the admin, the project lead, or whoever gave it to someone else.
+// Its owner asks for more time instead.
+export const setsDue = (u, t) =>
+  Boolean(u?.active && (u.role === 'admin' || byId(db.projects, t.projectId)?.managerId === u.id || (t.createdBy === u.id && t.assigneeId !== u.id)))
 
 export function channelName(d, ch, me) {
   if (ch.type === 'project') return byId(d.projects, ch.projectId)?.name ?? 'project'
@@ -140,45 +167,63 @@ export function can(u, action, x = {}) {
   if (!u?.active) return false
   const admin = u.role === 'admin'
   const team = isTeam(u)
+  const all = seesAll(u)
+  const member = u.role === 'member'
   const isStaffer = u.role !== 'client'
   const free = u.role === 'freelancer'
   const ownProject = (pid) => u.role === 'client' && byId(db.projects, pid)?.clientId === u.clientId
-  // a freelancer works only in projects they lead or are on, and on tasks handed to them
   const leads = (p) => Boolean(p && (p.managerId === u.id || p.memberIds.includes(u.id)))
-  const onProject = (pid) => team || (free && leads(byId(db.projects, pid)))
-  const onTask = (t) => team || (free && (t.assigneeId === u.id || leads(byId(db.projects, t.projectId))))
+  // the task rule (private.sees_task): a member sees their department's work and anything they own, made or lead;
+  // a freelancer, the tasks in projects they're on and any handed to them
+  const onTask = (t) =>
+    all ||
+    (member && ((t.dept && t.dept === u.dept) || t.assigneeId === u.id || t.createdBy === u.id || byId(db.projects, t.projectId)?.managerId === u.id)) ||
+    (free && (t.assigneeId === u.id || leads(byId(db.projects, t.projectId))))
+  // a project you work in (private.sees_project): you lead it, are on it, or (a member) see work in it
+  const onProject = (pid) => all || (isStaffer && (leads(byId(db.projects, pid)) || (member && db.tasks.some((t) => t.projectId === pid && onTask(t)))))
   switch (action) {
     case 'org.manage': // people, clients, announcements
       return admin
+    case 'comp.view': // a make-up owed to a client: the admins, whoever's on it or noted it, and the client once shared
+      return all || x.ownerId === u.id || x.createdBy === u.id || (u.role === 'client' && x.shared && x.clientId === u.clientId)
+    case 'leave.view': // the team sees who's away; a request and its note stay with the person and the admins
+      return all || x.userId === u.id || (x.status === 'approved' && isStaffer)
+    case 'activity.view':
+      return all
     case 'project.view':
-      return team || (free && leads(x)) || x.clientId === u.clientId
+      return onProject(x.id) || x.clientId === u.clientId
     case 'project.create':
       return admin
     case 'project.edit':
       return admin || x.managerId === u.id
     case 'task.view':
       return onTask(x) || ownProject(x.projectId)
-    case 'task.edit': // small team: anyone can create, edit, reassign and hand off any task (a freelancer: in their projects)
-      return team || (free && (!x.projectId || onTask(x)))
+    case 'task.create': // in a project you work in
+      return isStaffer && (!x.projectId || onProject(x.projectId))
+    case 'task.edit': // small team: anyone who can see a task can edit, reassign and hand it off
+      return isStaffer && onTask(x)
     case 'task.delete':
       return admin || (x.createdBy === u.id && onTask(x))
     case 'deliverable.submit':
-      return team || (free && (!x.projectId || onProject(x.projectId)))
+      return isStaffer && (!x.projectId || onProject(x.projectId))
     case 'deliverable.view':
+      if (member && !all)
+        return onProject(x.projectId) && (x.submittedBy === u.id || [undefined, u.dept].includes(TYPE_DEPT[x.type]) || byId(db.projects, x.projectId)?.managerId === u.id)
       return onProject(x.projectId) || (x.sent && ownProject(x.projectId))
     case 'deliverable.review':
       return admin
     case 'deliverable.decide':
       return admin || ownProject(x.projectId)
     case 'event.view':
-      return team || x.attendeeIds.includes(u.id) || x.createdBy === u.id
+      return all || x.attendeeIds.includes(u.id) || x.createdBy === u.id
     case 'event.edit':
       return admin || x.createdBy === u.id
     case 'content.manage':
       return team
-    case 'content.view':
+    case 'content.view': // social media captions and posts everything, so they see every post
+      return all || (member && (u.dept === 'social' || (x.dept && x.dept === u.dept) || x.assigneeId === u.id)) || (u.role === 'client' && x.clientId === u.clientId)
     case 'content.decide':
-      return team || (u.role === 'client' && x.clientId === u.clientId)
+      return can(u, 'content.view', x) && (isTeam(u) || u.role === 'client')
     case 'channel.view':
       if (x.type === 'dm') return x.memberIds.includes(u.id)
       // an admin can read every group, even ones they aren't in (members aren't told)
@@ -229,6 +274,7 @@ export function savePerson(me, p) {
   need(/^\S+@\S+\.\S+$/.test(email), 'Add a valid email — it is their login.')
   need(!db.users.some((u) => u.email === email && u.id !== p.id), 'Someone already uses that email.')
   need(p.role !== 'client' || p.clientId, 'Pick which client this login belongs to.')
+  need(!p.dept || (p.role === 'member' ? PERSON_DEPTS : DEPTS)[p.dept], 'Pick a department from the list.')
   need(!old || old.id !== me.id || p.role === old.role, 'You cannot change your own role.')
   need(!p.password || p.password.length >= 8, 'Passwords need at least 8 characters.')
   need(!live || old || p.password, 'Set a temporary password (8+ characters) and share it with them.')
@@ -236,7 +282,7 @@ export function savePerson(me, p) {
   if (live) return callPeople({ action: 'save', person: { ...p, email } })
   return commit((d) => {
     const { password: _, ...rest } = p
-    const clean = { ...rest, email, name: p.name.trim(), clientId: p.role === 'client' ? p.clientId : null }
+    const clean = { ...rest, email, name: p.name.trim(), clientId: p.role === 'client' ? p.clientId : null, dept: p.role === 'client' ? '' : p.dept || '' }
     if (old) {
       Object.assign(byId(d.users, p.id), clean)
       if (old.role !== clean.role) notify(d, me, [old.id], `changed your role to ${ROLES[clean.role].label}`, '#/settings')
@@ -244,7 +290,7 @@ export function savePerson(me, p) {
       return p.id
     }
     const id = uid()
-    d.users.push({ title: '', phone: '', color: COLORS[d.users.length % COLORS.length], ...clean, id, active: true })
+    d.users.push({ title: '', phone: '', dept: '', color: COLORS[d.users.length % COLORS.length], ...clean, id, active: true })
     notify(d, me, [id], 'added you to YG Hub — welcome!', '#/')
     log(d, me, clean.role === 'client' ? `gave ${clean.name} a login for ${byId(d.clients, clean.clientId)?.name}` : `added ${clean.name} to the team`, clean.role === 'client' ? '#/settings/clients' : '#/settings/team')
     return id
@@ -284,6 +330,30 @@ export function saveClient(me, c) {
   return id
 }
 
+// the client and everything of theirs: projects (tasks, work, project chats), posts and logins. Meetings stay,
+// unlinked. Asks for their exact name, like the server does.
+export function deleteClient(me, id, confirmName = '') {
+  must(can(me, 'org.manage'), 'delete clients')
+  const c = byId(db.clients, id)
+  need(c, 'This client no longer exists.')
+  need(confirmName.trim().toLowerCase() === c.name.toLowerCase(), 'Type the client’s name exactly to confirm.')
+  commit((d) => {
+    const pids = new Set(d.projects.filter((p) => p.clientId === id).map((p) => p.id))
+    const chans = new Set(d.channels.filter((ch) => pids.has(ch.projectId)).map((ch) => ch.id))
+    d.clients = d.clients.filter((x) => x.id !== id)
+    d.projects = d.projects.filter((p) => !pids.has(p.id))
+    d.tasks = d.tasks.filter((t) => !pids.has(t.projectId))
+    d.deliverables = d.deliverables.filter((x) => !pids.has(x.projectId))
+    d.channels = d.channels.filter((ch) => !chans.has(ch.id))
+    d.messages = d.messages.filter((m) => !chans.has(m.channelId))
+    d.posts = d.posts.filter((p) => p.clientId !== id)
+    d.users = d.users.filter((u) => u.clientId !== id)
+    for (const e of d.events) if (pids.has(e.projectId)) e.projectId = ''
+    log(d, me, `deleted the client ${c.name} and all their work`, '#/settings/clients')
+  })
+  send('delete_client', { id, confirm: confirmName })
+}
+
 /* ---------- projects ---------- */
 
 export function saveProject(me, p) {
@@ -291,6 +361,7 @@ export function saveProject(me, p) {
   must(old ? can(me, 'project.edit', old) : can(me, 'project.create'), old ? 'edit this project' : 'create projects')
   need(p.name?.trim(), 'Give the project a name.')
   need(p.clientId, 'Pick the client.')
+  if (p.ongoing) p = { ...p, due: '' } // a retainer has no end date
   need(!p.start || !p.due || p.start <= p.due, 'The due date is before the start date.')
   const id = commit((d) => {
     const link = (id) => `#/projects/${id}`
@@ -308,7 +379,7 @@ export function saveProject(me, p) {
       return p.id
     }
     const id = uid()
-    d.projects.push({ status: 'planning', memberIds: [], brief: '', priority: 'normal', ...p, id, createdAt: today() })
+    d.projects.push({ status: 'planning', memberIds: [], brief: '', priority: 'normal', ongoing: false, ...p, id, createdAt: today() })
     d.channels.push({ id: `ch-${id}`, type: 'project', projectId: id, clientVisible: true, memberIds: [] })
     notify(d, me, [...p.memberIds, p.managerId], `added you to the new project “${p.name}”`, link(id))
     log(d, me, `started the project “${p.name}” for ${byId(d.clients, p.clientId)?.name}`, link(id))
@@ -322,21 +393,34 @@ export function saveProject(me, p) {
 
 export function saveTask(me, t) {
   const old = t.id && byId(db.tasks, t.id)
-  must(can(me, 'task.edit', old || t), old ? 'edit this task' : 'create tasks')
-  // a freelancer only adds tasks to (or moves them into) projects they're on
+  must(old ? can(me, 'task.edit', old) : can(me, 'task.create'), old ? 'edit this task' : 'create tasks')
+  // new work (or work moved to another project) only goes into a project you work in
   const projectId = t.projectId ?? old?.projectId
-  must(can(me, 'task.edit', { projectId, assigneeId: old?.projectId === projectId ? old.assigneeId : null }), 'add tasks to this project')
+  must(old?.projectId === projectId || can(me, 'task.create', { projectId }), 'add tasks to this project')
   need(t.title?.trim(), 'Give the task a title.')
   need(t.projectId, 'Pick the project.')
+  need(!old || (t.due || null) === (old.due || null) || setsDue(me, old), 'Only the admin, the project lead or whoever gave you this task can move its due date — ask for more time instead.')
+  need(!t.repeat || t.repeat === 'none' || t.due, 'A repeating task needs a due date.')
+  // finishing a repeating task makes the next one (the server makes it with this id too)
+  const repeat = t.status === 'done' && old?.status !== 'done' && t.repeat && t.repeat !== 'none' ? t.repeat : null
+  const nextId = repeat && uid()
   const id = commit((d) => {
     let task
     if (old) Object.assign((task = byId(d.tasks, t.id)), t, { title: t.title.trim() })
-    else d.tasks.push((task = { status: 'todo', priority: 'normal', desc: '', checklist: [], comments: [], ...t, title: t.title.trim(), id: uid(), createdBy: me.id, createdAt: nowIso() }))
+    else d.tasks.push((task = { status: 'todo', priority: 'normal', dept: '', repeat: 'none', desc: '', checklist: [], comments: [], ask: null, extensions: [], ...t, title: t.title.trim(), id: uid(), createdBy: me.id, createdAt: nowIso() }))
     if (task.status === 'done') task.completedAt ||= today()
     else task.completedAt = null
+    if (repeat) {
+      task.repeat = 'none'
+      const due = repeat === 'weekly' ? addDays(task.due, 7) : addMonth(task.due)
+      const { _r, ...copy } = structuredClone(task) // a new row: none of the finished task's revisions
+      d.tasks.push({ ...copy, id: nextId, status: 'todo', due, repeat, completedAt: null, comments: [], ask: null, extensions: [],
+        checklist: task.checklist.map((c) => ({ ...c, done: false })), createdBy: old?.createdBy ?? me.id, createdAt: nowIso() })
+    }
     const link = `#/tasks/${task.id}`
     const q = `“${task.title}”`
     if (task.assigneeId && (!old || old.assigneeId !== task.assigneeId)) notify(d, me, [task.assigneeId], `gave you ${q}`, link)
+    if (old && (old.due || null) !== (task.due || null) && task.assigneeId) notify(d, me, [task.assigneeId], `moved ${q} to ${task.due ? fmtDay(task.due) : 'no due date'}`, link)
     if (old && old.status !== task.status) {
       if (task.status === 'review') notify(d, me, [...admins(d), byId(d.projects, task.projectId)?.managerId], `${q} is ready for review`, link)
       if (task.status === 'done') notify(d, me, [task.createdBy], `finished ${q}`, link)
@@ -345,8 +429,46 @@ export function saveTask(me, t) {
     return task.id
   })
   const diff = old && changes(old, t)
-  send('save_task', old ? { id, ...diff } : { ...t, id }, old ? [['tasks', id], ...('desc' in diff || 'checklist' in diff ? [['task_private', id]] : [])] : [])
+  send('save_task', { ...(old ? { id, ...diff } : { ...t, id }), ...(nextId && { nextId }) }, old ? [['tasks', id], ...('desc' in diff || 'checklist' in diff ? [['task_private', id]] : [])] : [])
   return id
+}
+
+// a task's owner asks for a new date, with a reason; the admin, the project lead or whoever gave it decides
+export function askTime(me, id, due, reason) {
+  const t = byId(db.tasks, id)
+  need(t && can(me, 'task.edit', t) && t.assigneeId === me.id, 'Only the task’s owner can ask for more time.')
+  need(t.status !== 'done', 'This task is already done.')
+  need(due && due >= today() && due !== t.due, 'Pick the new date (from today on).')
+  reason = (reason || '').trim()
+  need(reason, 'Say why you need more time.')
+  const commentId = uid()
+  commit((d) => {
+    const x = byId(d.tasks, id)
+    x.ask = { due, reason, by: me.id, at: nowIso() }
+    x.comments.push({ id: commentId, userId: me.id, at: nowIso(), text: reason, ask: `asked for more time, until ${fmtDay(due)}` })
+    notify(d, me, [...admins(d), byId(d.projects, x.projectId)?.managerId, x.createdBy], `asked for more time on “${x.title}” (until ${fmtDay(due)}): ${reason.slice(0, 90)}`, `#/tasks/${id}`)
+  })
+  send('ask_time', { id, due, reason, commentId }, [['task_private', id]])
+}
+
+export const canDecideTime = (me, t) => Boolean(t?.ask && setsDue(me, t) && (me.role === 'admin' || t.ask.by !== me.id))
+export function decideTime(me, id, approve, note = '') {
+  const t = byId(db.tasks, id)
+  need(t?.ask, 'There’s no request for more time on this task.')
+  must(canDecideTime(me, t), 'decide this')
+  note = note.trim()
+  const commentId = uid()
+  commit((d) => {
+    const x = byId(d.tasks, id)
+    const a = x.ask
+    x.extensions = [...(x.extensions || []), { ...a, from: x.due, approved: approve, decidedBy: me.id, decidedAt: nowIso(), note }]
+    x.comments.push({ id: commentId, userId: me.id, at: nowIso(), text: note, ask: approve ? `gave more time, until ${fmtDay(a.due)}` : `kept the date (${x.due ? fmtDay(x.due) : 'none'})` })
+    if (approve) x.due = a.due
+    x.ask = null
+    notify(d, me, [a.by], approve ? `gave you until ${fmtDay(a.due)} for “${x.title}”` : `kept the date for “${x.title}”${note ? `: ${note}` : ''}`, `#/tasks/${id}`)
+    log(d, me, `${approve ? 'gave more time on' : 'declined more time on'} “${x.title}”`, `#/tasks/${id}`)
+  })
+  send('decide_time', { id, approve, note, commentId }, [['tasks', id], ['task_private', id]])
 }
 
 export const moveTask = (me, id, status) => saveTask(me, { ...byId(db.tasks, id), status })
@@ -653,10 +775,11 @@ export function savePost(me, p) {
   need(p.title?.trim(), 'Give the post a working title or hook.')
   need(p.clientId && p.date, 'Pick the client and the day it goes out.')
   const old = p.id && byId(db.posts, p.id)
+  if (old) must(can(me, 'content.view', old), 'change this post')
   const id = commit((d) => {
     const cur = old && byId(d.posts, p.id)
     if (cur) Object.assign(cur, p)
-    else d.posts.push({ status: 'idea', caption: '', notes: [], ...p, id: uid() })
+    else d.posts.push({ status: 'idea', caption: '', notes: [], dept: postDept(p.format), ...p, id: uid() })
     const link = '#/content'
     if (p.assigneeId && (!old || old.assigneeId !== p.assigneeId)) notify(d, me, [p.assigneeId], `gave you the ${p.format} “${p.title}” (${fmtDay(p.date)})`, link)
     if (p.status === 'ready' && old?.status !== 'ready') notify(d, me, clientUsers(d, p.clientId).map((u) => u.id), `has a ${p.format} ready for your approval: “${p.title}”`, link)
@@ -682,9 +805,116 @@ export function decidePost(me, id, approve, note) {
 }
 
 export function deletePost(me, id) {
-  must(can(me, 'content.manage'), 'delete posts')
+  must(can(me, 'content.manage') && can(me, 'content.view', byId(db.posts, id)), 'delete posts')
   commit((d) => (d.posts = d.posts.filter((x) => x.id !== id)))
   send('delete_post', { id })
+}
+
+/* ---------- compensation: what we owe a client for work never delivered ---------- */
+
+export function saveCompensation(me, c) {
+  const old = c.id && byId(db.compensations, c.id)
+  must(old ? me.role === 'admin' || old.createdBy === me.id : isTeam(me), 'change this')
+  need(c.clientId && byId(db.clients, c.clientId), 'Pick the client.')
+  need(c.missed?.trim(), 'Say what was missed.')
+  need(c.offer?.trim(), 'Say what we’ll give instead.')
+  need(Boolean(c.shared) === Boolean(old?.shared) || me.role === 'admin', 'Only an admin shares this with the client.')
+  const client = byId(db.clients, c.clientId).name
+  const by = c.due ? ` by ${fmtDay(c.due)}` : ''
+  const id = commit((d) => {
+    const next = { ...c, missed: c.missed.trim(), offer: c.offer.trim(), shared: Boolean(c.shared) }
+    if (old) Object.assign(byId(d.compensations, c.id), next)
+    else d.compensations.push({ postId: null, due: null, ownerId: null, ...next, id: uid(), status: 'open', createdBy: me.id, createdAt: nowIso(), givenAt: null })
+    const x = old ? byId(d.compensations, c.id) : d.compensations.at(-1)
+    if (x.ownerId && x.ownerId !== old?.ownerId) notify(d, me, [x.ownerId], `gave you a make-up for ${client}: ${x.offer}${by}`, '#/content/owed')
+    if (x.shared && !old?.shared) notify(d, me, clientUsers(d, x.clientId).map((u) => u.id), `will make up for ${x.missed}: ${x.offer}${by}`, '#/')
+    log(d, me, `${old ? 'updated a make-up owed to' : 'noted a make-up owed to'} ${client}: ${x.offer}`, '#/content/owed')
+    return x.id
+  })
+  send('save_compensation', old ? { id, ...changes(old, c) } : { ...c, id }, old ? [['compensations', id]] : [])
+  return id
+}
+
+export function giveCompensation(me, id) {
+  const c = byId(db.compensations, id)
+  need(c, 'This no longer exists.')
+  must(me.role === 'admin' || c.ownerId === me.id || c.createdBy === me.id, 'change this')
+  need(c.status === 'open', 'This has already been given.')
+  const client = byId(db.clients, c.clientId)?.name
+  commit((d) => {
+    Object.assign(byId(d.compensations, id), { status: 'given', givenAt: today() })
+    notify(d, me, [...admins(d), c.createdBy], `gave ${client} their make-up: ${c.offer}`, '#/content/owed')
+    if (c.shared) notify(d, me, clientUsers(d, c.clientId).map((u) => u.id), `delivered your make-up: ${c.offer}`, '#/')
+    log(d, me, `gave ${client} their make-up: ${c.offer}`, '#/content/owed')
+  })
+  send('give_compensation', { id }, [['compensations', id]])
+}
+
+export function deleteCompensation(me, id) {
+  must(me.role === 'admin', 'remove this')
+  commit((d) => (d.compensations = d.compensations.filter((x) => x.id !== id)))
+  send('delete_compensation', { id })
+}
+
+/* ---------- leave ---------- */
+
+export const LEAVE_STATUS = { pending: 'Waiting for approval', approved: 'Approved', declined: 'Declined' }
+export const leaveDays = (l) => (l.start === l.end ? fmtDay(l.start) : `${fmtDay(l.start)} – ${fmtDay(l.end)}`)
+// is this person on approved leave that day? (private.away)
+export const isAway = (d, userId, day) => d.leaves.some((l) => l.userId === userId && l.status === 'approved' && l.start <= day && day <= l.end)
+// their tasks and posts still to do that fall due between two days (private.open_work)
+export const openWork = (d, userId, start, end) => [
+  ...d.tasks.filter((t) => t.assigneeId === userId && t.status !== 'done' && t.due && t.due >= start && t.due <= end).map((t) => ({ title: t.title, due: t.due, href: `#/tasks/${t.id}` })),
+  ...d.posts.filter((p) => p.assigneeId === userId && !['scheduled', 'posted', 'missed'].includes(p.status) && p.date >= start && p.date <= end).map((p) => ({ title: p.title, due: p.date, href: '#/content' })),
+]
+
+export function applyLeave(me, { start, end, note = '' }) {
+  must(isStaff(me), 'apply for leave')
+  end ||= start
+  need(start && start >= today(), 'Pick the first day (today or later).')
+  need(end >= start && addDays(start, 60) >= end, 'Pick the last day (on or after the first, at most two months).')
+  need(!db.leaves.some((l) => l.userId === me.id && l.status !== 'declined' && l.start <= end && l.end >= start), 'You already have leave on some of those days.')
+  // short notice: the work for those days has to be done (or handed on) before you go
+  if (start <= addDays(today(), 1)) {
+    const due = openWork(db, me.id, start, end)
+    need(!due.length, `Leave from today or tomorrow needs the work due on those days done or handed off first: ${due.slice(0, 3).map((w) => `“${w.title}”`).join(', ')}${due.length > 3 ? ` and ${due.length - 3} more` : ''}.`)
+  }
+  const id = uid()
+  commit((d) => {
+    d.leaves.push({ id, userId: me.id, start, end, status: 'pending', decidedBy: null, note: note.trim(), reply: '', createdAt: nowIso() })
+    notify(d, me, admins(d), `asked for leave: ${leaveDays({ start, end })}${note.trim() ? ` — ${note.trim().slice(0, 90)}` : ''}`, '#/leave')
+  })
+  send('apply_leave', { id, start, end, note: note.trim() })
+  return id
+}
+
+export function decideLeave(me, id, approve, reply = '', force = false) {
+  const l = byId(db.leaves, id)
+  must(me.role === 'admin', 'approve leave')
+  need(l, 'This leave request no longer exists.')
+  need(l.userId !== me.id, 'Another admin has to decide your own leave.')
+  need(l.status === 'pending', 'This leave has already been decided.')
+  const due = openWork(db, l.userId, l.start, l.end)
+  need(!approve || force || !due.length, `${due.length} of their tasks or posts are due while they’re away. Hand them on first, or approve anyway.`)
+  reply = reply.trim()
+  commit((d) => {
+    Object.assign(byId(d.leaves, id), { status: approve ? 'approved' : 'declined', decidedBy: me.id, reply })
+    notify(d, me, [l.userId], `${approve ? 'approved' : 'declined'} your leave: ${leaveDays(l)}${reply ? ` — ${reply.slice(0, 90)}` : ''}`, '#/leave')
+    log(d, me, `${approve ? 'approved' : 'declined'} ${userName(d, l.userId).split(' ')[0]}'s leave (${leaveDays(l)})`, '#/leave')
+  })
+  send('decide_leave', { id, approve, reply, force }, [['leaves', id], ['leave_private', id]])
+}
+
+export const canCancelLeave = (me, l) => me.role === 'admin' || (l.userId === me.id && (l.status !== 'approved' || l.start > today()))
+export function cancelLeave(me, id) {
+  const l = byId(db.leaves, id)
+  need(l, 'This leave no longer exists.')
+  must(canCancelLeave(me, l), 'cancel this leave')
+  commit((d) => {
+    d.leaves = d.leaves.filter((x) => x.id !== id)
+    if (l.status === 'approved') notify(d, me, [...admins(d), l.userId], `cancelled the leave ${leaveDays(l)}${l.userId !== me.id ? ` for ${userName(d, l.userId).split(' ')[0]}` : ''}`, '#/leave')
+  })
+  send('cancel_leave', { id })
 }
 
 /* ---------- notifications ---------- */
@@ -701,8 +931,8 @@ export function readNotifications(me, ids) {
 // where each table lives in memory. The *_private tables are the studio-only half of a task or client (clients
 // can't read them) and merge into the same object.
 const COLL = { people: 'users' }
-const PRIVATE = { task_private: ['tasks', 'taskId'], client_private: ['clients', 'clientId'] }
-const DEFAULTS = { tasks: { desc: '', checklist: [], comments: [] }, clients: { notes: '' } }
+const PRIVATE = { task_private: ['tasks', 'taskId'], client_private: ['clients', 'clientId'], leave_private: ['leaves', 'leaveId'] }
+const DEFAULTS = { tasks: { desc: '', checklist: [], comments: [], ask: null, extensions: [] }, clients: { notes: '' }, leaves: { note: '', reply: '' } }
 const NEWEST_FIRST = new Set(['activity', 'notifications'])
 const camel = (k) => k.replace(/_(\w)/g, (_, c) => c.toUpperCase())
 const ISO = /^\d{4}-\d\d-\d\dT/
@@ -812,6 +1042,7 @@ function failed(error) {
 async function callPeople(body) {
   const { data, error } = await supabase.functions.invoke('people', { body })
   if (error) throw new Error((await error.context?.json?.().catch(() => null))?.error || friendly(error))
+  if (data.mailed === false) say(new Error('Added — but the welcome email didn’t go out. Share the login and temporary password with them yourself.'))
   return data.id
 }
 
@@ -852,6 +1083,9 @@ function flush() {
     // a freelancer put on a project: everything in it was out of sight until now, so load afresh
     if (freelancer && /^#\/projects\/[^/]+$/.test(link)) reload = true
   }
+  // a member's first task in a project they couldn't see until now (handed to them, or their department's): the
+  // project itself never arrives as a change, so load afresh to bring it in
+  if (!freelancer && d.tasks.some((t) => !d.projects.some((p) => p.id === t.projectId)) && byId(d.users, session?.userId)?.role === 'member') reload = true
   db = d
   emit()
   if (reload) return load().catch(say)

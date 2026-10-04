@@ -470,6 +470,12 @@ avatars ---------- */
 .t-deadline {
   --c: #475569;
 }
+.t-leave {
+  --c: #0d9488;
+}
+.t-ps-missed {
+  --c: #dc2626;
+}
 .t-post {
   --c: #db2777;
 }
@@ -1227,6 +1233,10 @@ button.row:hover {
   padding: 10px 12px;
   font-size: 13.5px;
 }
+.warn-box.bad {
+  background: var(--red-bg);
+  color: var(--red-ink);
+}
 .warn-box ul {
   list-style: disc;
   padding-left: 18px;
@@ -1597,6 +1607,40 @@ dialog.modal::backdrop {
   background: var(--blue-bg);
   border-radius: 10px;
   padding: 8px 10px;
+}
+.comments li.asked {
+  background: var(--amber-bg);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.ask-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--amber-bg);
+  font-size: 14px;
+}
+.check-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.check-field input {
+  margin-top: 3px;
+}
+.ask-box.compact {
+  margin: 0;
+  padding: 0;
+  background: none;
+}
+.ask-box input {
+  flex: 1 1 160px;
+  min-width: 0;
 }
 .comment-meta {
   display: flex;
@@ -2530,4 +2574,72 @@ p.composer {
 }
 .row-actions.end {
   justify-content: flex-end;
+}
+
+/* ---------- Home: most urgent first ---------- */
+.urgent-card {
+  margin-bottom: 18px;
+}
+.urgent-head {
+  padding: 14px 6px 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.urgent li:first-child .urgent-head {
+  padding-top: 0;
+}
+.urgent-head.is-late {
+  color: var(--red-ink);
+}
+.urgent .row {
+  flex-wrap: wrap;
+}
+.urgent-text {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.urgent-text:hover b {
+  text-decoration: underline;
+}
+.urgent .row-actions.end {
+  margin-left: auto;
+}
+.more-btn {
+  margin: 8px 6px 0;
+}
+
+/* ---------- content: report and make-ups ---------- */
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+td.num.late {
+  color: var(--red-ink);
+  font-weight: 800;
+}
+.owed-row {
+  flex-wrap: wrap;
+}
+.owed-row > .grow {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+/* ---------- leave ---------- */
+.leave-request {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+}
+.leave-request .row {
+  padding: 0 6px;
+}
+.leave-request input.grow {
+  flex: 1 1 180px;
+  min-width: 0;
 }

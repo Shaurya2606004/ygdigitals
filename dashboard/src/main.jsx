@@ -14,6 +14,7 @@ import Calendar, { EventForm } from './pages/Calendar.jsx'
 import Chat from './pages/Chat.jsx'
 import Content, { PostForm } from './pages/Content.jsx'
 import Home from './pages/Home.jsx'
+import Leave from './pages/Leave.jsx'
 import Projects, { ProjectForm } from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
 import Tasks, { TaskForm } from './pages/Tasks.jsx'
@@ -28,6 +29,7 @@ const NAV = [
   { id: 'tasks', label: 'Tasks', icon: 'check', show: isStaff, page: Tasks },
   { id: 'projects', label: 'Projects', icon: 'folder', show: () => true, page: Projects },
   { id: 'calendar', label: 'Calendar', icon: 'calendar', show: () => true, page: Calendar },
+  { id: 'leave', label: 'Leave', icon: 'sun', show: isStaff, page: Leave },
   { id: 'chat', label: 'Messages', icon: 'chat', show: () => true, page: Chat },
   { id: 'content', label: 'Content plan', icon: 'grid', show: (u) => u.role !== 'freelancer', page: Content },
   { id: 'settings', label: 'Settings', icon: 'sliders', show: () => true, page: Settings },
@@ -185,7 +187,7 @@ function Login() {
   )
 }
 
-function Shell({ me, signOut }) {
+export function Shell({ me, signOut }) {
   const d = useDb()
   const route = useRoute()
   const [theme, toggleTheme] = useTheme()
@@ -204,7 +206,8 @@ function Shell({ me, signOut }) {
   const Page = current && current.show(me) ? current.page : null
   const unreadChat = d.channels.filter((c) => can(me, 'channel.view', c)).reduce((s, c) => s + unread(d, me, c), 0)
   const myOpen = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const badge = { chat: unreadChat, tasks: myOpen }
+  const leaveAsks = me.role === 'admin' ? d.leaves.filter((l) => l.status === 'pending' && l.userId !== me.id).length : 0
+  const badge = { chat: unreadChat, tasks: myOpen, leave: leaveAsks }
   const client = byId(d.clients, me.clientId)
 
   return (
@@ -361,9 +364,16 @@ function Bell({ me }) {
             {mine.slice(0, 40).map((n) => (
               <li key={n.id}>
                 <a href={n.link || '#/'} className={`notif ${n.read ? '' : 'new'}`} onClick={() => readNotifications(me, [n.id])}>
-                  <Avatar user={byId(d.users, n.fromId)} size={30} />
+                  {n.fromId ? (
+                    <Avatar user={byId(d.users, n.fromId)} size={30} />
+                  ) : (
+                    <span className="av" style={{ '--c': '#e04c5c', '--s': '30px' }} aria-hidden="true">
+                      YG
+                    </span>
+                  )}
                   <span>
-                    <b>{userName(d, n.fromId)}</b> {n.text}
+                    {/* the morning reminders come from the hub itself */}
+                    <b>{n.fromId ? userName(d, n.fromId) : 'YG Hub:'}</b> {n.text}
                     <small>{ago(n.at)}</small>
                   </span>
                 </a>
@@ -376,8 +386,11 @@ function Bell({ me }) {
   )
 }
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// only the app page has #root (a test page can import Shell without starting the app)
+const root = document.getElementById('root')
+if (root)
+  createRoot(root).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, isStaff, PERMISSIONS, ROLES } from '../store.js'
+import { byId, can, DEPTS, isStaff, PERMISSIONS, PERSON_DEPTS, ROLES } from '../store.js'
 import { Avatar, Card, download, Empty, Err, Field, Icon, Modal, PageHead, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 
 export default function Settings({ args }) {
@@ -166,6 +166,7 @@ function Team() {
                 </td>
                 <td>
                   <span className="pill grey">{u.active ? ROLES[u.role].label : 'Deactivated'}</span>
+                  {u.dept && <small className="block muted">{PERSON_DEPTS[u.dept]}</small>}
                 </td>
                 <td className="small">
                   <a href={`mailto:${u.email}`}>{u.email}</a>
@@ -210,6 +211,7 @@ function Clients() {
   const d = useDb()
   const [form, setForm] = useState(null) // {client} to edit, {} for new
   const [login, setLogin] = useState(null) // {clientId, edit?, fill?}: a portal login to add or edit
+  const [deleting, setDeleting] = useState(null) // the client to delete
   const [err, setErr] = useState('')
   const admin = can(me, 'org.manage')
   return (
@@ -235,9 +237,14 @@ function Clients() {
                   {c.name} <small className="muted">· {[c.industry, c.city].filter(Boolean).join(' · ')}</small>
                 </h2>
                 {admin && (
-                  <button className="btn sm" onClick={() => setForm(c)}>
-                    Edit
-                  </button>
+                  <span className="row-actions">
+                    <button className="btn sm" onClick={() => setForm(c)}>
+                      Edit
+                    </button>
+                    <button className="btn sm danger" onClick={() => setDeleting(c)}>
+                      <Icon name="trash" size={14} /> Delete
+                    </button>
+                  </span>
                 )}
               </header>
               <p className="small muted">
@@ -291,7 +298,53 @@ function Clients() {
       </div>
       {form && <ClientForm edit={form.id ? form : null} onClose={() => setForm(null)} />}
       {login && <PersonForm {...login} onClose={() => setLogin(null)} />}
+      {deleting && <DeleteClient c={deleting} onClose={() => setDeleting(null)} />}
     </>
+  )
+}
+
+// deleting a client can't be undone, so say exactly what goes and ask for their name
+function DeleteClient({ c, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const { v, set, err, run } = useForm({ confirm: '' })
+  const pids = d.projects.filter((p) => p.clientId === c.id).map((p) => p.id)
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`
+  const goes = [
+    count(pids.length, 'project', 'projects'),
+    count(d.tasks.filter((t) => pids.includes(t.projectId)).length, 'task', 'tasks'),
+    count(d.deliverables.filter((x) => pids.includes(x.projectId)).length, 'piece of work for approval', 'pieces of work for approval'),
+    count(d.posts.filter((p) => p.clientId === c.id).length, 'content post', 'content posts'),
+    count(d.users.filter((u) => u.clientId === c.id).length, 'portal login', 'portal logins'),
+  ]
+  const match = v.confirm.trim().toLowerCase() === c.name.toLowerCase()
+  return (
+    <Modal title={`Delete ${c.name}?`} onClose={onClose}>
+      <form
+        className="form-grid one"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (run(() => S.deleteClient(me, c.id, v.confirm))) onClose()
+        }}
+      >
+        <p>
+          This deletes the client and everything of theirs: <b>{goes.join(', ')}</b>, and their project discussions. Meetings stay on the
+          calendar. <b>It can’t be undone.</b>
+        </p>
+        <Field label={`Type “${c.name}” to confirm`}>
+          <input data-autofocus value={v.confirm} onChange={set('confirm')} autoComplete="off" />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn danger" disabled={!match}>
+            <Icon name="trash" size={16} /> Delete forever
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -349,7 +402,7 @@ function Roles() {
 function PersonForm({ onClose, edit, clientId, fill }) {
   const me = useMe()
   const d = useDb()
-  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', ...(edit || { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '', ...fill }) })
+  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', dept: '', sendEmail: true, ...(edit || { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '', ...fill }) })
   return (
     <Modal title={edit ? `Edit ${edit.name}` : clientId ? `Login for ${byId(d.clients, clientId)?.name}` : 'Add a person'} onClose={onClose}>
       <form
@@ -378,6 +431,31 @@ function PersonForm({ onClose, edit, clientId, fill }) {
             </select>
           </Field>
         )}
+        {v.role !== 'client' && (
+          <Field
+            label="Department"
+            hint={
+              v.role === 'admin'
+                ? 'Admins see the whole studio whatever this says.'
+                : v.role === 'freelancer'
+                  ? 'Freelancers see only the projects they’re on; this is a label.'
+                  : v.dept === 'all'
+                    ? 'Sees the whole studio, like an admin, but can’t manage people or check work.'
+                    : v.dept
+                      ? `Sees ${PERSON_DEPTS[v.dept]} work, plus anything they own, made or lead.`
+                      : 'No department: sees only the work they own, made or lead.'
+            }
+          >
+            <select value={v.dept || ''} onChange={set('dept')}>
+              <option value="">None</option>
+              {Object.entries(v.role === 'member' ? PERSON_DEPTS : DEPTS).map(([k, l]) => (
+                <option key={k} value={k}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field label={v.role === 'client' ? 'Their role at the company' : 'What they do'}>
           <input value={v.title} onChange={set('title')} placeholder={v.role === 'client' ? 'e.g. Marketing Head' : 'e.g. Shoots & video editing'} />
         </Field>
@@ -387,11 +465,19 @@ function PersonForm({ onClose, edit, clientId, fill }) {
         {S.live && (
           <Field
             label={edit ? 'New password (optional)' : 'Temporary password'}
-            hint={edit ? 'Only if they forgot theirs. Share it with them; they can change it in Settings.' : 'At least 8 characters. Share it with them — they can change it in Settings › Profile.'}
+            hint={edit ? 'Only if they forgot theirs. Share it with them; they can change it in Settings.' : 'At least 8 characters. It goes in their welcome email (or share it yourself); they can change it in Settings › Profile.'}
             full
           >
             <input type="text" autoComplete="off" spellCheck={false} value={v.password} onChange={set('password')} />
           </Field>
+        )}
+        {S.live && !edit && (
+          <label className="check-field full">
+            <input type="checkbox" checked={v.sendEmail} onChange={set('sendEmail')} />
+            <span>
+              <b>Email them their login</b> — the sign-in link and this temporary password, from hub@ygdigitals.com.
+            </span>
+          </label>
         )}
         <Err msg={err} />
         <div className="form-actions">

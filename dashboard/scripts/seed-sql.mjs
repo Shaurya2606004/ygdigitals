@@ -13,7 +13,7 @@ const env = Object.fromEntries(
     .filter((l) => /^\w+=/.test(l))
     .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]),
 )
-const pw = env.DEMO_PASSWORD
+const pw = env.DEMO_PASSWORD || process.env.DEMO_PASSWORD
 if (!pw) throw new Error('Set DEMO_PASSWORD in .env.local first')
 
 const d = seed()
@@ -53,13 +53,14 @@ select id, id::text, jsonb_build_object('sub', id::text, 'email', email, 'email_
 ${rows('clients', ['id', 'name', 'industry', 'city', 'contact', 'email', 'created_at'],
   d.clients.map((c, i) => [str(c.id), str(c.name), str(c.industry), str(c.city), str(c.contact), str(`${c.id}@example.com`), `pg_temp.m(${60 * 24 * 30 - i})`]))}
 ${rows('client_private', ['client_id', 'notes'], d.clients.map((c) => [str(c.id), str(c.notes)]))}
-${rows('people', ['id', 'name', 'email', 'role', 'client_id', 'title', 'phone', 'color', 'created_at'],
-  d.users.map((x, i) => [u(x.id), str(x.name), str(`${x.id}@example.com`), str(x.role), x.clientId ? str(x.clientId) : 'null', str(x.title), str(x.phone), str(x.color), `pg_temp.m(${60 * 24 * 30 - i})`]))}
+${rows('people', ['id', 'name', 'email', 'role', 'client_id', 'title', 'phone', 'color', 'dept', 'created_at'],
+  d.users.map((x, i) => [u(x.id), str(x.name), str(`${x.id}@example.com`), str(x.role), x.clientId ? str(x.clientId) : 'null', str(x.title), str(x.phone), str(x.color), str(x.dept), `pg_temp.m(${60 * 24 * 30 - i})`]))}
 ${rows('projects', ['id', 'client_id', 'name', 'status', 'priority', 'start', 'due', 'manager_id', 'member_ids', 'brief', 'created_at'],
   d.projects.map((p) => [str(p.id), str(p.clientId), str(p.name), str(p.status), str(p.priority), day(p.start), day(p.due), u(p.managerId), us(p.memberIds), str(p.brief), day(p.createdAt)]))}
-${rows('tasks', ['id', 'project_id', 'assignee_id', 'status', 'priority', 'due', 'title', 'created_by', 'created_at', 'completed_at'],
-  d.tasks.map((t, i) => [str(t.id), str(t.projectId), u(t.assigneeId), str(t.status), str(t.priority), day(t.due), str(t.title), u(t.createdBy), `pg_temp.m(${60 * 24 * 12 - i})`, day(t.completedAt)]))}
-${rows('task_private', ['task_id', '"desc"', 'checklist', 'comments'], d.tasks.map((t) => [str(t.id), str(t.desc), `${str(JSON.stringify(t.checklist))}::jsonb`, people(t.comments)]))}
+${rows('tasks', ['id', 'project_id', 'assignee_id', 'status', 'priority', 'due', 'title', 'dept', 'repeat', 'created_by', 'created_at', 'completed_at'],
+  d.tasks.map((t, i) => [str(t.id), str(t.projectId), u(t.assigneeId), str(t.status), str(t.priority), day(t.due), str(t.title), str(t.dept), str(t.repeat), u(t.createdBy), `pg_temp.m(${60 * 24 * 12 - i})`, day(t.completedAt)]))}
+${rows('task_private', ['task_id', '"desc"', 'checklist', 'comments', 'ask'], d.tasks.map((t) => [str(t.id), str(t.desc), `${str(JSON.stringify(t.checklist))}::jsonb`, people(t.comments),
+  t.ask ? `jsonb_build_object('due', ${day(t.ask.due)}, 'reason', ${str(t.ask.reason)}, 'by', ${u(t.ask.by)}, 'at', private.iso(${at(t.ask.at)}))` : 'null']))}
 ${rows('deliverables', ['id', 'project_id', 'title', 'type', 'link', 'version', 'status', 'sent', 'submitted_by', 'history', 'created_at'],
   d.deliverables.map((x) => [str(x.id), str(x.projectId), str(x.title), str(x.type), str(x.link), x.version, str(x.status), x.sent, u(x.submittedBy), people(x.history), at(x.history[0].at)]))}
 ${rows('events', ['id', 'title', 'type', 'date', 'start', '"end"', 'repeat', 'attendee_ids', 'location', 'agenda', 'project_id', 'created_by', 'rsvp'],
@@ -70,8 +71,13 @@ ${rows('channels', ['id', 'type', 'name', 'project_id', 'member_ids', 'read_only
 ${rows('messages', ['id', 'channel_id', 'user_id', 'text', 'at'], d.messages.map((m) => [str(m.id), ch(m.channelId), u(m.userId), str(m.text), at(m.at)]))}
 -- everyone has read everything older than six hours
 insert into public.reads (user_id, channel_id, at) select p.id, c.id, pg_temp.m(360) from public.people p cross join public.channels c;
-${rows('posts', ['id', 'client_id', 'date', 'time', 'platform', 'format', 'title', 'status', 'assignee_id', 'caption'],
-  d.posts.map((s) => [str(s.id), str(s.clientId), day(s.date), str(s.time), str(s.platform), str(s.format), str(s.title), str(s.status), u(s.assigneeId), str(s.caption)]))}
+${rows('posts', ['id', 'client_id', 'date', 'time', 'platform', 'format', 'title', 'status', 'assignee_id', 'caption', 'dept'],
+  d.posts.map((s) => [str(s.id), str(s.clientId), day(s.date), str(s.time), str(s.platform), str(s.format), str(s.title), str(s.status), u(s.assigneeId), str(s.caption), str(s.dept)]))}
+${rows('leaves', ['id', 'user_id', 'start', '"end"', 'status', 'decided_by', 'created_at'],
+  d.leaves.map((l) => [str(l.id), u(l.userId), day(l.start), day(l.end), str(l.status), u(l.decidedBy), at(l.createdAt)]))}
+${rows('leave_private', ['leave_id', 'note', 'reply'], d.leaves.map((l) => [str(l.id), str(l.note), str(l.reply)]))}
+${rows('compensations', ['id', 'client_id', 'post_id', 'missed', 'offer', 'due', 'owner_id', 'status', 'shared', 'created_by', 'created_at'],
+  d.compensations.map((c) => [str(c.id), str(c.clientId), c.postId ? str(c.postId) : 'null', str(c.missed), str(c.offer), day(c.due), u(c.ownerId), str(c.status), c.shared, u(c.createdBy), at(c.createdAt)]))}
 ${rows('activity', ['id', 'user_id', 'text', 'link', 'at'], d.activity.map((a) => [str(a.id), u(a.userId), str(a.text), link(a.link), at(a.at)]))}
 ${rows('notifications', ['id', 'user_id', 'from_id', 'text', 'link', 'at', 'read'],
   d.notifications.map((n) => [str(n.id), u(n.userId), u(n.fromId), str(n.text), link(n.link), at(n.at), n.read]))}

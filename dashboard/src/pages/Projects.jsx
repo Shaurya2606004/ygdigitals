@@ -72,6 +72,7 @@ function ProjectList() {
                   <Status s={p.status} label={PROJECT_STATUS[p.status]} />
                   {p.priority !== 'normal' && <Status s={p.priority} label={PRIORITY[p.priority]} />}
                   <span className="grow" />
+                  {p.ongoing && p.status !== 'done' && <span className="pill violet">Ongoing</span>}
                   {p.due && <span className={`due ${p.status !== 'done' && p.due < today() ? 'late' : ''}`}>{p.status === 'done' ? `Delivered ${fmtDay(p.due)}` : relDay(p.due)}</span>}
                 </span>
                 <h3>{p.name}</h3>
@@ -131,7 +132,7 @@ function ProjectPage({ id, tab }) {
       </a>
       <PageHead
         title={p.name}
-        sub={`${byId(d.clients, p.clientId)?.name} · ${p.start ? `${fmtDay(p.start)} → ` : ''}${fmtDay(p.due)} · Lead: ${S.userName(d, p.managerId)}`}
+        sub={`${byId(d.clients, p.clientId)?.name} · ${p.ongoing ? `Ongoing${p.start ? ` since ${fmtDay(p.start)}` : ''}` : `${p.start ? `${fmtDay(p.start)} → ` : ''}${fmtDay(p.due)}`} · Lead: ${S.userName(d, p.managerId)}`}
       >
         {editable ? (
           <select
@@ -205,7 +206,7 @@ function Overview({ p }) {
           </div>
           <div className="kpi">
             <span className="kpi-label">Due</span>
-            <span className="kpi-value">{p.status === 'done' ? 'Done' : relDay(p.due)}</span>
+            <span className="kpi-value">{p.status === 'done' ? 'Done' : p.ongoing ? 'Ongoing' : p.due ? relDay(p.due) : '—'}</span>
           </div>
         </div>
         <Card title="Brief">
@@ -301,7 +302,7 @@ function ProjectTasks({ p }) {
     <>
       <div className="toolbar">
         <p className="muted">Drag cards between columns. The client sees these titles, owners and dates (not comments) in their Plan tab.</p>
-        {can(me, 'task.edit') && p.status !== 'done' && (
+        {can(me, 'task.create', { projectId: p.id }) && p.status !== 'done' && (
           <button className="btn primary" onClick={() => setAdding(true)}>
             <Icon name="plus" /> Add task
           </button>
@@ -372,7 +373,7 @@ function Deliverables({ p }) {
     <>
       <div className="toolbar">
         <p className="muted">{staffer ? 'Work goes: submitted → Admin checks and sends it to the client → client approves or asks for changes.' : 'Open each file, then approve it or tell the team what to change.'}</p>
-        {can(me, 'deliverable.submit') && (
+        {can(me, 'deliverable.submit', { projectId: p.id }) && (
           <button className="btn primary" onClick={() => setSubmitting({})}>
             <Icon name="plus" /> Submit work
           </button>
@@ -592,9 +593,17 @@ export function ProjectForm({ onClose, edit, initial = {} }) {
         <Field label="Start">
           <input type="date" value={v.start} onChange={set('start')} />
         </Field>
-        <Field label="Due">
-          <input type="date" value={v.due} onChange={set('due')} />
-        </Field>
+        {!v.ongoing && (
+          <Field label="Due">
+            <input type="date" value={v.due || ''} onChange={set('due')} />
+          </Field>
+        )}
+        <label className="check-field full">
+          <input type="checkbox" checked={Boolean(v.ongoing)} onChange={set('ongoing')} />
+          <span>
+            <b>Ongoing</b> — a retainer or monthly work with no end date. Use repeating tasks for the regular work.
+          </span>
+        </label>
         <Field label="Brief" hint="The client can read this." full>
           <textarea rows={4} value={v.brief} onChange={set('brief')} placeholder="Goal, deliverables, tone, references, deadlines that can’t move…" />
         </Field>

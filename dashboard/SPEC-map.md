@@ -1,0 +1,51 @@
+# YG Hub — next round (capability map)
+
+Requested 2026-10-04. Each module ships and is tested on its own, in the build order below.
+Every rule is enforced on the server (Supabase RLS + the action functions), the same way the hub works today.
+
+| Module id | What it does | Depends on |
+|---|---|---|
+| delete-client | Admin can delete a client (see decision D4) | — |
+| departments | Each person and each task/project/post gets a department (Video, Design, Social, Website, Packaging, Office). People see their own department's work plus anything handed to them; admins see everything (decision D1) | — |
+| overdue | Overdue work has to be resolved, not ignored (proposal below) | departments |
+| urgent-home | Home opens on one list, most urgent first: overdue → due today → waiting on you → due this week. Everything else comes below it, filtered to your department | departments, overdue |
+| leave | Apply for leave; the admin approves. Work due on leave days must be finished early or handed off before approval. Approved leave shows on the calendar, and nobody gets an overdue mark for those days | overdue |
+| email | Real email: a welcome mail with the login link when someone is added (decision D3) | — |
+| reminders | Daily morning email per person: overdue, due today, waiting for your check. Overdue escalates to the admins after 2 days | email, overdue, leave |
+| recurring | Ongoing / retainer projects with no end date, plus repeating tasks (weekly or monthly): finishing one creates the next | departments |
+| excel-import | Upload the content-calendar .xlsx and it becomes posts on the Content page, with a preview before saving | departments |
+| marks | One clear mark on every piece of work (task, post, deliverable): Due, Overdue, Done or Delivered, Undelivered. Marking a client post or deliverable Undelivered opens a compensation owed to that client | overdue |
+| compensation | Per-client list of what we owe for work promised and not delivered, e.g. "1 extra reel for the missed 12 Oct reel". Each has what we'll give, by when, and an owner, tracked until it's given. Admins and the owner see it, and the client sees it once the admin shares it | marks |
+
+Build order: delete-client → departments → overdue → urgent-home → leave → email → reminders → recurring → excel-import → marks → compensation
+
+## Overdue resolution (proposal)
+1. When a due date passes, the task turns red and goes to the top of the owner's Home with three buttons:
+   - **Done**
+   - **Need more time**: pick a new date and give a reason; it goes to the admin to approve
+   - **Hand off**: pass it to someone else with a note
+2. The owner gets an email that morning. If it's still unresolved 2 days later, the admins get an email too.
+3. Every overdue item is recorded against the person: how many days late, and whether the extension was approved. That record feeds `marks`.
+4. Days on approved leave never count as late.
+
+## Decisions (user, 2026-10-04)
+- D1 Visibility: **hard block**, enforced on the server.
+  - Admins, and anyone in the "All" department (Yukti, PA), see everything.
+  - A member sees their department's work, plus anything they're assigned, created, lead or are on.
+  - Social sees every content post, because they caption and publish all of them.
+  - Freelancers keep today's rule.
+  - The activity log becomes admin-only.
+  - Members see only the meetings they're invited to.
+- D2 Marks = the delivery status of every piece of work. Compensation = what we owe clients for undelivered posts, reels and other work. It is not a staff score or pay.
+- D3 Email from **hub@ygdigitals.com** via Resend. This needs DNS records added in Cloudflare.
+- D4 Delete client = **delete everything**: projects, tasks, posts, deliverables, project chats and client logins. You confirm by typing the client's name.
+
+## Boundaries
+- Always: server-side checks for every rule, tests for store logic, and a browser check at real size before saying done.
+- Ask first: new dependencies (SheetJS for .xlsx), DNS changes in Cloudflare, anything that emails real people.
+- Never: commit secrets, email clients without the admin turning it on, or delete data without a confirmation step.
+
+## Success criteria
+- Each module: `npm test` passes, the server access checks pass, and it is verified in the browser as admin, member and freelancer.
+- A member in Video sees only Video work plus their own tasks (if D1 = hard).
+- An overdue task can't sit unresolved for more than 2 days without the admins being emailed.

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { byId, getDb, subscribe } from './store.js'
+import { byId, getDb, MARKS, subscribe } from './store.js'
 import { initials } from './util.js'
 
 export const useDb = () => useSyncExternalStore(subscribe, getDb)
@@ -74,10 +74,13 @@ const TONES = {
   idea: 'grey', production: 'blue', ready: 'amber', scheduled: 'violet', posted: 'green',
   draft: 'grey', sent: 'blue', paid: 'green', overdue: 'red',
   pending: 'amber', declined: 'red',
+  missed: 'red', due: 'grey', today: 'amber', late: 'amber', delivered: 'green', undelivered: 'red',
   low: 'grey', normal: 'grey', high: 'amber', urgent: 'red',
 }
 export const Pill = ({ tone = 'grey', children }) => <span className={`pill ${tone}`}>{children}</span>
 export const Status = ({ s, label }) => <Pill tone={TONES[s]}>{label}</Pill>
+// where a task or post stands against its date (taskMark / postMark in the store)
+export const Mark = ({ m }) => (m ? <Status s={m} label={MARKS[m]} /> : null)
 
 export const Bar = ({ pct, label }) => (
   <span className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>

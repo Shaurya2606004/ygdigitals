@@ -83,13 +83,15 @@ begin
   select count(*) into n from public.notifications where text like 'wrote in #Diwali Festive Campaign%';
   out := out || format(E'\n%s client message pings the lead + admin (2): %s', case when n = 2 then '✓' else '✗' end, n);
 
-  /* ---------- Priya: team member, leads the Diwali project ---------- */
+  /* ---------- Priya: social media, leads the Diwali and GV monthly projects ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:priya')::uuid, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   select count(*) into n from public.tasks;
-  out := out || format(E'\n%s member sees every task (33): %s', case when n = 33 then '✓' else '✗' end, n);
+  out := out || format(E'\n%s member sees the projects they lead, plus their department''s work elsewhere (16): %s', case when n = 16 then '✓' else '✗' end, n);
   select count(*) into n from public.channels;
-  out := out || format(E'\n%s member sees team + project channels + own DM (10): %s', case when n = 10 then '✓' else '✗' end, n);
+  out := out || format(E'\n%s member sees team channels + their projects'' channels + own DM (7): %s', case when n = 7 then '✓' else '✗' end, n);
+  select count(*) into n from public.posts;
+  out := out || format(E'\n%s social media sees every post (12): %s', case when n = 12 then '✓' else '✗' end, n);
   begin
     perform public.save_project('{"name":"New","clientId":"desi"}');
     out := out || E'\n✗ member created a project';
@@ -138,7 +140,58 @@ begin
   perform set_config('role', 'authenticated', true);
   select count(*) into n from public.channels where type = 'dm';
   out := out || format(E'\n%s DMs stay between the two people: %s', case when n = 0 then '✓' else '✗' end, n);
+
+  /* ---------- departments: Vikas does video ---------- */
+  select count(*) into n from public.tasks;
+  out := out || format(E'\n%s video sees video work, their own and the project they lead (8 tasks): %s', case when n = 8 then '✓' else '✗' end, n);
+  select count(*) into n from public.tasks t where t.dept <> 'video' and t.assignee_id is distinct from md5('yg-sample:vikas')::uuid
+    and t.project_id <> 'p-gv-reels';
+  out := out || format(E'\n%s …and no other department''s tasks: %s', case when n = 0 then '✓' else '✗' end, n);
+  select string_agg(id, ',' order by id) into s from public.projects;
+  out := out || format(E'\n%s sees only the projects they work in: %s', case when s = 'p-diwali,p-gv-month,p-gv-reels,p-steel-web' then '✓' else '✗' end, s);
+  select string_agg(id, ',' order by id) into s from public.posts;
+  out := out || format(E'\n%s sees video posts and their own: %s', case when s = 's1,s11,s4,s5,s8' then '✓' else '✗' end, s);
+  select string_agg(id, ',' order by id) into s from public.deliverables;
+  out := out || format(E'\n%s sees only video work for approval: %s', case when s = 'd2' then '✓' else '✗' end, s);
+  select (select count(*) from public.activity) + (select count(*) from public.events
+    where not (md5('yg-sample:vikas')::uuid = any (attendee_ids) or created_by = md5('yg-sample:vikas')::uuid)) into n;
+  out := out || format(E'\n%s no studio activity log, only meetings they''re in: %s', case when n = 0 then '✓' else '✗' end, n);
+  select string_agg(id, ',' order by id) into s from public.clients;
+  out := out || format(E'\n%s sees only the clients they work for: %s', case when s = 'desi,glow,greenvalley,steel' then '✓' else '✗' end, s);
+  select count(*) into n from public.channels where type = 'project' and project_id = 'p-glow-mkt';
+  out := out || format(E'\n%s no discussions of projects they don''t work in: %s', case when n = 0 then '✓' else '✗' end, n);
+  begin
+    perform public.handoff(json_build_object('id', 't5', 'toId', md5('yg-sample:vikas')::uuid)::jsonb);
+    out := out || E'\n✗ video took over a design task';
+  exception when others then
+    out := out || format(E'\n✓ can''t touch another department''s task (%s)', sqlerrm);
+  end;
+  begin
+    perform public.comment_task('{"id":"t5","text":"hi"}');
+    out := out || E'\n✗ video commented on a design task';
+  exception when others then
+    out := out || format(E'\n✓ …nor comment on it (%s)', sqlerrm);
+  end;
+  begin
+    perform public.save_task('{"projectId":"p-glow-mkt","title":"Sneaky"}');
+    out := out || E'\n✗ video added a task to a project they don''t work in';
+  exception when others then
+    out := out || format(E'\n✓ can''t add tasks to projects they don''t work in (%s)', sqlerrm);
+  end;
+  perform public.save_task(json_build_object('id', 't-dept', 'projectId', 'p-diwali', 'title', 'End card for Reel 1', 'dept', 'design',
+    'assigneeId', md5('yg-sample:ritika')::uuid)::jsonb);
+  select count(*) into n from public.tasks where id = 't-dept';
+  out := out || format(E'\n%s can ask another department for work and still follow it: %s', case when n = 1 then '✓' else '✗' end, n);
   perform set_config('role', 'none', true);
+
+  /* ---------- the "All" department (the PA) sees the whole studio ---------- */
+  update public.people set dept = 'all' where id = md5('yg-sample:arjun')::uuid;
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:arjun')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  select (select count(*) from public.tasks) * 100 + (select count(*) from public.posts) into n;
+  out := out || format(E'\n%s "All" sees every task and post (34 tasks, 12 posts): %s', case when n = 3412 then '✓' else '✗' end, n);
+  perform set_config('role', 'none', true);
+  update public.people set dept = 'website' where id = md5('yg-sample:arjun')::uuid;
 
   /* ---------- Aman: admin ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
@@ -290,7 +343,7 @@ begin
     out := out || format(E'\n✓ …nor submit work to them (%s)', sqlerrm);
   end;
   perform public.save_task('{"id":"t-free","projectId":"p-desi-pack","title":"Dieline v2"}');
-  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:priya')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
   perform public.handoff(json_build_object('id', steel, 'toId', fl, 'note', 'Need icons')::jsonb);
   perform set_config('request.jwt.claims', json_build_object('sub', fl, 'role', 'authenticated')::text, true);
   perform public.comment_task(json_build_object('id', steel, 'text', 'On it')::jsonb);
@@ -298,6 +351,32 @@ begin
   out := out || format(E'\n%s works in own projects + on a task handed to them, without seeing that other project: %s', case when n = 20 then '✓' else '✗' end, n);
   perform set_config('role', 'none', true);
   update public.people set role = 'member' where id = fl;
+
+  /* ---------- deleting a client takes everything of theirs with it ---------- */
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:priya')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform public.delete_client('{"id":"glow","confirm":"Glow Herbals"}');
+    out := out || E'\n✗ member deleted a client';
+  exception when others then
+    out := out || format(E'\n✓ only the admin deletes clients (%s)', sqlerrm);
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  begin
+    perform public.delete_client('{"id":"glow","confirm":"Glow"}');
+    out := out || E'\n✗ deleted without the exact name';
+  exception when others then
+    out := out || format(E'\n✓ needs the client''s exact name (%s)', sqlerrm);
+  end;
+  perform public.delete_client('{"id":"glow","confirm":"  glow herbals "}');
+  perform set_config('role', 'none', true);
+  select (select count(*) from public.clients where id = 'glow') + (select count(*) from public.projects where client_id = 'glow')
+    + (select count(*) from public.tasks where project_id = 'p-glow-mkt') + (select count(*) from public.posts where client_id = 'glow')
+    + (select count(*) from public.channels where id = 'ch-p-glow-mkt') + (select count(*) from public.people where client_id = 'glow')
+    + (select count(*) from auth.users where id = md5('yg-sample:ishita')::uuid) into n;
+  out := out || format(E'\n%s client, projects, tasks, posts, chat and logins all gone: %s left', case when n = 0 then '✓' else '✗' end, n);
+  select project_id is null into ok from public.events where id = 'e10';
+  out := out || format(E'\n%s their meetings stay on the calendar, unlinked', case when ok then '✓' else '✗' end);
 
   /* ---------- logged out / deactivated ---------- */
   perform set_config('role', 'anon', true);

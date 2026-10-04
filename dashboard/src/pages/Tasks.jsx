@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, isOverdue, PRIORITY, staff, TASK_STATUS } from '../store.js'
-import { Avatar, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
+import { byId, can, DEPTS, isOverdue, PRIORITY, REPEATS, seesAll, setsDue, staff, TASK_STATUS, taskMark } from '../store.js'
+import { Avatar, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, ago, fmtDay, relDay, today } from '../util.js'
 
+// a finished task shows whether it was on time; an open one, when it's due
 export const DueChip = ({ t }) =>
-  t.due ? (
+  t.status === 'done' ? (
+    <Mark m={taskMark(t)} />
+  ) : t.due ? (
     <span className={`due ${isOverdue(t) ? 'late' : t.due === today() && t.status !== 'done' ? 'soon' : ''}`}>
       <Icon name="clock" size={13} />
       {isOverdue(t) ? `Overdue · ${fmtDay(t.due)}` : relDay(t.due)}
@@ -133,7 +136,7 @@ export default function Tasks({ args }) {
   const sorted = [...tasks].sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9'))
   return (
     <div className="page">
-      <PageHead title="Tasks" sub="Everything the studio is working on. Drag a card to change its status; use Hand off to pass work on.">
+      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. Drag a card to change its status; use Hand off to pass work on.`}>
         <button className="btn primary" onClick={() => setAdding(true)}>
           <Icon name="plus" /> New task
         </button>
@@ -145,7 +148,7 @@ export default function Tasks({ args }) {
           onChange={setScope}
           tabs={[
             ['mine', 'My tasks', mine],
-            ['all', 'Everyone'],
+            ['all', seesAll(me) ? 'Everyone' : DEPTS[me.dept] ? `${DEPTS[me.dept]} team` : 'Shared with me'],
           ]}
         />
         <div className="filters">
@@ -241,8 +244,13 @@ function TaskTable({ tasks }) {
 export function TaskForm({ onClose, initial = {} }) {
   const me = useMe()
   const d = useDb()
-  const projects = d.projects.filter((p) => p.status !== 'done')
-  const { v, set, err, run } = useForm({ title: '', projectId: projects[0]?.id ?? '', assigneeId: me.id, priority: 'normal', due: '', desc: '', checklist: '', status: 'todo', ...initial })
+  const projects = d.projects.filter((p) => p.status !== 'done' && can(me, 'task.create', { projectId: p.id }))
+  const { v, set, setV, err, run } = useForm({ title: '', projectId: projects[0]?.id ?? '', assigneeId: me.id, dept: me.dept === 'all' ? '' : me.dept || '', priority: 'normal', repeat: 'none', due: '', desc: '', checklist: '', status: 'todo', ...initial })
+  // the work usually belongs to whoever does it
+  const pickOwner = (e) => {
+    const dept = byId(d.users, e.target.value)?.dept
+    setV((s) => ({ ...s, assigneeId: e.target.value, dept: dept && dept !== 'all' && DEPTS[dept] ? dept : s.dept }))
+  }
   const submit = (e) => {
     e.preventDefault()
     const checklist = v.checklist
@@ -268,12 +276,15 @@ export function TaskForm({ onClose, initial = {} }) {
           </select>
         </Field>
         <Field label="Owner">
-          <select value={v.assigneeId || ''} onChange={set('assigneeId')}>
+          <select value={v.assigneeId || ''} onChange={pickOwner}>
             <option value="">No owner yet</option>
             <PeopleOptions users={staff(d)} />
           </select>
         </Field>
-        <Field label="Due">
+        <Field label="Department" hint="Everyone in it can see this task.">
+          <DeptSelect value={v.dept} onChange={set('dept')} />
+        </Field>
+        <Field label="Due" hint={v.assigneeId && v.due && S.isAway(d, v.assigneeId, v.due) ? `${S.userName(d, v.assigneeId).split(' ')[0]} is on leave that day.` : ''}>
           <input type="date" value={v.due} onChange={set('due')} />
         </Field>
         <Field label="Priority">
@@ -284,6 +295,9 @@ export function TaskForm({ onClose, initial = {} }) {
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="Repeats" hint={v.repeat !== 'none' ? 'Finishing it makes the next one, due a week or a month later.' : ''}>
+          <RepeatSelect value={v.repeat} onChange={set('repeat')} />
         </Field>
         <Field label="Details" full>
           <textarea rows={3} value={v.desc} onChange={set('desc')} placeholder="Brief, links, references…" />
@@ -303,12 +317,34 @@ export function TaskForm({ onClose, initial = {} }) {
   )
 }
 
+export const DeptSelect = ({ value, onChange, disabled, label }) => (
+  <select value={value || ''} onChange={onChange} disabled={disabled} aria-label={label}>
+    <option value="">No department</option>
+    {Object.entries(DEPTS).map(([k, l]) => (
+      <option key={k} value={k}>
+        {l}
+      </option>
+    ))}
+  </select>
+)
+
+const RepeatSelect = ({ value, onChange, disabled }) => (
+  <select value={value || 'none'} onChange={onChange} disabled={disabled} aria-label="Repeats">
+    {Object.entries(REPEATS).map(([k, l]) => (
+      <option key={k} value={k}>
+        {l}
+      </option>
+    ))}
+  </select>
+)
+
 export function TaskModal({ id, onClose }) {
   const me = useMe()
   const d = useDb()
   const t = byId(d.tasks, id)
   const [err, setErr] = useState('')
   const [handing, setHanding] = useState(false)
+  const [asking, setAsking] = useState(false)
   const [comment, setComment] = useState('')
   const [item, setItem] = useState('')
   if (!t) return null
@@ -335,6 +371,7 @@ export function TaskModal({ id, onClose }) {
             <h3 className="title-static">{t.title}</h3>
           )}
           <Err msg={err} />
+          {t.ask && <TimeAsk t={t} />}
           <h4>Details</h4>
           {editable ? (
             <textarea rows={4} defaultValue={t.desc} aria-label="Details" placeholder="Add a brief, links, references…" onBlur={(e) => e.target.value !== t.desc && save({ desc: e.target.value })} />
@@ -381,11 +418,12 @@ export function TaskModal({ id, onClose }) {
           <h4>Comments & handoffs</h4>
           <ul className="comments">
             {t.comments.map((c) => (
-              <li key={c.id} className={c.handoff ? 'handoff' : ''}>
+              <li key={c.id} className={c.handoff ? 'handoff' : c.ask ? 'asked' : ''}>
                 <Avatar user={byId(d.users, c.userId)} size={28} />
                 <div>
                   <p className="comment-meta">
-                    <b>{S.userName(d, c.userId)}</b> {c.handoff && <span className="pill blue">Handed off: {c.handoff}</span>} <small className="muted">{ago(c.at)}</small>
+                    <b>{S.userName(d, c.userId)}</b> {c.handoff && <span className="pill blue">Handed off: {c.handoff}</span>}
+                    {c.ask && <span className="pill amber">{c.ask}</span>} <small className="muted">{ago(c.at)}</small>
                   </p>
                   {c.text && (
                     <p className="prewrap">
@@ -435,6 +473,10 @@ export function TaskModal({ id, onClose }) {
                 </button>
               )}
             </dd>
+            <dt>Department</dt>
+            <dd>
+              <DeptSelect value={t.dept} disabled={!editable} onChange={(e) => save({ dept: e.target.value })} label="Department" />
+            </dd>
             <dt>Project</dt>
             <dd>
               <a href={`#/projects/${p?.id}`}>{p?.name}</a>
@@ -451,9 +493,17 @@ export function TaskModal({ id, onClose }) {
               </select>
             </dd>
             <dt>Due</dt>
+            <dd className="stack">
+              {editable && setsDue(me, t) ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
+              {t.assigneeId === me.id && t.status !== 'done' && !t.ask && !setsDue(me, t) && (
+                <button className="btn sm" onClick={() => setAsking(true)}>
+                  <Icon name="clock" size={14} /> Need more time
+                </button>
+              )}
+            </dd>
+            <dt>Repeats</dt>
             <dd>
-              {editable ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
-              {isOverdue(t) && <small className="late block">Overdue</small>}
+              <RepeatSelect value={t.repeat} disabled={!editable || t.status === 'done'} onChange={(e) => save({ repeat: e.target.value })} />
             </dd>
             <dt>Created</dt>
             <dd className="muted">
@@ -473,11 +523,87 @@ export function TaskModal({ id, onClose }) {
         </aside>
       </div>
       {handing && <HandoffForm t={t} onClose={() => setHanding(false)} />}
+      {asking && <AskTimeForm t={t} onClose={() => setAsking(false)} />}
     </Modal>
   )
 }
 
-function HandoffForm({ t, onClose }) {
+// a pending "need more time": who asked, until when and why — and, for whoever decides, the two answers
+export function TimeAsk({ t, compact }) {
+  const me = useMe()
+  const d = useDb()
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState('')
+  const decide = (ok) => {
+    try {
+      S.decideTime(me, t.id, ok, note)
+      setErr('')
+    } catch (x) {
+      setErr(x.message)
+    }
+  }
+  const mine = S.canDecideTime(me, t)
+  return (
+    <div className={`ask-box ${compact ? 'compact' : ''}`}>
+      {!compact && (
+        <p>
+          <b>{S.userName(d, t.ask.by).split(' ')[0]}</b> asked for more time, until <b>{fmtDay(t.ask.due)}</b>: {t.ask.reason}
+          {!mine && <span className="muted"> · waiting for an answer</span>}
+        </p>
+      )}
+      {mine && (
+        <div className="row-actions">
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note for them" />
+          <button className="btn sm" onClick={() => decide(false)}>
+            Keep the date
+          </button>
+          <button className="btn sm primary" onClick={() => decide(true)}>
+            Give until {fmtDay(t.ask.due)}
+          </button>
+        </div>
+      )}
+      <Err msg={err} />
+    </div>
+  )
+}
+
+export function AskTimeForm({ t, onClose }) {
+  const me = useMe()
+  const { v, set, err, run } = useForm({ due: addDays(t.due && t.due > today() ? t.due : today(), 1), reason: '' })
+  return (
+    <Modal title="Need more time" onClose={onClose}>
+      <form
+        className="form-grid one"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (run(() => S.askTime(me, t.id, v.due, v.reason))) onClose()
+        }}
+      >
+        <p className="muted">
+          “{t.title}” {isOverdue(t) ? `was due ${fmtDay(t.due)}` : t.due ? `is due ${fmtDay(t.due)}` : 'has no date'}. Ask for a new date — the admin or whoever gave you this
+          task decides, and every extension stays on the task.
+        </p>
+        <Field label="New date">
+          <input type="date" data-autofocus min={today()} value={v.due} onChange={set('due')} />
+        </Field>
+        <Field label="Why">
+          <textarea rows={3} value={v.reason} onChange={set('reason')} placeholder="What’s holding it up, and what you’ve done so far" />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary">
+            <Icon name="clock" size={16} /> Ask for more time
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+export function HandoffForm({ t, onClose }) {
   const me = useMe()
   const d = useDb()
   const people = staff(d).filter((u) => u.id !== t.assigneeId)
