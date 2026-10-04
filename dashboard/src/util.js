@@ -15,7 +15,7 @@ export const clockNow = () => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 export const nowIso = () => new Date().toISOString()
-export const uid = () => Math.random().toString(36).slice(2, 10)
+export const uid = () => crypto.randomUUID()
 export const overlaps = (a0, a1, b0, b1) => a0 < b1 && b0 < a1
 export const daysBetween = (a, b) => Math.round((parseDay(b) - parseDay(a)) / 864e5)
 

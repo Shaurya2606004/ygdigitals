@@ -3,9 +3,11 @@ import '@fontsource/manrope/600.css'
 import '@fontsource/manrope/700.css'
 import '@fontsource/unbounded/700.css'
 import './styles.css'
-import { StrictMode, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import * as S from './store.js'
 import { byId, can, isStaff, readNotifications, ROLES, unread, userName } from './store.js'
+import { seed } from './seed.js'
 import { Avatar, Empty, Icon, MeCtx, Menu, useDb } from './ui.jsx'
 import { ago } from './util.js'
 import Calendar, { EventForm } from './pages/Calendar.jsx'
@@ -16,26 +18,10 @@ import Projects, { ProjectForm } from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
 import Tasks, { TaskForm } from './pages/Tasks.jsx'
 
-// demo sign-in: every sample account shares this password. Real logins arrive with Supabase Auth.
-const DEMO_PASSWORD = 'yghub'
-const SESSION = 'yg-hub-session' // per tab, so two tabs can be two different people
-const session = {
-  get: () => {
-    try {
-      return sessionStorage.getItem(SESSION)
-    } catch {
-      return null
-    }
-  },
-  set: (id) => {
-    try {
-      if (id) sessionStorage.setItem(SESSION, id)
-      else sessionStorage.removeItem(SESSION)
-    } catch {
-      /* private mode: stays signed in for this page load only */
-    }
-  },
-}
+// dev only: one-click sign-in as any sample account (loaded by scripts/seed-sql.mjs with this password).
+// Production builds define it as '' (vite.config.js), which drops the buttons and the sample list entirely.
+const DEMO_PASSWORD = __DEMO_PASSWORD__
+const DEMO = DEMO_PASSWORD ? seed() : null
 
 const NAV = [
   { id: 'home', label: 'Home', icon: 'home', show: () => true, page: Home },
@@ -43,7 +29,7 @@ const NAV = [
   { id: 'projects', label: 'Projects', icon: 'folder', show: () => true, page: Projects },
   { id: 'calendar', label: 'Calendar', icon: 'calendar', show: () => true, page: Calendar },
   { id: 'chat', label: 'Messages', icon: 'chat', show: () => true, page: Chat },
-  { id: 'content', label: 'Content plan', icon: 'grid', show: () => true, page: Content },
+  { id: 'content', label: 'Content plan', icon: 'grid', show: (u) => u.role !== 'freelancer', page: Content },
   { id: 'settings', label: 'Settings', icon: 'sliders', show: () => true, page: Settings },
 ]
 
@@ -78,36 +64,66 @@ function useTheme() {
 
 function App() {
   const d = useDb()
-  const [meId, setMeId] = useState(session.get)
-  const me = meId && byId(d.users, meId)
-  const signIn = (id) => {
-    session.set(id)
-    setMeId(id)
-  }
-  if (!me?.active) return <Login onSignIn={signIn} />
+  const session = S.getSession()
+  if (!S.live) return <Splash text="YG Hub isn’t connected yet: copy dashboard/.env.example to .env.local and fill it in." />
+  if (session === undefined) return <Splash />
+  if (!session) return <Login />
+  if (!S.isLoaded()) return <Splash error={S.getNotice()} />
+  const me = byId(d.users, session.userId)
+  if (!me?.active) return <Splash error="This login has no access to YG Hub any more. Ask your admin." />
   return (
     <MeCtx.Provider value={me.id}>
-      <Shell me={me} signOut={() => signIn(null)} />
+      <Shell me={me} signOut={S.signOut} />
     </MeCtx.Provider>
   )
 }
 
-function Login({ onSignIn }) {
-  const d = useDb()
+// shown while we check for a saved sign-in and load the studio (well under a second), or when that fails
+function Splash({ text, error }) {
+  return (
+    <div className="splash" role={error ? 'alert' : 'status'}>
+      <div className="logo-mark">
+        YG<span>Hub</span>
+      </div>
+      {error ? (
+        <>
+          <p className="err">{error}</p>
+          <div className="row-actions">
+            <button className="btn primary" onClick={S.retry}>
+              Try again
+            </button>
+            <button className="btn ghost" onClick={S.signOut}>
+              Sign out
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="muted">{text || 'Loading…'}</p>
+      )}
+    </div>
+  )
+}
+
+function Login() {
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
-  const attempt = (e, pick) => {
+  const [busy, setBusy] = useState(false)
+  const attempt = async (e, as) => {
     e?.preventDefault()
-    const u = pick || d.users.find((x) => x.email === email.trim().toLowerCase())
-    if (!pick && (!u || pw !== DEMO_PASSWORD)) return setErr('That email and password don’t match an account.')
-    if (!u.active) return setErr('This login has been deactivated. Ask your admin.')
-    location.hash = '#/'
-    onSignIn(u.id)
+    setBusy(true)
+    setErr('')
+    try {
+      await S.signIn(as || email, as ? DEMO_PASSWORD : pw)
+      location.hash = '#/'
+    } catch (x) {
+      setErr(x.message)
+      setBusy(false)
+    }
   }
-  const groups = [
-    ['YG team', d.users.filter((u) => u.role !== 'client')],
-    ['Client portal', d.users.filter((u) => u.role === 'client')],
+  const groups = DEMO && [
+    ['YG team', DEMO.users.filter((u) => u.role !== 'client')],
+    ['Client portal', DEMO.users.filter((u) => u.role === 'client')],
   ]
   return (
     <div className="login">
@@ -139,29 +155,31 @@ function Login({ onSignIn }) {
               {err}
             </p>
           )}
-          <button className="btn primary block">Sign in</button>
-          <p className="small muted">
-            Demo: every sample account uses the password <code>{DEMO_PASSWORD}</code>, or pick a person below.
-          </p>
+          <button className="btn primary block" disabled={busy}>
+            {busy ? 'Signing in…' : 'Sign in'}
+          </button>
+          <p className="small muted">Forgot your password? Ask your admin to set a new one.</p>
         </form>
-        <div className="demo-accounts">
-          {groups.map(([label, users]) => (
-            <div key={label}>
-              <h3>{label}</h3>
-              <div className="demo-grid">
-                {users.map((u) => (
-                  <button key={u.id} type="button" className="demo-acc" onClick={() => attempt(null, u)} disabled={!u.active}>
-                    <Avatar user={u} size={32} />
-                    <span>
-                      <b>{u.name}</b>
-                      <small>{u.role === 'client' ? byId(d.clients, u.clientId)?.name : `${ROLES[u.role].label} · ${u.title}`}</small>
-                    </span>
-                  </button>
-                ))}
+        {groups && (
+          <div className="demo-accounts">
+            {groups.map(([label, users]) => (
+              <div key={label}>
+                <h3>{label} · sample accounts (dev only)</h3>
+                <div className="demo-grid">
+                  {users.map((u) => (
+                    <button key={u.id} type="button" className="demo-acc" onClick={() => attempt(null, `${u.id}@example.com`)} disabled={busy}>
+                      <Avatar user={u} size={32} />
+                      <span>
+                        <b>{u.name}</b>
+                        <small>{u.role === 'client' ? byId(DEMO.clients, u.clientId)?.name : `${ROLES[u.role].label} · ${u.title}`}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   )
@@ -215,7 +233,6 @@ function Shell({ me, signOut }) {
               <small>{client ? client.name : ROLES[me.role].label}</small>
             </span>
           </div>
-          <p className="demo-note">Demo mode — data lives in this browser.</p>
         </div>
       </aside>
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
@@ -268,7 +285,7 @@ function Shell({ me, signOut }) {
                 <Icon name="sliders" /> Profile & settings
               </a>
               <button className="menu-item" onClick={signOut}>
-                <Icon name="logout" /> Sign out / switch account
+                <Icon name="logout" /> Sign out
               </button>
             </Menu>
           </div>
@@ -286,10 +303,29 @@ function Shell({ me, signOut }) {
         </main>
       </div>
 
+      {S.getNotice() && <Toast text={S.getNotice()} />}
       {modal === 'task' && <TaskForm onClose={() => setModal(null)} />}
       {modal === 'project' && <ProjectForm onClose={() => setModal(null)} />}
       {modal === 'event' && <EventForm onClose={() => setModal(null)} />}
       {modal === 'post' && <PostForm onClose={() => setModal(null)} />}
+    </div>
+  )
+}
+
+// a popover sits in the browser's top layer, so it shows above an open dialog too (a z-index can't)
+function Toast({ text }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    el.hidePopover() // re-raise above anything opened since
+    el.showPopover()
+  })
+  return (
+    <div ref={ref} popover="manual" className="toast" role="alert">
+      <span>{text}</span>
+      <button className="icon-btn" onClick={S.dismissNotice} aria-label="Dismiss">
+        <Icon name="x" />
+      </button>
     </div>
   )
 }

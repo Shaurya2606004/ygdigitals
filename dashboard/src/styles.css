@@ -724,10 +724,38 @@ avatars ---------- */
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.demo-note {
-  font-size: 11.5px;
-  color: var(--side-ink-2);
-  padding: 6px 6px 0;
+/* signing in / loading the studio, or why it couldn't */
+.splash {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 24px 16px;
+  text-align: center;
+}
+.splash .err {
+  max-width: 420px;
+}
+/* a save the server refused, or no connection */
+.toast {
+  position: fixed;
+  inset: auto auto 20px 50%;
+  margin: 0;
+  border: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 10px;
+  background: var(--red-bg);
+  color: var(--red-ink);
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: var(--shadow);
 }
 .scrim {
   position: fixed;
@@ -2174,6 +2202,160 @@ dialog.modal::backdrop {
 .chat-composer textarea {
   max-height: 160px;
   field-sizing: content;
+}
+.chat-composer .count {
+  align-self: center;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.chat-composer .count.over {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.pane {
+  position: relative;
+}
+.msg {
+  position: relative;
+}
+.msg-actions {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  opacity: 0; /* not display:none, so keyboard users can still tab to the buttons */
+  pointer-events: none;
+}
+.msg:hover .msg-actions,
+.msg:focus-within .msg-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.msg-actions .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+.msg-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 2px;
+}
+.msg-edit textarea {
+  min-width: min(520px, 60vw);
+  field-sizing: content;
+  max-height: 200px;
+}
+.msg-body .deleted {
+  font-size: 14px;
+  font-style: italic;
+  color: var(--ink-3);
+}
+.msg-body .edited {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.sys-line {
+  margin: 10px 0 4px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.sys-line b {
+  color: var(--ink-2);
+}
+.new-sep {
+  position: relative;
+  margin: 12px 0 6px;
+  text-align: right;
+}
+.new-sep::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid var(--accent);
+}
+.new-sep span {
+  position: relative;
+  padding: 0 8px;
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-ink);
+}
+.seen {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 4px 8px 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.msgs .older {
+  align-self: center;
+  margin: 4px 0 8px;
+}
+.jump {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  box-shadow: var(--shadow);
+}
+.typing {
+  margin: 0;
+  padding: 4px 20px 0;
+  min-height: 22px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--ink-3);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+.typing + .chat-composer {
+  border-top: 0;
+  padding-top: 4px;
+}
+.typing + p.composer {
+  border-top: 0;
+}
+.av-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.online-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid var(--surface);
+}
+.online-text {
+  color: var(--green-ink);
+  font-weight: 700;
+}
+.new-chat-seg {
+  margin-bottom: 14px;
+}
+.leave-row {
+  display: flex;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }
 p.composer {
   padding: 14px 20px;

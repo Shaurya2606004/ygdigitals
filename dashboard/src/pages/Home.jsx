@@ -174,6 +174,7 @@ function StaffHome({ me }) {
   const d = useDb()
   const T = today()
   const admin = me.role === 'admin'
+  const free = me.role === 'freelancer' // no studio-wide feeds: they only see their own projects
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))
   const open = d.tasks.filter((t) => t.status !== 'done')
   const kpis = admin
@@ -224,17 +225,21 @@ function StaffHome({ me }) {
               <Workload />
             </Card>
           )}
-          <Card title="Recent activity">
-            <Activity />
-          </Card>
+          {!free && (
+            <Card title="Recent activity">
+              <Activity />
+            </Card>
+          )}
         </div>
         <div className="col-side">
           <Card title="Today" action={<a href="#/calendar">Calendar</a>}>
             <Agenda me={me} />
           </Card>
-          <Card title="Announcements" action={<a href="#/chat/ch-announce">Open</a>}>
-            <Announcements />
-          </Card>
+          {!free && (
+            <Card title="Announcements" action={<a href="#/chat/ch-announce">Open</a>}>
+              <Announcements />
+            </Card>
+          )}
           <Card title="Upcoming deadlines">
             <ul className="list">
               {d.projects
@@ -273,7 +278,7 @@ function ClientHome({ me }) {
   const meetings = occurrences(d, T, addDays(T, 30)).filter((o) => o.attendeeIds.includes(me.id))
   const teamIds = [...new Set(projects.filter((p) => p.status !== 'done').flatMap((p) => [p.managerId, ...p.memberIds]))]
   const chans = d.channels.filter((c) => c.type === 'project' && can(me, 'channel.view', c)).map((c) => c.id)
-  const msgs = d.messages.filter((m) => chans.includes(m.channelId)).slice(-4).reverse()
+  const msgs = d.messages.filter((m) => chans.includes(m.channelId) && !m.deleted).slice(-4).reverse()
   const leads = [...new Set(projects.filter((p) => p.status !== 'done').map((p) => p.managerId))]
 
   return (

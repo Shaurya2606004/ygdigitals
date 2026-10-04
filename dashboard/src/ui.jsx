@@ -143,10 +143,12 @@ export const Empty = ({ icon = 'check', title, children }) => (
   </div>
 )
 
-// form state + "run this action, show its error if it throws"
+// form state + "run this action, show its error if it throws". runAsync is for the few actions that wait on the
+// server (logins, passwords); everything else saves in the background and returns at once.
 export function useForm(init) {
   const [v, setV] = useState(init)
   const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const set = (k) => (e) => setV((s) => ({ ...s, [k]: e?.target ? (e.target.type === 'checkbox' ? e.target.checked : e.target.value) : e }))
   const run = (fn) => {
     try {
@@ -158,7 +160,20 @@ export function useForm(init) {
       return false
     }
   }
-  return { v, setV, set, err, setErr, run }
+  const runAsync = async (fn) => {
+    setBusy(true)
+    try {
+      await fn()
+      setErr('')
+      return true
+    } catch (x) {
+      setErr(x.message)
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
+  return { v, setV, set, err, setErr, run, runAsync, busy }
 }
 
 // the team first, then client logins, for any <select>

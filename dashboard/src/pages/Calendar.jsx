@@ -499,7 +499,7 @@ export function EventForm({ onClose, initial = {}, edit }) {
           </div>
         )}
         <Field label="Project (optional)">
-          <select value={v.projectId} onChange={set('projectId')}>
+          <select value={v.projectId || ''} onChange={set('projectId')}>
             <option value="">—</option>
             {d.projects
               .filter((p) => can(me, 'project.view', p) && p.status !== 'done')

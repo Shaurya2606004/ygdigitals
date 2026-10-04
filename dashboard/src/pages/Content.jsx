@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, FORMATS, isStaff, PLATFORMS, POST_STATUS, staff } from '../store.js'
+import { byId, can, FORMATS, isStaff, PLATFORMS, POST_STATUS, team } from '../store.js'
 import { Avatar, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, Status, useDb, useForm, useMe } from '../ui.jsx'
 import { ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, today, ymd } from '../util.js'
 import { MonthGrid } from './Calendar.jsx'
@@ -217,7 +217,7 @@ export function PostForm({ onClose, initial = {}, edit }) {
   const { v, set, err, run } = useForm(
     edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', title: '', caption: '', status: 'idea', assigneeId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
   )
-  const makers = staff(d)
+  const makers = team(d)
   return (
     <Modal title={edit ? 'Edit post' : 'Plan a post'} onClose={onClose}>
       <form

@@ -563,7 +563,7 @@ export function ProjectForm({ onClose, edit, initial = {} }) {
           </select>
         </Field>
         <Field label="Project lead" hint="The client’s point of contact. They can edit this project.">
-          <select value={v.managerId} onChange={set('managerId')}>
+          <select value={v.managerId || ''} onChange={set('managerId')}>
             <PeopleOptions users={staff(d)} />
           </select>
         </Field>

@@ -55,7 +55,8 @@ function Profile({ me }) {
             <input type="tel" value={v.phone} onChange={set('phone')} />
           </Field>
           <p className="full muted small">
-            <Icon name="lock" size={14} /> Password and email changes come with real logins. Your role is set by the admin.
+            <Icon name="lock" size={14} />{' '}
+            {me.role === 'admin' ? 'Change your login email under Team. Only another admin can change your role.' : 'Your email (your login) and role are set by the admin.'}
           </p>
           <Err msg={err} />
           <div className="form-actions">
@@ -64,22 +65,61 @@ function Profile({ me }) {
           </div>
         </form>
       </Card>
-      {can(me, 'org.manage') && (
-        <Card title="Demo data">
-          <p className="small muted">Everything you see lives in this browser only. Export a backup before you reset, or to carry it over to the live version.</p>
-          <div className="row-actions">
+      <div className="col-side">
+        {S.live && <PasswordCard />}
+        {can(me, 'org.manage') && (
+          <Card title="Backup">
+            <p className="small muted">Download a copy of everything in YG Hub — projects, tasks, approvals, chat — as one file. Keep one now and then.</p>
             <button className="btn sm" onClick={() => download(`yg-hub-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(d, null, 2), 'application/json')}>
-              <Icon name="download" size={14} /> Export backup
+              <Icon name="download" size={14} /> Download backup
             </button>
-            <button className="btn sm danger" onClick={() => confirm('Reset everything back to the sample studio? All changes in this browser are lost.') && S.resetDemo()}>
-              Reset demo data
-            </button>
-          </div>
-        </Card>
-      )}
+          </Card>
+        )}
+      </div>
     </div>
   )
 }
+
+function PasswordCard() {
+  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', again: '' })
+  const [saved, setSaved] = useState(false)
+  return (
+    <Card title="Change password">
+      <form
+        className="form-grid one"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          setSaved(false)
+          const ok = await runAsync(() => {
+            if (v.password !== v.again) throw new Error('The two passwords don’t match.')
+            return S.changePassword(v.password)
+          })
+          if (ok) {
+            setV({ password: '', again: '' })
+            setSaved(true)
+          }
+        }}
+      >
+        <Field label="New password" hint="At least 8 characters.">
+          <input type="password" autoComplete="new-password" value={v.password} onChange={set('password')} />
+        </Field>
+        <Field label="Type it again">
+          <input type="password" autoComplete="new-password" value={v.again} onChange={set('again')} />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          {saved && <span className="muted small">Password changed.</span>}
+          <button className="btn" disabled={busy}>
+            {busy ? 'Saving…' : 'Change password'}
+          </button>
+        </div>
+      </form>
+    </Card>
+  )
+}
+
+// for actions that may wait on the server: shows their error in place of throwing
+const attempt = (fn, setErr) => Promise.resolve().then(fn).then(() => setErr(''), (x) => setErr(x.message))
 
 function Team() {
   const me = useMe()
@@ -91,7 +131,9 @@ function Team() {
   return (
     <>
       <div className="toolbar">
-        <p className="muted">Everyone at YG who can sign in. The admin adds people and sets their role.</p>
+        <p className="muted">
+          {admin ? 'Everyone at YG who can sign in. Edit someone to change their role or set them a new password.' : 'Everyone at YG who can sign in. The admin adds people and sets their role.'}
+        </p>
         {admin && (
           <button className="btn primary" onClick={() => setForm({})}>
             <Icon name="plus" /> Add person
@@ -146,12 +188,7 @@ function Team() {
                       className={`btn sm ${u.active ? 'danger' : ''}`}
                       onClick={() => {
                         if (!u.active || confirm(`Deactivate ${u.name}? They can’t sign in any more; their tasks stay with them until you hand them on.`))
-                          try {
-                            S.setActive(me, u.id, !u.active)
-                            setErr('')
-                          } catch (x) {
-                            setErr(x.message)
-                          }
+                          attempt(() => S.setActive(me, u.id, !u.active), setErr)
                       }}
                     >
                       {u.active ? 'Deactivate' : 'Reactivate'}
@@ -172,10 +209,9 @@ function Clients() {
   const me = useMe()
   const d = useDb()
   const [form, setForm] = useState(null) // {client} to edit, {} for new
-  const [login, setLogin] = useState(null) // clientId to add a login for
+  const [login, setLogin] = useState(null) // {clientId, edit?, fill?}: a portal login to add or edit
   const [err, setErr] = useState('')
   const admin = can(me, 'org.manage')
-  if (!d.clients.length) return <Empty icon="briefcase" title="No clients yet" />
   return (
     <>
       <div className="toolbar">
@@ -187,6 +223,7 @@ function Clients() {
         )}
       </div>
       <Err msg={err} />
+      {!d.clients.length && <Empty icon="briefcase" title="No clients yet">{admin && 'Add a client, then give them a portal login.'}</Empty>}
       <div className="client-list">
         {d.clients.map((c) => {
           const logins = d.users.filter((u) => u.role === 'client' && u.clientId === c.id)
@@ -222,25 +259,28 @@ function Clients() {
                     <Avatar user={u} size={20} />
                     {u.name}
                     {admin && (
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => {
-                          try {
-                            S.setActive(me, u.id, !u.active)
-                          } catch (x) {
-                            setErr(x.message)
-                          }
-                        }}
-                      >
-                        {u.active ? 'Revoke' : 'Restore'}
-                      </button>
+                      <>
+                        <button type="button" className="link-btn" onClick={() => setLogin({ clientId: c.id, edit: u })}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="link-btn"
+                          onClick={() => {
+                            if (!u.active || confirm(`Revoke ${u.name}’s login? They can’t sign in until you restore it.`))
+                              attempt(() => S.setActive(me, u.id, !u.active), setErr)
+                          }}
+                        >
+                          {u.active ? 'Revoke' : 'Restore'}
+                        </button>
+                      </>
                     )}
                   </span>
                 ))}
                 {!logins.length && <span className="small muted">No portal login yet.</span>}
                 {admin && (
-                  <button className="btn sm ghost" onClick={() => setLogin(c.id)}>
+                  // the first login is usually the contact person, so start from their details
+                  <button className="btn sm ghost" onClick={() => setLogin({ clientId: c.id, fill: logins.length ? null : { name: c.contact, email: c.email, phone: c.phone } })}>
                     <Icon name="plus" size={14} /> Add login
                   </button>
                 )}
@@ -250,7 +290,7 @@ function Clients() {
         })}
       </div>
       {form && <ClientForm edit={form.id ? form : null} onClose={() => setForm(null)} />}
-      {login && <PersonForm clientId={login} onClose={() => setLogin(null)} />}
+      {login && <PersonForm {...login} onClose={() => setLogin(null)} />}
     </>
   )
 }
@@ -305,17 +345,18 @@ function Roles() {
   )
 }
 
-function PersonForm({ onClose, edit, clientId }) {
+// a team login (from Team), or a client's portal login (from Clients, which passes clientId)
+function PersonForm({ onClose, edit, clientId, fill }) {
   const me = useMe()
   const d = useDb()
-  const { v, set, setV, err, run } = useForm(edit || { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '' })
+  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', ...(edit || { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '', ...fill }) })
   return (
     <Modal title={edit ? `Edit ${edit.name}` : clientId ? `Login for ${byId(d.clients, clientId)?.name}` : 'Add a person'} onClose={onClose}>
       <form
         className="form-grid"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault()
-          if (run(() => S.savePerson(me, v))) onClose()
+          if (await runAsync(() => S.savePerson(me, v))) onClose()
         }}
       >
         <Field label="Full name">
@@ -325,25 +366,15 @@ function PersonForm({ onClose, edit, clientId }) {
           <input type="email" value={v.email} onChange={set('email')} />
         </Field>
         {!clientId && (
-          <Field label="Role" hint={ROLES[v.role]?.blurb}>
-            <select value={v.role} onChange={(e) => setV({ ...v, role: e.target.value })} disabled={edit?.id === me.id}>
-              {Object.entries(ROLES).map(([k, r]) => (
-                <option key={k} value={k}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        )}
-        {v.role === 'client' && !clientId && (
-          <Field label="Client">
-            <select value={v.clientId || ''} onChange={set('clientId')}>
-              <option value="">Pick…</option>
-              {d.clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
+          <Field label="Role" hint={edit?.id === me.id ? 'Only another admin can change your role.' : ROLES[v.role]?.blurb}>
+            <select value={v.role} onChange={set('role')} disabled={edit?.id === me.id}>
+              {Object.entries(ROLES)
+                .filter(([k]) => k !== 'client') // client logins are added under their client (Settings › Clients)
+                .map(([k, r]) => (
+                  <option key={k} value={k}>
+                    {r.label}
+                  </option>
+                ))}
             </select>
           </Field>
         )}
@@ -353,13 +384,23 @@ function PersonForm({ onClose, edit, clientId }) {
         <Field label="Phone / WhatsApp">
           <input type="tel" value={v.phone} onChange={set('phone')} placeholder="+91 …" />
         </Field>
-        {!edit && <p className="muted small">Demo mode: new logins use the demo password. Once live, they get an email invite to set their own.</p>}
+        {S.live && (
+          <Field
+            label={edit ? 'New password (optional)' : 'Temporary password'}
+            hint={edit ? 'Only if they forgot theirs. Share it with them; they can change it in Settings.' : 'At least 8 characters. Share it with them — they can change it in Settings › Profile.'}
+            full
+          >
+            <input type="text" autoComplete="off" spellCheck={false} value={v.password} onChange={set('password')} />
+          </Field>
+        )}
         <Err msg={err} />
         <div className="form-actions">
           <button type="button" className="btn ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn primary">{edit ? 'Save' : 'Add'}</button>
+          <button className="btn primary" disabled={busy}>
+            {busy ? 'Saving…' : edit ? 'Save' : 'Add'}
+          </button>
         </div>
       </form>
     </Modal>
