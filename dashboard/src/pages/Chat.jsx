@@ -37,7 +37,7 @@ export default function Chat({ args }) {
           ([label, list]) =>
             list.length > 0 && (
               <div key={label} className="chat-group">
-                <h2 title={label === 'Other groups' ? 'Groups you’re not in. Only admins see these, and the members don’t know.' : undefined}>
+                <h2 title={label === 'Other groups' ? 'Groups you’re not in. Only supervisors see these, and the members don’t know.' : undefined}>
                   {label} {label === 'Other groups' && <Icon name="lock" size={11} />}
                 </h2>
                 {list.map((c) => {
@@ -283,7 +283,7 @@ export function ChatPane({ channelId }) {
           <h2>{channelName(d, ch, me)}</h2>
           <p className="muted small">
             {other && (S.isOnline(other.id) ? <span className="online-text">Online</span> : other.title)}
-            {ch.type === 'public' && (ch.readOnly ? 'Studio news — only the admin posts here' : 'Everyone at YG')}
+            {ch.type === 'public' && (ch.readOnly ? 'Studio news — only supervisors post here' : 'Everyone at YG')}
             {project && (
               <>
                 <a href={`#/projects/${project.id}`}>{project.name}</a> · {people.length} people
@@ -299,8 +299,8 @@ export function ChatPane({ channelId }) {
           </span>
         )}
         {hidden && (
-          <span className="pill" title="You can read this group because you’re an admin. The members don’t see you here, and nothing you do here shows.">
-            <Icon name="lock" size={13} /> Admin view
+          <span className="pill" title="You can read this group because you’re a supervisor. The members don’t see you here, and nothing you do here shows.">
+            <Icon name="lock" size={13} /> Supervisor view
           </span>
         )}
         {can(me, 'group.manage', ch) && (
@@ -425,7 +425,7 @@ export function ChatPane({ channelId }) {
         </form>
       ) : (
         <p className="composer muted small">
-          {hidden ? 'You’re reading this group as an admin. Only its members can post.' : 'Only the admin can post here.'}
+          {hidden ? 'You’re reading this group as a supervisor. Only its members can post.' : 'Only supervisors can post here.'}
         </p>
       )}
       <Err msg={err} />

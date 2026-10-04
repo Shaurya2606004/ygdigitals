@@ -1,9 +1,9 @@
 -- Every morning (9 am IST) the hub nudges people about what's slipping, in the app — and by email once the mail
 -- function is set up (private.settings 'mail_url', see functions/daily-mail):
---   * your overdue tasks: finish, ask for more time or hand off (not while you're on leave)
---   * the admins: anything 2+ days overdue with no request for more time
+--   * your overdue tasks: finish them or hand them over (not while you're on leave)
+--   * the supervisors and owners: anything 2+ days overdue
 --   * posts whose day has passed that nobody marked posted or undelivered
---   * make-ups owed to clients that are due today or late
+--   * compensation owed to clients that is due today or late
 -- Runs at most once a day, however often it's called.
 
 create table private.daily_runs (
@@ -35,15 +35,14 @@ begin
     where k.status <> 'done' and k.due < t and k.assignee_id is not null and not private.away(k.assignee_id, t)
   loop
     perform private.nudge(r.assignee_id, private.q(r.title) || ' is overdue (was due ' || private.fmt_day(r.due)
-      || ') — finish it, ask for more time or hand it off', '#/tasks/' || r.id);
+      || ') — finish it today, or hand it over', '#/tasks/' || r.id);
   end loop;
 
   for r in select k.id, k.title, k.due, k.assignee_id, a from public.tasks k
-    join public.task_private x on x.task_id = k.id
     cross join unnest(private.admins()) a
-    where k.status <> 'done' and k.due <= t - 2 and x.ask is null and a is distinct from k.assignee_id
+    where k.status <> 'done' and k.due <= t - 2 and a is distinct from k.assignee_id
   loop
-    perform private.nudge(r.a, private.q(r.title) || ' (' || case when r.assignee_id is null then 'no owner' else private.first_name(r.assignee_id) end || ') is '
+    perform private.nudge(r.a, private.q(r.title) || ' (' || case when r.assignee_id is null then 'not given to anyone' else private.first_name(r.assignee_id) end || ') is '
       || (t - r.due) || ' days overdue', '#/tasks/' || r.id);
   end loop;
 
@@ -51,14 +50,14 @@ begin
     where s.date < t and s.status not in ('posted', 'missed')
   loop
     perform private.nudge(x, r.format || ' ' || private.q(r.title) || ' for ' || r.name || ' was due ' || private.fmt_day(r.date)
-      || ' — mark it posted, or undelivered and note a make-up', '#/content')
+      || ' — mark it posted, or undelivered and note the compensation', '#/content')
     from unnest(case when r.assignee_id is null or private.away(r.assignee_id, t) then private.admins() else array[r.assignee_id] end) x;
   end loop;
 
   for r in select k.offer, k.due, k.owner_id, c.name from public.compensations k join public.clients c on c.id = k.client_id
     where k.status = 'open' and k.due <= t
   loop
-    perform private.nudge(x, 'Make-up for ' || r.name || ' ' || case when r.due = t then 'is due today' else 'is late' end || ': ' || r.offer, '#/content/owed')
+    perform private.nudge(x, 'Compensation for ' || r.name || ' ' || case when r.due = t then 'is due today' else 'is late' end || ': ' || r.offer, '#/content/owed')
     from unnest(case when r.owner_id is null or r.due < t then private.admins() || r.owner_id else array[r.owner_id] end) x
     where x is not null;
   end loop;

@@ -4,6 +4,7 @@ import { beforeEach, test } from 'node:test'
 import { seed } from './seed.js'
 import * as S from './store.js'
 import { addDays, today } from './util.js'
+import { postsFromSheet, toDay } from './xlsx.js'
 
 const u = (id) => S.byId(S.getDb().users, id)
 const unreadFor = (id) => S.getDb().notifications.filter((n) => n.userId === id && !n.read)
@@ -187,27 +188,30 @@ test('deleting a client takes their projects, tasks, posts, chats and logins; me
   assert.equal(S.byId(d.events, 'e10').projectId, '')
 })
 
-test('overdue: the owner asks for more time, the lead decides; every extension is kept', () => {
-  const [vikas, priya, ritika] = ['vikas', 'priya', 'ritika'].map(u)
+test('overdue: only a supervisor, the project lead or whoever gave the task moves its date', () => {
+  const [vikas, priya, aman] = ['vikas', 'priya', 'aman'].map(u)
   const t = () => S.byId(S.getDb().tasks, 't4') // Vikas's edit, given by Priya (who leads the project)
   const T = today()
-  assert.throws(() => S.saveTask(vikas, { ...t(), due: addDays(T, 9) }), /ask for more time/)
-  assert.throws(() => S.askTime(vikas, 't4', addDays(T, 8), ''), /why/)
-  assert.throws(() => S.askTime(priya, 't4', addDays(T, 8), 'x'), /owner/)
-  S.askTime(vikas, 't4', addDays(T, 8), 'Footage came in late')
-  assert.ok(unreadFor('aman').some((n) => n.text.startsWith('asked for more time on “Edit Reel 1')))
-  assert.equal(S.canDecideTime(ritika, t()), false)
-  assert.equal(S.canDecideTime(vikas, t()), false)
-  S.decideTime(priya, 't4', true, 'OK, but no later')
-  assert.equal(t().due, addDays(T, 8))
-  assert.equal(t().ask, null)
-  assert.deepEqual(t().extensions.map((x) => [x.approved, x.reason]), [[true, 'Footage came in late']])
-  assert.ok(unreadFor('vikas').some((n) => n.text.startsWith('gave you until')))
-  S.askTime(vikas, 't4', addDays(T, 12), 'New hook')
-  S.decideTime(priya, 't4', false, 'Use the old hook')
-  assert.equal(t().due, addDays(T, 8))
-  S.saveTask(priya, { ...t(), due: addDays(T, 10) }) // the lead can just move it
+  assert.equal(S.setsDue(vikas, t()), false)
+  assert.throws(() => S.saveTask(vikas, { ...t(), due: addDays(T, 9) }), /Tell them if you need more time/)
+  S.saveTask(vikas, { ...t(), status: 'doing' }) // the rest of it is still his to change
+  S.saveTask(priya, { ...t(), due: addDays(T, 10) }) // the lead can
   assert.equal(t().due, addDays(T, 10))
+  assert.ok(unreadFor('vikas').some((n) => n.text.startsWith('moved “Edit Reel 1')))
+  S.saveTask(aman, { ...t(), due: addDays(T, 11) }) // and so can a supervisor
+  assert.equal(t().due, addDays(T, 11))
+})
+
+test('owner: a supervisor with the owner flag, picked from the role list like any role', () => {
+  const aman = u('aman')
+  assert.equal(S.level(aman), 'owner')
+  assert.ok(S.can(aman, 'org.manage') && S.can(aman, 'deliverable.review', {}))
+  S.savePerson(aman, { ...u('vikas'), role: 'owner' })
+  assert.deepEqual([u('vikas').role, u('vikas').owner, S.level(u('vikas'))], ['admin', true, 'owner'])
+  assert.ok(unreadFor('vikas').some((n) => n.text === 'changed your role to Owner'))
+  S.savePerson(aman, { ...u('vikas'), role: 'member' })
+  assert.deepEqual([u('vikas').role, u('vikas').owner], ['member', false])
+  assert.throws(() => S.savePerson(aman, { ...aman, role: 'admin' }), /own role/) // owner → supervisor is a change too
 })
 
 test('repeating tasks: finishing one makes the next (weekly, or monthly kept to the month’s end)', () => {
@@ -256,16 +260,16 @@ test('leave: short notice needs that work done first; the admin is warned about 
   assert.equal(l(), undefined)
 })
 
-test('compensation: the team notes what’s owed; only an admin tells the client; the owner marks it given', () => {
+test('compensation: the team notes what’s owed; only a supervisor tells the client; whoever’s on it marks it given', () => {
   const [priya, vikas, ritika, aman, rahul] = ['priya', 'vikas', 'ritika', 'aman', 'rahul'].map(u)
   S.savePost(priya, { ...S.byId(S.getDb().posts, 's4'), status: 'missed' })
   assert.equal(S.postMark(S.byId(S.getDb().posts, 's4')), 'undelivered')
   const base = { clientId: 'desi', postId: 's4', missed: 'Reel — Ghar ki Mithaas', offer: '1 extra Reel', ownerId: 'vikas' }
-  assert.throws(() => S.saveCompensation(priya, { ...base, shared: true }), /Only an admin/)
+  assert.throws(() => S.saveCompensation(priya, { ...base, shared: true }), /Only a supervisor/)
   assert.throws(() => S.saveCompensation(rahul, base), /permission/)
   const id = S.saveCompensation(priya, base)
   const k = () => S.byId(S.getDb().compensations, id)
-  assert.ok(unreadFor('vikas').some((n) => n.text.startsWith('gave you a make-up for Desi Crunch')))
+  assert.ok(unreadFor('vikas').some((n) => n.text.startsWith('gave you the compensation for Desi Crunch')))
   assert.equal(S.can(ritika, 'comp.view', k()), false)
   assert.equal(S.can(rahul, 'comp.view', k()), false)
   S.saveCompensation(aman, { ...k(), shared: true })
@@ -274,4 +278,26 @@ test('compensation: the team notes what’s owed; only an admin tells the client
   S.giveCompensation(vikas, id)
   assert.equal(k().status, 'given')
   assert.throws(() => S.deleteCompensation(priya, id), /permission/)
+})
+
+test('content calendar import: the header row finds the columns; days with nothing planned and notes are left out', () => {
+  const rows = [
+    ['Zoe’s | Content Calendar | Oct'],
+    [],
+    ['Date', 'Day', 'Festival', 'Content Type', 'Topic', 'Basic Script / Reference', 'Status'],
+    [46300, 'Monday', '-', 'Single Post', 'Location post', 'https://instagram.com/p/x', 'Planned'],
+    [46301, 'Tuesday', '-'], // no post that day
+    [46306, 'Sunday', 'Navratri · Day 1', 'Reel', 'Rock paper scissors', '', 'Posted'],
+    ['12/10/2026', '', '', 'Carousel', '', '', 'Ready for approval'], // a text date, day first; no topic → the type
+    ['Deliverables check'],
+    ['Single Posts', '', '', 10],
+  ]
+  assert.deepEqual(postsFromSheet(rows), [
+    { date: '2026-10-05', format: 'Post', title: 'Location post', brief: 'https://instagram.com/p/x', status: 'idea' },
+    { date: '2026-10-11', format: 'Reel', title: 'Rock paper scissors', brief: 'Festival: Navratri · Day 1', status: 'posted' },
+    { date: '2026-10-12', format: 'Carousel', title: 'Carousel', brief: '', status: 'ready' },
+  ])
+  assert.equal(toDay('5 Oct 2026'), '2026-10-05')
+  assert.equal(toDay('31/02/2026'), '') // no such day
+  assert.throws(() => postsFromSheet([['Topic', 'Type']]), /Date/)
 })

@@ -1,20 +1,115 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, EVENT_TYPES, isOverdue, occurrences, POST_STATUS, postMark, PROJECT_STATUS, progress, staff } from '../store.js'
-import { Avatar, Bar, Card, Empty, Err, Icon, isUrl, RichText, Status, useDb, useMe } from '../ui.jsx'
+import { byId, can, EVENT_TYPES, isOverdue, occurrences, POST_STATUS, postMark, PROJECT_STATUS, progress, staff, taskMark } from '../store.js'
+import { Avatar, Bar, Card, Empty, Err, Icon, isUrl, Mark, RichText, Status, useDb, useMe } from '../ui.jsx'
 import { addDays, ago, daysBetween, fmtDay, fmtLong, fmtTime, relDay, today } from '../util.js'
 import { EventForm } from './Calendar.jsx'
 import { CompensationForm, makeUpFor } from './Content.jsx'
-import { AskTimeForm, HandoffForm, TaskRow, TimeAsk } from './Tasks.jsx'
+import { HandoffForm, TaskRow } from './Tasks.jsx'
 
 const hello = () => {
   const h = new Date().getHours()
   return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'
 }
+const late = (day) => {
+  const n = daysBetween(day, today())
+  return n === 1 ? '1 day late' : `${n} days late`
+}
 
 export default function Home() {
   const me = useMe()
-  return me.role === 'client' ? <ClientHome me={me} /> : <StaffHome me={me} />
+  return me.role === 'client' ? <ClientHome me={me} /> : me.owner ? <OwnerHome me={me} /> : <StaffHome me={me} />
+}
+
+// the owners' Home: only what matters — what's late, whether today's work went out, and what's coming this week.
+// Every task, post and compensation with a date, across the studio.
+function OwnerHome({ me }) {
+  const d = useDb()
+  const T = today()
+  const [allWeek, setAllWeek] = useState(false)
+  const away = d.users.filter((u) => u.active && S.isAway(d, u.id, T)).map((u) => u.name.split(' ')[0])
+  const client = (id) => byId(d.clients, id)?.name ?? ''
+  const work = [
+    ...d.tasks.filter((t) => t.due).map((t) => ({ key: t.id, what: t.title, client: client(byId(d.projects, t.projectId)?.clientId), who: t.assigneeId, due: t.due, doneOn: t.completedAt, mark: taskMark(t), href: `#/tasks/${t.id}` })),
+    ...d.posts.map((p) => ({ key: p.id, what: `${p.format}: ${p.title}`, client: client(p.clientId), who: p.assigneeId, due: p.date, mark: postMark(p), href: '#/content' })),
+    ...d.compensations
+      .filter((k) => k.due)
+      .map((k) => ({ key: k.id, what: `Compensation: ${k.offer}`, client: client(k.clientId), who: k.ownerId, due: k.due, doneOn: k.givenAt, mark: k.status === 'given' ? 'delivered' : k.due < T ? 'overdue' : k.due === T ? 'today' : 'due', href: '#/content/owed' })),
+  ]
+  const byDue = (a, b) => a.due.localeCompare(b.due)
+  const overdue = work.filter((w) => w.mark === 'overdue').sort(byDue)
+  // due today, plus anything finished today; what's still not out comes first
+  const todays = work.filter((w) => w.due === T || w.doneOn === T).sort((a, b) => (b.mark === 'today') - (a.mark === 'today'))
+  const out = todays.filter((w) => w.mark !== 'today' && w.mark !== 'undelivered')
+  const week = work.filter((w) => w.mark === 'due' && w.due <= addDays(T, 7)).sort(byDue)
+  const meta = (w, when) => [w.client, w.who ? S.userName(d, w.who).split(' ')[0] : 'not given to anyone', when].filter(Boolean).join(' · ')
+  const Row = ({ w, right, when }) => (
+    <li>
+      <a href={w.href} className="row">
+        <span className="grow">
+          <b>{w.what}</b>
+          <small>{meta(w, when)}</small>
+        </span>
+        {right}
+      </a>
+    </li>
+  )
+  return (
+    <div className="page">
+      <div className="hello">
+        <h1>
+          {hello()}, {me.name.split(' ')[0]}
+        </h1>
+        <p className="sub">
+          {fmtLong(T)}
+          {away.length > 0 && ` · On leave today: ${away.join(', ')}`}
+        </p>
+      </div>
+      <div className="kpis">
+        <Kpi label="Late" value={overdue.length} tone={overdue.length ? 'late' : ''} note={overdue.length ? 'not done by their date' : 'nothing late'} />
+        <Kpi label="Done today" value={`${out.length} of ${todays.length}`} tone={out.length < todays.length ? 'warn' : ''} note="due or finished today" />
+        <Kpi label="Due this week" value={week.length} />
+      </div>
+      <Card title={`Late${overdue.length ? ` (${overdue.length})` : ''}`} className="urgent-card">
+        {overdue.length ? (
+          <ul className="list">
+            {overdue.map((w) => (
+              <Row key={w.key} w={w} right={<span className="due late">{late(w.due)}</span>} />
+            ))}
+          </ul>
+        ) : (
+          <Empty title="Nothing is late" />
+        )}
+      </Card>
+      <Card title="Today — done or not">
+        {todays.length ? (
+          <ul className="list">
+            {todays.map((w) => (
+              <Row key={w.key} w={w} when={w.due !== T ? `was due ${fmtDay(w.due)}` : ''} right={w.mark === 'today' ? <Status s="today" label="Not done yet" /> : <Mark m={w.mark} />} />
+            ))}
+          </ul>
+        ) : (
+          <Empty icon="calendar" title="Nothing due today" />
+        )}
+      </Card>
+      <Card title="Coming up this week">
+        {week.length ? (
+          <ul className="list">
+            {(allWeek ? week : week.slice(0, 6)).map((w) => (
+              <Row key={w.key} w={w} right={<span className="due">{relDay(w.due)}</span>} />
+            ))}
+          </ul>
+        ) : (
+          <Empty icon="calendar" title="Nothing else due this week" />
+        )}
+        {!allWeek && week.length > 6 && (
+          <button className="link-btn more-btn" onClick={() => setAllWeek(true)}>
+            Show {week.length - 6} more
+          </button>
+        )}
+      </Card>
+    </div>
+  )
 }
 
 const Kpi = ({ label, value, note, tone, href }) => {
@@ -140,14 +235,14 @@ function Workload() {
 }
 
 // everything waiting on you, most urgent first: your overdue work, then what only you can decide, then work running
-// late around you, then today, then the rest of the week
-const GROUPS = { overdue: 'Overdue — sort these out first', decide: 'Waiting on you', late: 'Running late', today: 'Due today', week: 'Later this week' }
+// late around you, then today, the rest of the week, and the rest of your work
+const GROUPS = { overdue: 'Overdue — finish these first', decide: 'Waiting on you', late: 'Late in the team', today: 'Due today', week: 'Later this week', later: 'After that' }
 
 function Urgent({ me }) {
   const d = useDb()
   const T = today()
   const admin = me.role === 'admin'
-  const [form, setForm] = useState(null) // {kind: 'ask' | 'handoff', t} or {kind: 'makeup', initial}
+  const [form, setForm] = useState(null) // {kind: 'handoff', t} or {kind: 'makeup', initial}
   const [err, setErr] = useState('')
   const [more, setMore] = useState(false)
   const run = (fn) => {
@@ -161,13 +256,9 @@ function Urgent({ me }) {
   const proj = (id) => byId(d.projects, id)?.name ?? ''
   const first = (id) => S.userName(d, id).split(' ')[0]
   const leads = (pid) => byId(d.projects, pid)?.managerId === me.id
-  const daysLate = (day) => {
-    const n = daysBetween(day, T)
-    return n === 1 ? '1 day overdue' : `${n} days overdue`
-  }
   const openTask = (t) => t.status !== 'done'
   const rows = [
-    // make-ups owed to clients: the person on it, by their date; the admins once they're late
+    // compensation owed to clients: the person on it, by their date; the supervisors once it's late
     ...d.compensations
       .filter((k) => k.status === 'open' && k.due && (k.ownerId === me.id ? k.due <= addDays(T, 7) : admin && k.due < T))
       .map((k) => ({
@@ -176,38 +267,38 @@ function Urgent({ me }) {
         key: `k${k.id}`,
         icon: 'clock',
         late: k.due < T,
-        text: `Make-up for ${byId(d.clients, k.clientId)?.name}: ${k.offer}`,
-        meta: `for ${k.missed} · ${k.due < T ? daysLate(k.due) : relDay(k.due)}${k.ownerId && k.ownerId !== me.id ? ` · ${first(k.ownerId)}` : ''}`,
+        text: `Compensation for ${byId(d.clients, k.clientId)?.name}: ${k.offer}`,
+        meta: `for ${k.missed} · ${k.due < T ? late(k.due) : relDay(k.due)}${k.ownerId && k.ownerId !== me.id ? ` · ${first(k.ownerId)}` : ''}`,
         href: '#/content/owed',
         comp: k,
       })),
-    ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId === me.id).map((t) => ({ g: 'overdue', at: t.due, key: t.id, icon: 'clock', late: true, text: t.title, meta: `${proj(t.projectId)} · ${daysLate(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
+    ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId === me.id).map((t) => ({ g: 'overdue', at: t.due, key: t.id, icon: 'clock', late: true, text: t.title, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
     ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId === me.id).map((p) => ({ g: 'overdue', at: p.date, key: p.id, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)}, still ${POST_STATUS[p.status]}`, href: '#/content', post: p })),
 
     ...d.leaves
       .filter((l) => admin && l.status === 'pending' && l.userId !== me.id)
       .map((l) => {
         const due = S.openWork(d, l.userId, l.start, l.end).length
-        const meta = [l.note, due ? `${due} of their tasks or posts due then` : 'nothing of theirs due then'].filter(Boolean).join(' · ')
+        const meta = [l.note, due ? `${due} of their tasks or posts are due then` : 'nothing of theirs is due then'].filter(Boolean).join(' · ')
         return { g: 'decide', at: l.start, key: `v${l.id}`, icon: 'sun', text: `${first(l.userId)} asks for leave: ${S.leaveDays(l)}`, meta, href: '#/leave' }
       }),
-    ...d.tasks.filter((t) => S.canDecideTime(me, t)).map((t) => ({ g: 'decide', at: t.ask.at, key: `a${t.id}`, icon: 'clock', text: `${first(t.ask.by)} asks for more time on “${t.title}”`, meta: `until ${fmtDay(t.ask.due)} · ${t.ask.reason}`, href: `#/tasks/${t.id}`, ask: t })),
     ...d.deliverables.filter((x) => x.status === 'internal' && can(me, 'deliverable.review', x)).map((x) => ({ g: 'decide', at: '', key: x.id, icon: 'eye', text: `Check “${x.title}” v${x.version}`, meta: `${proj(x.projectId)} · from ${S.userName(d, x.submittedBy)}`, href: `#/projects/${x.projectId}/deliverables` })),
-    ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Review “${t.title}”`, meta: `${first(t.assigneeId)} moved it to Review`, href: `#/tasks/${t.id}` })),
+    ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}` })),
     ...d.deliverables.filter((x) => x.status === 'changes' && x.submittedBy === me.id).map((x) => ({ g: 'decide', at: '', key: `c${x.id}`, icon: 'edit', text: `Changes asked on “${x.title}”`, meta: x.history.at(-1)?.note || proj(x.projectId), href: `#/projects/${x.projectId}/deliverables` })),
-    ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” an owner`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
+    ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” to someone`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
 
-    ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId && t.assigneeId !== me.id && (admin || leads(t.projectId))).map((t) => ({ g: 'late', at: t.due, key: `l${t.id}`, icon: 'clock', late: true, text: `${first(t.assigneeId)}: “${t.title}”`, meta: `${proj(t.projectId)} · ${daysLate(t.due)}${t.ask ? ' · asked for more time' : ''}`, href: `#/tasks/${t.id}` })),
+    ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId && t.assigneeId !== me.id && (admin || leads(t.projectId))).map((t) => ({ g: 'late', at: t.due, key: `l${t.id}`, icon: 'clock', late: true, text: `${first(t.assigneeId)}: “${t.title}”`, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}` })),
     ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId !== me.id && S.seesAll(me)).map((p) => ({ g: 'late', at: p.date, key: `p${p.id}`, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)} · ${p.assigneeId ? first(p.assigneeId) : 'no one on it'}`, href: '#/content', post: p })),
 
     ...d.tasks.filter((t) => openTask(t) && t.due === T && t.assigneeId === me.id).map((t) => ({ g: 'today', at: t.due, key: `t${t.id}`, icon: 'check', text: t.title, meta: proj(t.projectId), href: `#/tasks/${t.id}`, task: t })),
     ...d.posts.filter((p) => p.date === T && p.assigneeId === me.id && !['scheduled', 'posted', 'missed'].includes(p.status)).map((p) => ({ g: 'today', at: p.date, key: `d${p.id}`, icon: 'grid', text: `${p.format} goes out today: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · still ${POST_STATUS[p.status]}`, href: '#/content' })),
 
     ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && t.due > T && t.due <= addDays(T, 7)).map((t) => ({ g: 'week', at: t.due, key: `w${t.id}`, icon: 'calendar', text: t.title, meta: `${proj(t.projectId)} · ${relDay(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
+    ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && (!t.due || t.due > addDays(T, 7))).map((t) => ({ g: 'later', at: t.due || '9', key: `n${t.id}`, icon: 'calendar', text: t.title, meta: [proj(t.projectId), t.due && relDay(t.due)].filter(Boolean).join(' · '), href: `#/tasks/${t.id}`, task: t })),
   ]
   const order = Object.keys(GROUPS)
   rows.sort((a, b) => order.indexOf(a.g) - order.indexOf(b.g) || a.at.localeCompare(b.at))
-  if (!rows.length) return <Empty title="Nothing urgent — you’re all caught up" />
+  if (!rows.length) return <Empty title="Nothing to do right now — you’re all caught up" />
   // overdue and decisions always show in full; the rest fold away after a few
   const shown = more ? rows : rows.filter((r, i) => ['overdue', 'decide'].includes(r.g) || i < 8)
   return (
@@ -231,17 +322,8 @@ function Urgent({ me }) {
                     <button className="btn sm" onClick={() => run(() => S.moveTask(me, r.task.id, 'done'))}>
                       <Icon name="check" size={14} /> Done
                     </button>
-                    {r.task.ask ? (
-                      <span className="pill amber">Asked until {fmtDay(r.task.ask.due)}</span>
-                    ) : (
-                      !S.setsDue(me, r.task) && (
-                        <button className="btn sm" onClick={() => setForm({ kind: 'ask', t: r.task })}>
-                          More time
-                        </button>
-                      )
-                    )}
                     <button className="btn sm ghost" onClick={() => setForm({ kind: 'handoff', t: r.task })}>
-                      <Icon name="swap" size={14} /> Hand off
+                      <Icon name="swap" size={14} /> Hand over
                     </button>
                   </>
                 )}
@@ -261,7 +343,6 @@ function Urgent({ me }) {
                     </button>
                   </>
                 )}
-                {r.ask && <TimeAsk t={r.ask} compact />}
                 {r.comp && (me.role === 'admin' || r.comp.ownerId === me.id) && (
                   <button className="btn sm" onClick={() => run(() => S.giveCompensation(me, r.comp.id))}>
                     <Icon name="check" size={14} /> Given
@@ -277,7 +358,6 @@ function Urgent({ me }) {
           Show {rows.length - shown.length} more
         </button>
       )}
-      {form?.kind === 'ask' && <AskTimeForm t={form.t} onClose={() => setForm(null)} />}
       {form?.kind === 'handoff' && <HandoffForm t={form.t} onClose={() => setForm(null)} />}
       {form?.kind === 'makeup' && <CompensationForm initial={form.initial} onClose={() => setForm(null)} />}
     </>
@@ -305,6 +385,39 @@ function StaffHome({ me }) {
         { label: 'Due today', value: mine.filter((t) => t.due === T).length },
         { label: 'Overdue', value: mine.filter(isOverdue).length, tone: mine.some(isOverdue) ? 'late' : '' },
       ]
+
+  // the team and freelancers: just their work, most urgent first, and today's meetings
+  if (!admin)
+    return (
+      <div className="page">
+        <div className="hello">
+          <h1>
+            {hello()}, {me.name.split(' ')[0]}
+          </h1>
+          <p className="sub">
+            {fmtLong(T)}
+            {away.length > 0 && ` · On leave today: ${away.join(', ')}`}
+          </p>
+        </div>
+        <div className="cols">
+          <div className="col-main">
+            <Card title="Your work — most urgent first" className="urgent-card">
+              <Urgent me={me} />
+            </Card>
+          </div>
+          <div className="col-side">
+            <Card title="Today’s meetings" action={<a href="#/calendar">Calendar</a>}>
+              <Agenda me={me} />
+            </Card>
+            {!free && (
+              <Card title="Announcements" action={<a href="#/chat/ch-announce">Open</a>}>
+                <Announcements />
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
+    )
 
   return (
     <div className="page">

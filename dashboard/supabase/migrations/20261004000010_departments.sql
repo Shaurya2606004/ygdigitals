@@ -1,14 +1,16 @@
 -- Departments: each person works in one (Video, Design, Social media, Websites, Packaging), and tasks and posts belong
 -- to one. A team member sees their department's work plus anything they own, made, or lead — nothing else of the
 -- studio. Admins and the "All" department (the PA) still see everything. Freelancers keep their own rule (009).
--- Also: the admin can delete a client and everything that belongs to them.
+-- Also: the admin can delete a client and everything that belongs to them, and a post gets a brief (what to make:
+-- script, reference links), which the content-calendar import fills from the sheet.
 
 alter table public.people add column dept text not null default ''
   check (dept in ('', 'video', 'design', 'social', 'website', 'packaging', 'all'));
 alter table public.tasks add column dept text not null default ''
   check (dept in ('', 'video', 'design', 'social', 'website', 'packaging'));
 alter table public.posts add column dept text not null default ''
-  check (dept in ('', 'video', 'design', 'social', 'website', 'packaging'));
+  check (dept in ('', 'video', 'design', 'social', 'website', 'packaging')),
+  add column brief text not null default '' check (length(brief) <= 5000);
 create index on public.tasks (dept);
 
 /* ---------- who sees what ---------- */
@@ -200,7 +202,7 @@ declare
 begin
   select * into t from public.tasks where id = p ->> 'id' for update;
   perform private.need(t.id is not null, 'This task no longer exists.');
-  perform private.need(private.sees_task(t, me), 'You don''t have permission to hand off this task.');
+  perform private.need(private.sees_task(t, me), 'You don''t have permission to hand over this task.');
   perform private.need(exists (select 1 from public.people where id = to_id and active and role <> 'client')
     and to_id is distinct from t.assignee_id, 'Pick who to hand it to.');
   from_name := case when t.assignee_id is null then 'Unassigned' else private.first_name(t.assignee_id) end;
@@ -313,17 +315,18 @@ begin
   s.status := case when p ? 'status' then p ->> 'status' else coalesce(old.status, 'idea') end;
   s.assignee_id := case when old.id is null or p ? 'assigneeId' then nullif(p ->> 'assigneeId', '')::uuid else old.assignee_id end;
   s.caption := case when old.id is null or p ? 'caption' then coalesce(p ->> 'caption', '') else old.caption end;
+  s.brief := case when old.id is null or p ? 'brief' then coalesce(p ->> 'brief', '') else old.brief end;
   s.dept := case when old.id is null or p ? 'dept' then coalesce(p ->> 'dept', '') else old.dept end;
 
   perform private.need(length(s.title) > 0, 'Give the post a working title or hook.');
   perform private.need(s.client_id is not null and s.date is not null, 'Pick the client and the day it goes out.');
 
   if old.id is null then
-    insert into public.posts (id, client_id, date, time, platform, format, title, status, assignee_id, caption, dept)
-    values (s.id, s.client_id, s.date, s.time, s.platform, s.format, s.title, s.status, s.assignee_id, s.caption, s.dept);
+    insert into public.posts (id, client_id, date, time, platform, format, title, status, assignee_id, caption, brief, dept)
+    values (s.id, s.client_id, s.date, s.time, s.platform, s.format, s.title, s.status, s.assignee_id, s.caption, s.brief, s.dept);
   else
     update public.posts set client_id = s.client_id, date = s.date, time = s.time, platform = s.platform, format = s.format,
-      title = s.title, status = s.status, assignee_id = s.assignee_id, caption = s.caption, dept = s.dept
+      title = s.title, status = s.status, assignee_id = s.assignee_id, caption = s.caption, brief = s.brief, dept = s.dept
     where id = s.id;
   end if;
   if s.assignee_id is not null and (old.id is null or old.assignee_id is distinct from s.assignee_id) then

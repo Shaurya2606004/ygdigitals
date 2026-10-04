@@ -1,4 +1,4 @@
--- Workflow rules (overdue + more time, repeating tasks, ongoing projects, undelivered posts), checked as real
+-- Workflow rules (overdue dates, owners, repeating tasks, ongoing projects, undelivered posts), checked as real
 -- users against the sample data. Like access.sql: run it on a database loaded with scripts/seed-sql.mjs; it always
 -- ends with an error listing every check, which rolls back everything it changed.
 do $$
@@ -11,65 +11,30 @@ declare
   priya uuid := md5('yg-sample:priya')::uuid;
   as_ text;
 begin
-  /* ---------- overdue: the owner asks for more time, the lead decides ---------- */
+  /* ---------- overdue: only a supervisor, the lead or whoever gave the task moves its date ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   begin
     perform public.save_task(json_build_object('id', 't4', 'due', private.today() + 9)::jsonb);
-    out := out || E'\n✗ owner moved their own deadline';
+    out := out || E'\n✗ the person doing it moved their own deadline';
   exception when others then
-    out := out || format(E'\n✓ an owner can''t move their own deadline (%s)', sqlerrm);
-  end;
-  begin
-    perform public.ask_time(json_build_object('id', 't4', 'due', private.today() + 8)::jsonb);
-    out := out || E'\n✗ asked without a reason';
-  exception when others then
-    out := out || format(E'\n✓ asking needs a reason (%s)', sqlerrm);
-  end;
-  perform public.ask_time(json_build_object('id', 't4', 'due', private.today() + 8, 'reason', 'Footage came in late')::jsonb);
-  perform set_config('role', 'none', true);
-  select count(*) into n from public.notifications where text like 'asked for more time on “Edit Reel 1%';
-  out := out || format(E'\n%s the admin and the lead hear about it (2): %s', case when n = 2 then '✓' else '✗' end, n);
-
-  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:ritika')::uuid, 'role', 'authenticated')::text, true);
-  perform set_config('role', 'authenticated', true);
-  begin
-    perform public.decide_time('{"id":"t4","approve":true}');
-    out := out || E'\n✗ an outsider gave more time';
-  exception when others then
-    out := out || format(E'\n✓ only the admin, lead or task giver decides (%s)', sqlerrm);
+    out := out || format(E'\n✓ the person doing a task can''t move its date (%s)', sqlerrm);
   end;
   perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
-  begin
-    perform public.ask_time(json_build_object('id', 't4', 'due', private.today() + 8, 'reason', 'x')::jsonb);
-    out := out || E'\n✗ someone else asked on the owner''s behalf';
-  exception when others then
-    out := out || format(E'\n✓ only the owner asks (%s)', sqlerrm);
-  end;
-  perform public.decide_time('{"id":"t4","approve":true,"note":"OK, but no later"}');
-  perform set_config('role', 'none', true);
-  select t.due = private.today() + 8 and x.ask is null and jsonb_array_length(x.extensions) = 1 and (x.extensions -> 0 ->> 'approved')::boolean
-    and x.extensions -> 0 ->> 'reason' = 'Footage came in late' into ok
-  from public.tasks t join public.task_private x on x.task_id = t.id where t.id = 't4';
-  out := out || format(E'\n%s approved: new date, request cleared, extension kept with its reason', case when ok then '✓' else '✗' end);
-  select count(*) into n from public.notifications where user_id = vikas and text like 'gave you until%Edit Reel 1%';
-  out := out || format(E'\n%s the owner is told: %s', case when n = 1 then '✓' else '✗' end, n);
-
-  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
-  perform set_config('role', 'authenticated', true);
-  perform public.ask_time(json_build_object('id', 't4', 'due', private.today() + 12, 'reason', 'Client wants a new hook')::jsonb);
-  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
-  perform public.decide_time('{"id":"t4","approve":false,"note":"Use the old hook"}');
-  perform set_config('role', 'none', true);
-  select t.due = private.today() + 8 and jsonb_array_length(x.extensions) = 2 and not (x.extensions -> 1 ->> 'approved')::boolean into ok
-  from public.tasks t join public.task_private x on x.task_id = t.id where t.id = 't4';
-  out := out || format(E'\n%s declined: the date stays, the request is kept as declined', case when ok then '✓' else '✗' end);
-  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
-  perform set_config('role', 'authenticated', true);
   perform public.save_task(json_build_object('id', 't4', 'due', private.today() + 10)::jsonb);
   perform set_config('role', 'none', true);
   select count(*) into n from public.notifications where user_id = vikas and text like 'moved “Edit Reel 1%';
-  out := out || format(E'\n%s the lead can move a date, and the owner is told: %s', case when n = 1 then '✓' else '✗' end, n);
+  out := out || format(E'\n%s the lead can move a date, and the person doing it is told: %s', case when n = 1 then '✓' else '✗' end, n);
+
+  /* ---------- owner: a supervisor with the owner flag ---------- */
+  begin
+    update public.people set owner = true where id = vikas;
+    out := out || E'\n✗ a team member was made an owner';
+  exception when others then
+    out := out || E'\n✓ only a supervisor can be an owner';
+  end;
+  select owner and role = 'admin' into ok from public.people where id = md5('yg-sample:aman')::uuid;
+  out := out || format(E'\n%s the sample owner is a supervisor with the flag', case when ok then '✓' else '✗' end);
 
   /* ---------- repeating tasks ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
@@ -108,7 +73,12 @@ begin
   perform set_config('role', 'authenticated', true);
   perform public.save_project('{"id":"p-gv-month","ongoing":true}');
   perform public.save_post('{"id":"s4","status":"missed"}');
+  -- an imported post: its brief (what to make) is kept, and a later edit without it leaves it alone
+  perform public.save_post('{"id":"s-imp","clientId":"desi","date":"2026-11-02","format":"Reel","title":"Missing you","brief":"Festival: Diwali"}');
+  perform public.save_post('{"id":"s-imp","title":"Missing you (v2)"}');
   perform set_config('role', 'none', true);
+  select brief into s from public.posts where id = 's-imp';
+  out := out || format(E'\n%s a post keeps its brief: %s', case when s = 'Festival: Diwali' then '✓' else '✗' end, s);
   select ongoing and due is null into ok from public.projects where id = 'p-gv-month';
   out := out || format(E'\n%s an ongoing project has no end date', case when ok then '✓' else '✗' end);
   select status into s from public.posts where id = 's4';
@@ -208,7 +178,7 @@ begin
   perform set_config('role', 'none', true);
   select status = 'given' and given_at = private.today() into ok from public.compensations where id = 'k1';
   out := out || format(E'\n%s the owner marks it given', case when ok then '✓' else '✗' end);
-  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and (text like 'will make up for%' or text like 'delivered your make-up%');
+  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and (text like 'will make up for%' or text like 'delivered your compensation%');
   out := out || format(E'\n%s the client hears when it''s promised and when it''s given (2): %s', case when n = 2 then '✓' else '✗' end, n);
 
   /* ---------- the morning job ---------- */
@@ -225,12 +195,12 @@ begin
   select string_agg(text, ' | ') into s from public.notifications where user_id = md5('yg-sample:aman')::uuid and text like '“Send last week%';
   out := out || format(E'\n%s the admin hears about work 2+ days overdue with no request for time: %s',
     case when s like '“Send last week’s lead sheet to Sunita” (Priya) is 2 days overdue' then '✓' else '✗' end, s);
-  select count(*) into n from public.notifications where user_id = md5('yg-sample:aman')::uuid and text like '“Monthly report” (no owner) is % days overdue';
-  out := out || format(E'\n%s …unowned work says so: %s', case when n = 1 then '✓' else '✗' end, n);
+  select count(*) into n from public.notifications where user_id = md5('yg-sample:aman')::uuid and text like '“Monthly report” (not given to anyone) is % days overdue';
+  out := out || format(E'\n%s …work not given to anyone says so: %s', case when n = 1 then '✓' else '✗' end, n);
   select count(*) into n from public.notifications where user_id = priya and text like 'Reel “Office wala Diwali” for Desi Crunch Snacks was due%';
   out := out || format(E'\n%s a post nobody marked: whoever made it is asked to mark it: %s', case when n = 1 then '✓' else '✗' end, n);
-  select count(*) into n from public.notifications where user_id = vikas and text = 'Make-up for Desi Crunch Snacks is due today: 1 extra Reel this week';
-  out := out || format(E'\n%s a make-up due today reminds whoever''s on it: %s', case when n = 1 then '✓' else '✗' end, n);
+  select count(*) into n from public.notifications where user_id = vikas and text = 'Compensation for Desi Crunch Snacks is due today: 1 extra Reel this week';
+  out := out || format(E'\n%s compensation due today reminds whoever''s on it: %s', case when n = 1 then '✓' else '✗' end, n);
   select count(*) into n from public.notifications where from_id is not null;
   out := out || format(E'\n%s the hub sends these itself (no sender): %s from a person', case when n = 0 then '✓' else '✗' end, n);
   select count(*) into n from public.notifications;

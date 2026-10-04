@@ -14,6 +14,7 @@ export function seed() {
   let n = 0
   const person = (id, name, role, title, color, extra = {}) => ({
     dept: '',
+    owner: false,
     id,
     name,
     email: `${id}@ygdigitals.com`,
@@ -28,7 +29,7 @@ export function seed() {
   const client = (id, name, clientId, title, email, color) => ({ ...person(id, name, 'client', title, color), email, clientId, phone: '' })
 
   const users = [
-    person('aman', 'Aman Verma', 'admin', 'Founder · strategy & client servicing', '#9f1239'),
+    person('aman', 'Aman Verma', 'admin', 'Founder · strategy & client servicing', '#9f1239', { owner: true }),
     person('priya', 'Priya Kadian', 'member', 'Social media & content', '#e04c5c', { dept: 'social' }),
     person('vikas', 'Vikas Rathee', 'member', 'Shoots & video editing', '#d97706', { dept: 'video' }),
     person('ritika', 'Ritika Arora', 'member', 'Design — packaging & creatives', '#7c3aed', { dept: 'design' }),
@@ -75,8 +76,6 @@ export function seed() {
       desc: '',
       checklist: [],
       comments: [],
-      ask: null,
-      extensions: [],
       createdBy: projects.find((p) => p.id === projectId).managerId,
       createdAt: ago(12 * D),
       completedAt: status === 'done' ? day(Math.min(due, -1)) : null,
@@ -90,7 +89,6 @@ export function seed() {
     task('p-diwali', 'priya', 'done', 'high', -6, 'Festive content calendar — 12 posts', { checklist: [['Theme & hooks', true], ['12 post slots with formats', true], ['Client sign-off', true]] }),
     task('p-diwali', 'priya', 'done', 'normal', -4, 'Scripts for 3 Diwali Reels', { desc: 'Hinglish, 30 seconds each, hook in the first 2 seconds. Reel 1: grandma reveal. Reel 2: office Diwali. Reel 3: gift box unboxing.' }),
     task('p-diwali', 'vikas', 'doing', 'high', 2, 'Shoot day: family Reels + product macros at the Sonipat unit', {
-      ask: { due: day(4), reason: 'Rahul moved the packing-area slot to Thursday.', by: 'vikas', at: ago(3 * H) },
       desc: 'Full day at the Desi Crunch unit. Packing area free 10–1 (confirmed by Rahul). Talent: Rahul’s family + 2 staff.',
       checklist: [['Shot list', true], ['Book lights & gimbal', true], ['Props: diyas, gift boxes, rangoli', false], ['Talent release forms', false]],
       comments: [c('priya', 20 * H, 'Hook for Reel 1 is the grandma reveal — get at least 3 takes of it.'), c('vikas', 19 * H, 'Noted. Will also grab slow-mo of the bhujia pour for the end cards @Ritika.')],

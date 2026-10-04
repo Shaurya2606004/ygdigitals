@@ -130,8 +130,8 @@ begin
   out := out || format(E'\n%s handoff notifies the new owner: %s', case when n = 1 then '✓' else '✗' end, n);
   select (checklist -> 0 ->> 'done')::boolean = false and (checklist -> 1 ->> 'done')::boolean into ok from public.task_private where task_id = 't1';
   out := out || format(E'\n%s checklist item set without touching the others', case when ok then '✓' else '✗' end);
-  select count(*) into n from public.notifications where text like '“Edit Reel 1%is ready for review';
-  out := out || format(E'\n%s moving to Review pings admin + lead (1, lead is the mover): %s', case when n = 1 then '✓' else '✗' end, n);
+  select count(*) into n from public.notifications where text like '“Edit Reel 1%is ready to check';
+  out := out || format(E'\n%s moving to Ready to check pings the supervisors + lead (1, lead is the mover): %s', case when n = 1 then '✓' else '✗' end, n);
   select rev into n from public.tasks where id = 't4';
   out := out || format(E'\n%s every update bumps rev: %s', case when n = 1 then '✓' else '✗' end, n);
 

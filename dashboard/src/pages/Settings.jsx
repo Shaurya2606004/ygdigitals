@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, DEPTS, isStaff, PERMISSIONS, PERSON_DEPTS, ROLES } from '../store.js'
+import { byId, can, DEPTS, isStaff, level, PERMISSIONS, PERSON_DEPTS, ROLES } from '../store.js'
 import { Avatar, Card, download, Empty, Err, Field, Icon, Modal, PageHead, Tabs, useDb, useForm, useMe } from '../ui.jsx'
 
 export default function Settings({ args }) {
@@ -41,7 +41,7 @@ function Profile({ me }) {
             <span>
               <b>{me.email}</b>
               <small className="muted block">
-                {ROLES[me.role].label} — {ROLES[me.role].blurb}
+                {ROLES[level(me)].label} — {ROLES[level(me)].blurb}
               </small>
             </span>
           </div>
@@ -56,7 +56,7 @@ function Profile({ me }) {
           </Field>
           <p className="full muted small">
             <Icon name="lock" size={14} />{' '}
-            {me.role === 'admin' ? 'Change your login email under Team. Only another admin can change your role.' : 'Your email (your login) and role are set by the admin.'}
+            {me.role === 'admin' ? 'Change your login email under Team. Only another supervisor or owner can change your role.' : 'Your email (your login) and role are set by your supervisor.'}
           </p>
           <Err msg={err} />
           <div className="form-actions">
@@ -132,7 +132,7 @@ function Team() {
     <>
       <div className="toolbar">
         <p className="muted">
-          {admin ? 'Everyone at YG who can sign in. Edit someone to change their role or set them a new password.' : 'Everyone at YG who can sign in. The admin adds people and sets their role.'}
+          {admin ? 'Everyone at YG who can sign in. Edit someone to change their role or set them a new password.' : 'Everyone at YG who can sign in. A supervisor adds people and sets their role.'}
         </p>
         {admin && (
           <button className="btn primary" onClick={() => setForm({})}>
@@ -165,7 +165,7 @@ function Team() {
                   </span>
                 </td>
                 <td>
-                  <span className="pill grey">{u.active ? ROLES[u.role].label : 'Deactivated'}</span>
+                  <span className="pill grey">{u.active ? ROLES[level(u)].label : 'Deactivated'}</span>
                   {u.dept && <small className="block muted">{PERSON_DEPTS[u.dept]}</small>}
                 </td>
                 <td className="small">
@@ -378,7 +378,7 @@ function Roles() {
                 <td>{what}</td>
                 {roles.map((r) => (
                   <td key={r} className="c">
-                    {who.includes(r) ? (
+                    {who.includes(r) || (r === 'owner' && who.includes('admin')) ? (
                       <span className="yes" aria-label="Yes">
                         ✓
                       </span>
@@ -402,7 +402,7 @@ function Roles() {
 function PersonForm({ onClose, edit, clientId, fill }) {
   const me = useMe()
   const d = useDb()
-  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', dept: '', sendEmail: true, ...(edit || { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '', ...fill }) })
+  const { v, set, setV, err, runAsync, busy } = useForm({ password: '', dept: '', sendEmail: true, ...(edit ? { ...edit, role: level(edit) } : { name: '', email: '', role: clientId ? 'client' : 'member', clientId: clientId || '', title: '', phone: '', ...fill }) })
   return (
     <Modal title={edit ? `Edit ${edit.name}` : clientId ? `Login for ${byId(d.clients, clientId)?.name}` : 'Add a person'} onClose={onClose}>
       <form
@@ -419,7 +419,7 @@ function PersonForm({ onClose, edit, clientId, fill }) {
           <input type="email" value={v.email} onChange={set('email')} />
         </Field>
         {!clientId && (
-          <Field label="Role" hint={edit?.id === me.id ? 'Only another admin can change your role.' : ROLES[v.role]?.blurb}>
+          <Field label="Role" hint={edit?.id === me.id ? 'Only another supervisor or owner can change your role.' : ROLES[v.role]?.blurb}>
             <select value={v.role} onChange={set('role')} disabled={edit?.id === me.id}>
               {Object.entries(ROLES)
                 .filter(([k]) => k !== 'client') // client logins are added under their client (Settings › Clients)
@@ -435,12 +435,12 @@ function PersonForm({ onClose, edit, clientId, fill }) {
           <Field
             label="Department"
             hint={
-              v.role === 'admin'
-                ? 'Admins see the whole studio whatever this says.'
+              ['owner', 'admin'].includes(v.role)
+                ? 'Supervisors and owners see the whole studio whatever this says.'
                 : v.role === 'freelancer'
                   ? 'Freelancers see only the projects they’re on; this is a label.'
                   : v.dept === 'all'
-                    ? 'Sees the whole studio, like an admin, but can’t manage people or check work.'
+                    ? 'Sees the whole studio, like a supervisor, but can’t manage people or check work.'
                     : v.dept
                       ? `Sees ${PERSON_DEPTS[v.dept]} work, plus anything they own, made or lead.`
                       : 'No department: sees only the work they own, made or lead.'

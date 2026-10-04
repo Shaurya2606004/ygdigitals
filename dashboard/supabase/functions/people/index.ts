@@ -1,8 +1,8 @@
-// Admin-only: add people and client logins, edit them, switch logins off and on.
+// Supervisors and owners only: add people and client logins, edit them, switch logins off and on.
 // Lives here (not in a database function) because creating, renaming and banning logins needs the auth admin
 // API, which only the service role may use. Same checks and messages as savePerson / setActive in src/store.js.
 // A new login gets a welcome email with the sign-in link and its temporary password (when RESEND_API_KEY is set;
-// otherwise, and if sending fails, the admin shares the password themselves — the app tells them).
+// otherwise, and if sending fails, the supervisor shares the password themselves — the app tells them).
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const admin = createClient(
@@ -10,7 +10,8 @@ const admin = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}').default,
   { auth: { persistSession: false, autoRefreshToken: false } },
 )
-const ROLES: Record<string, string> = { admin: 'Admin', member: 'Team member', freelancer: 'Freelancer', client: 'Client' }
+// 'owner' is a supervisor (role 'admin') with people.owner set — the level above supervisor
+const ROLES: Record<string, string> = { owner: 'Owner', admin: 'Supervisor', member: 'Team member', freelancer: 'Freelancer', client: 'Client' }
 const DEPTS = ['video', 'design', 'social', 'website', 'packaging'] // + 'all' (the office) for team members
 const COLORS = ['#e04c5c', '#d97706', '#2563eb', '#0d9488', '#7c3aed', '#16a34a', '#db2777', '#475569', '#0891b2', '#ca8a04']
 const cors = {
@@ -74,7 +75,8 @@ Deno.serve(async (req) => {
     const p = body.person ?? {}
     const name = String(p.name ?? '').trim()
     const email = String(p.email ?? '').trim().toLowerCase()
-    const role = String(p.role ?? '')
+    const owner = p.role === 'owner'
+    const role = owner ? 'admin' : String(p.role ?? '')
     const clientId = role === 'client' ? p.clientId || null : null
     const password = p.password ? String(p.password) : ''
     const dept = role === 'client' ? '' : String(p.dept ?? '')
@@ -86,12 +88,13 @@ Deno.serve(async (req) => {
     if (dept && !DEPTS.includes(dept) && !(dept === 'all' && role === 'member')) return fail('Pick a department from the list.')
     const { data: taken } = await admin.from('people').select('id').eq('email', email).maybeSingle()
     if (taken && taken.id !== p.id) return fail('Someone already uses that email.')
-    const fields = { name, email, role, client_id: clientId, dept, title: String(p.title ?? ''), phone: String(p.phone ?? '') }
+    const fields = { name, email, role, owner, client_id: clientId, dept, title: String(p.title ?? ''), phone: String(p.phone ?? '') }
 
     if (p.id) {
-      const { data: old } = await admin.from('people').select('id, email, role').eq('id', p.id).maybeSingle()
+      const { data: old } = await admin.from('people').select('id, email, role, owner').eq('id', p.id).maybeSingle()
       if (!old) return fail('That person no longer exists.')
-      if (old.id === me.id && role !== old.role) return fail('You cannot change your own role.')
+      const changed = role !== old.role || owner !== old.owner
+      if (old.id === me.id && changed) return fail('You cannot change your own role.')
       const login: Record<string, unknown> = {}
       if (email !== old.email) Object.assign(login, { email, email_confirm: true })
       if (password) login.password = password
@@ -101,7 +104,7 @@ Deno.serve(async (req) => {
       }
       const { error } = await admin.from('people').update(fields).eq('id', p.id)
       if (error) return fail(error.message)
-      if (old.role !== role) await notify(me.id, p.id, `changed your role to ${ROLES[role]}`, '#/settings')
+      if (changed) await notify(me.id, p.id, `changed your role to ${ROLES[owner ? 'owner' : role]}`, '#/settings')
       await log(me.id, `updated ${name}'s details`, '#/settings/team')
       return reply({ id: p.id })
     }

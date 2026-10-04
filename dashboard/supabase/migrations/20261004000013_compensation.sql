@@ -57,7 +57,7 @@ begin
   perform private.need(length(c.offer) between 1 and 300, 'Say what we’ll give instead.');
   perform private.need(c.owner_id is null or exists (select 1 from public.people where id = c.owner_id and role <> 'client' and active), 'Pick someone from the team.');
   perform private.need(c.post_id is null or exists (select 1 from public.posts where id = c.post_id and client_id = c.client_id), 'That post isn''t this client''s.');
-  perform private.need(c.shared is not distinct from coalesce(old.shared, false) or me.role = 'admin', 'Only an admin shares this with the client.');
+  perform private.need(c.shared is not distinct from coalesce(old.shared, false) or me.role = 'admin', 'Only a supervisor shares this with the client.');
 
   if old.id is null then
     insert into public.compensations (id, client_id, post_id, missed, offer, due, owner_id, shared, created_by)
@@ -68,14 +68,14 @@ begin
     where id = c.id;
   end if;
   if c.owner_id is not null and c.owner_id is distinct from old.owner_id then
-    perform private.notify(me.id, array[c.owner_id], 'gave you a make-up for ' || (select name from public.clients where id = c.client_id)
+    perform private.notify(me.id, array[c.owner_id], 'gave you the compensation for ' || (select name from public.clients where id = c.client_id)
       || ': ' || c.offer || coalesce(' by ' || private.fmt_day(c.due), ''), '#/content/owed');
   end if;
   if c.shared and not coalesce(old.shared, false) then
     perform private.notify(me.id, private.client_users(c.client_id), 'will make up for ' || c.missed || ': ' || c.offer
       || coalesce(' by ' || private.fmt_day(c.due), ''), '#/');
   end if;
-  perform private.log(me.id, case when old.id is null then 'noted a make-up owed to ' else 'updated a make-up owed to ' end
+  perform private.log(me.id, case when old.id is null then 'noted compensation owed to ' else 'updated compensation owed to ' end
     || (select name from public.clients where id = c.client_id) || ': ' || c.offer, '#/content/owed');
   return c.id;
 end $$;
@@ -91,18 +91,18 @@ begin
   perform private.need(c.status = 'open', 'This has already been given.');
   update public.compensations set status = 'given', given_at = private.today() where id = c.id;
   perform private.notify(me.id, private.admins() || c.created_by, 'gave ' || (select name from public.clients where id = c.client_id)
-    || ' their make-up: ' || c.offer, '#/content/owed');
+    || ' their compensation: ' || c.offer, '#/content/owed');
   if c.shared then
-    perform private.notify(me.id, private.client_users(c.client_id), 'delivered your make-up: ' || c.offer, '#/');
+    perform private.notify(me.id, private.client_users(c.client_id), 'delivered your compensation: ' || c.offer, '#/');
   end if;
-  perform private.log(me.id, 'gave ' || (select name from public.clients where id = c.client_id) || ' their make-up: ' || c.offer, '#/content/owed');
+  perform private.log(me.id, 'gave ' || (select name from public.clients where id = c.client_id) || ' their compensation: ' || c.offer, '#/content/owed');
 end $$;
 
 create function public.delete_compensation(p jsonb) returns void language plpgsql security definer set search_path = '' as $$
 declare
   me public.people := private.me();
 begin
-  perform private.need(me.role = 'admin', 'Only an admin can remove this.');
+  perform private.need(me.role = 'admin', 'Only a supervisor can remove this.');
   delete from public.compensations where id = p ->> 'id';
 end $$;
 

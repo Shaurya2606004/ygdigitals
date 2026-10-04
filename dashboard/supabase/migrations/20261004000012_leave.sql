@@ -79,7 +79,7 @@ begin
   -- short notice: the work for those days has to be done (or handed on) before you go
   if s <= private.today() + 1 then
     due := private.open_work(me.id, s, e);
-    perform private.need(cardinality(due) = 0, 'Leave from today or tomorrow needs the work due on those days done or handed off first: '
+    perform private.need(cardinality(due) = 0, 'Leave from today or tomorrow needs the work due on those days done or handed over first: '
       || (select string_agg(private.q(x), ', ') from unnest(due[1:3]) x) || case when cardinality(due) > 3 then ' and ' || cardinality(due) - 3 || ' more' else '' end || '.');
   end if;
   insert into public.leaves (id, user_id, start, "end") values (lid, me.id, s, e);
@@ -96,10 +96,10 @@ declare
   answer text := trim(coalesce(p ->> 'reply', ''));
   due text[];
 begin
-  perform private.need(me.role = 'admin', 'Only an admin can approve leave.');
+  perform private.need(me.role = 'admin', 'Only a supervisor can approve leave.');
   select * into l from public.leaves where id = p ->> 'id' for update;
   perform private.need(l.id is not null, 'This leave request no longer exists.');
-  perform private.need(l.user_id <> me.id, 'Another admin has to decide your own leave.');
+  perform private.need(l.user_id <> me.id, 'Another supervisor has to decide your own leave.');
   perform private.need(l.status = 'pending', 'This leave has already been decided.');
   if ok and not coalesce((p ->> 'force')::boolean, false) then
     due := private.open_work(l.user_id, l.start, l."end");

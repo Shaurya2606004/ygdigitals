@@ -1,18 +1,15 @@
--- Overdue work gets resolved, not ignored. A task's owner can't quietly move their own deadline: they ask for more
--- time (new date + reason), and the admin, the project lead or whoever gave them the task approves or declines it.
--- Every extension is kept on the task. Also: repeating tasks (finishing one makes the next), ongoing (retainer)
--- projects with no end date, and "Undelivered" for a post that was promised and never went out.
+-- Overdue work gets resolved, not ignored. A task's owner can't quietly move their own deadline: only a supervisor,
+-- the project lead or whoever gave them the task can (the owner tells them if they need more time). Also: repeating
+-- tasks (finishing one makes the next), ongoing (retainer) projects with no end date, and "Undelivered" for a post
+-- that was promised and never went out.
 
-alter table public.task_private
-  add column ask jsonb check (ask is null or jsonb_typeof(ask) = 'object'),
-  add column extensions jsonb not null default '[]' check (jsonb_typeof(extensions) = 'array');
 alter table public.tasks add column repeat text not null default 'none' check (repeat in ('none', 'weekly', 'monthly'));
 alter table public.projects add column ongoing boolean not null default false,
   add constraint projects_ongoing_no_due check (not ongoing or due is null);
 alter table public.posts drop constraint posts_status_check,
   add constraint posts_status_check check (status in ('idea', 'production', 'ready', 'scheduled', 'posted', 'missed'));
 
--- who may set a task's due date: the admin, the project lead, or whoever gave it to someone else (never its owner)
+-- who may set a task's due date: a supervisor, the project lead, or whoever gave it to someone else (never its owner)
 create function private.sets_due(t public.tasks, u public.people) returns boolean language sql stable security definer set search_path = '' as $$
   select coalesce(u.active, false) and (u.role = 'admin'
     or exists (select 1 from public.projects p where p.id = t.project_id and p.manager_id = u.id)
@@ -52,7 +49,7 @@ begin
   perform private.need(t.assignee_id is null or exists (select 1 from public.people where id = t.assignee_id and role <> 'client'),
     'Tasks can only go to YG team members.');
   perform private.need(old.id is null or t.due is not distinct from old.due or private.sets_due(old, me),
-    'Only the admin, the project lead or whoever gave you this task can move its due date — ask for more time instead.');
+    'Only a supervisor, the project lead or whoever gave you this task can change its date. Tell them if you need more time.');
   perform private.need(t.repeat = 'none' or t.due is not null, 'A repeating task needs a due date.');
 
   -- finishing a repeating task makes the next one; the chain carries on from there
@@ -101,7 +98,7 @@ begin
   if old.id is not null and old.status <> t.status then
     if t.status = 'review' then
       perform private.notify(me.id, private.admins() || (select manager_id from public.projects where id = t.project_id),
-        private.q(t.title) || ' is ready for review', lnk);
+        private.q(t.title) || ' is ready to check', lnk);
     elsif t.status = 'done' then
       perform private.notify(me.id, array[t.created_by], 'finished ' || private.q(t.title), lnk);
     end if;
@@ -110,59 +107,6 @@ begin
     perform private.log(me.id, case when old.id is null then 'created ' else 'updated ' end || private.q(t.title), lnk);
   end if;
   return t.id;
-end $$;
-
--- the owner asks for a new date, with a reason
-create function public.ask_time(p jsonb) returns void language plpgsql security definer set search_path = '' as $$
-declare
-  me public.people := private.me();
-  t public.tasks;
-  new_due date := nullif(p ->> 'due', '')::date;
-  why text := trim(coalesce(p ->> 'reason', ''));
-begin
-  select * into t from public.tasks where id = p ->> 'id' for update;
-  perform private.need(t.id is not null and private.sees_task(t, me), 'This task is not available.');
-  perform private.need(t.assignee_id = me.id, 'Only the task’s owner can ask for more time.');
-  perform private.need(t.status <> 'done', 'This task is already done.');
-  perform private.need(new_due is not null and new_due >= private.today() and new_due is distinct from t.due, 'Pick the new date (from today on).');
-  perform private.need(length(why) between 1 and 1000, 'Say why you need more time.');
-  update public.task_private set
-    ask = jsonb_build_object('due', new_due, 'reason', why, 'by', me.id, 'at', private.iso()),
-    comments = comments || jsonb_build_array(jsonb_build_object('id', coalesce(nullif(p ->> 'commentId', ''), gen_random_uuid()::text),
-      'userId', me.id, 'at', private.iso(), 'text', why, 'ask', 'asked for more time, until ' || private.fmt_day(new_due)))
-  where task_id = t.id;
-  perform private.notify(me.id, private.admins() || (select manager_id from public.projects where id = t.project_id) || t.created_by,
-    'asked for more time on ' || private.q(t.title) || ' (until ' || private.fmt_day(new_due) || '): ' || left(why, 90), '#/tasks/' || t.id);
-end $$;
-
-create function public.decide_time(p jsonb) returns void language plpgsql security definer set search_path = '' as $$
-declare
-  me public.people := private.me();
-  t public.tasks;
-  a jsonb;
-  ok boolean := coalesce((p ->> 'approve')::boolean, false);
-  note text := trim(coalesce(p ->> 'note', ''));
-  new_due date;
-begin
-  select * into t from public.tasks where id = p ->> 'id' for update;
-  select ask into a from public.task_private where task_id = t.id for update;
-  perform private.need(t.id is not null and a is not null, 'There’s no request for more time on this task.');
-  perform private.need(private.sets_due(t, me) and (me.role = 'admin' or me.id is distinct from (a ->> 'by')::uuid),
-    'You don''t have permission to decide this.');
-  new_due := (a ->> 'due')::date;
-  if ok then
-    update public.tasks set due = new_due where id = t.id;
-  end if;
-  update public.task_private set ask = null,
-    extensions = extensions || jsonb_build_array(a || jsonb_build_object('from', t.due, 'approved', ok, 'decidedBy', me.id, 'decidedAt', private.iso(), 'note', note)),
-    comments = comments || jsonb_build_array(jsonb_build_object('id', coalesce(nullif(p ->> 'commentId', ''), gen_random_uuid()::text),
-      'userId', me.id, 'at', private.iso(), 'text', note,
-      'ask', case when ok then 'gave more time, until ' || private.fmt_day(new_due) else 'kept the date (' || coalesce(private.fmt_day(t.due), 'none') || ')' end))
-  where task_id = t.id;
-  perform private.notify(me.id, array[(a ->> 'by')::uuid],
-    case when ok then 'gave you until ' || private.fmt_day(new_due) || ' for ' || private.q(t.title)
-      else 'kept the date for ' || private.q(t.title) || case when note <> '' then ': ' || note else '' end end, '#/tasks/' || t.id);
-  perform private.log(me.id, case when ok then 'gave more time on ' else 'declined more time on ' end || private.q(t.title), '#/tasks/' || t.id);
 end $$;
 
 create or replace function public.save_project(p jsonb) returns text language plpgsql security definer set search_path = '' as $$

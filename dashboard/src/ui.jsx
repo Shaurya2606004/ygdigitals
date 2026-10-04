@@ -244,10 +244,10 @@ export function Menu({ label, children, className = 'btn', align = 'right', titl
     if (!open) return
     const out = (e) => !ref.current.contains(e.target) && setOpen(false)
     const esc = (e) => e.key === 'Escape' && setOpen(false)
-    document.addEventListener('mousedown', out)
+    document.addEventListener('pointerdown', out) // pointer, not mouse: phones send no mouse event for a tap on empty space
     document.addEventListener('keydown', esc)
     return () => {
-      document.removeEventListener('mousedown', out)
+      document.removeEventListener('pointerdown', out)
       document.removeEventListener('keydown', esc)
     }
   }, [open])

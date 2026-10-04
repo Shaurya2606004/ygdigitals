@@ -6,7 +6,7 @@ import './styles.css'
 import { StrictMode, useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import * as S from './store.js'
-import { byId, can, isStaff, readNotifications, ROLES, unread, userName } from './store.js'
+import { byId, can, isStaff, level, PERSON_DEPTS, readNotifications, ROLES, unread, userName } from './store.js'
 import { seed } from './seed.js'
 import { Avatar, Empty, Icon, MeCtx, Menu, useDb } from './ui.jsx'
 import { ago } from './util.js'
@@ -72,7 +72,7 @@ function App() {
   if (!session) return <Login />
   if (!S.isLoaded()) return <Splash error={S.getNotice()} />
   const me = byId(d.users, session.userId)
-  if (!me?.active) return <Splash error="This login has no access to YG Hub any more. Ask your admin." />
+  if (!me?.active) return <Splash error="This login has no access to YG Hub any more. Ask your supervisor." />
   return (
     <MeCtx.Provider value={me.id}>
       <Shell me={me} signOut={S.signOut} />
@@ -160,7 +160,7 @@ function Login() {
           <button className="btn primary block" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign in'}
           </button>
-          <p className="small muted">Forgot your password? Ask your admin to set a new one.</p>
+          <p className="small muted">Forgot your password? Ask your supervisor to set a new one.</p>
         </form>
         {groups && (
           <div className="demo-accounts">
@@ -173,7 +173,7 @@ function Login() {
                       <Avatar user={u} size={32} />
                       <span>
                         <b>{u.name}</b>
-                        <small>{u.role === 'client' ? byId(DEMO.clients, u.clientId)?.name : `${ROLES[u.role].label} · ${u.title}`}</small>
+                        <small>{u.role === 'client' ? byId(DEMO.clients, u.clientId)?.name : `${ROLES[level(u)].label} · ${u.title}`}</small>
                       </span>
                     </button>
                   ))}
@@ -233,7 +233,7 @@ export function Shell({ me, signOut }) {
             <Avatar user={me} size={34} />
             <span>
               <b>{me.name}</b>
-              <small>{client ? client.name : ROLES[me.role].label}</small>
+              <small>{client ? client.name : [ROLES[level(me)].label, me.role === 'member' && PERSON_DEPTS[me.dept]].filter(Boolean).join(' · ')}</small>
             </span>
           </div>
         </div>

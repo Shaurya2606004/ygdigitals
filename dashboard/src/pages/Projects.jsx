@@ -372,7 +372,7 @@ function Deliverables({ p }) {
   return (
     <>
       <div className="toolbar">
-        <p className="muted">{staffer ? 'Work goes: submitted → Admin checks and sends it to the client → client approves or asks for changes.' : 'Open each file, then approve it or tell the team what to change.'}</p>
+        <p className="muted">{staffer ? 'How work goes: you send it → a supervisor checks it and sends it to the client → the client approves or asks for changes.' : 'Open each file, then approve it or tell the team what to change.'}</p>
         {can(me, 'deliverable.submit', { projectId: p.id }) && (
           <button className="btn primary" onClick={() => setSubmitting({})}>
             <Icon name="plus" /> Submit work
@@ -601,7 +601,7 @@ export function ProjectForm({ onClose, edit, initial = {} }) {
         <label className="check-field full">
           <input type="checkbox" checked={Boolean(v.ongoing)} onChange={set('ongoing')} />
           <span>
-            <b>Ongoing</b> — a retainer or monthly work with no end date. Use repeating tasks for the regular work.
+            <b>Ongoing</b> — monthly work with no end date. Use repeating tasks for the regular jobs.
           </span>
         </label>
         <Field label="Brief" hint="The client can read this." full>

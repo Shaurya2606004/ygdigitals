@@ -27,7 +27,7 @@ export function TaskRow({ t, project = true }) {
           {project && <small>{p?.name}</small>}
         </span>
         <DueChip t={t} />
-        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">No owner</span>}
+        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">Not given to anyone</span>}
       </a>
     </li>
   )
@@ -99,7 +99,7 @@ export function Board({ tasks }) {
                           </span>
                         )}
                         <span className="grow" />
-                        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={22} /> : <span className="pill amber">No owner</span>}
+                        {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={22} /> : <span className="pill amber">Not given to anyone</span>}
                       </span>
                     </button>
                   )
@@ -136,7 +136,7 @@ export default function Tasks({ args }) {
   const sorted = [...tasks].sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9'))
   return (
     <div className="page">
-      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. Drag a card to change its status; use Hand off to pass work on.`}>
+      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. Drag a card to change where it’s at, or open it to change it.`}>
         <button className="btn primary" onClick={() => setAdding(true)}>
           <Icon name="plus" /> New task
         </button>
@@ -162,9 +162,9 @@ export default function Tasks({ args }) {
             ))}
           </select>
           {scope === 'all' && (
-            <select aria-label="Owner" value={f.person} onChange={set('person')}>
+            <select aria-label="Given to" value={f.person} onChange={set('person')}>
               <option value="">Anyone</option>
-              <option value="none">No owner yet</option>
+              <option value="none">Not given to anyone</option>
               <PeopleOptions users={staff(d)} />
             </select>
           )}
@@ -208,7 +208,7 @@ function TaskTable({ tasks }) {
           <tr>
             <th>Task</th>
             <th>Project</th>
-            <th>Owner</th>
+            <th>Given to</th>
             <th>Status</th>
             <th>Priority</th>
             <th>Due</th>
@@ -223,7 +223,7 @@ function TaskTable({ tasks }) {
                 </a>
               </td>
               <td className="muted">{byId(d.projects, t.projectId)?.name}</td>
-              <td>{t.assigneeId ? S.userName(d, t.assigneeId) : <span className="muted">No owner</span>}</td>
+              <td>{t.assigneeId ? S.userName(d, t.assigneeId) : <span className="muted">Not given to anyone</span>}</td>
               <td>
                 <Status s={t.status} label={TASK_STATUS[t.status]} />
               </td>
@@ -275,9 +275,9 @@ export function TaskForm({ onClose, initial = {} }) {
             ))}
           </select>
         </Field>
-        <Field label="Owner">
+        <Field label="Give it to">
           <select value={v.assigneeId || ''} onChange={pickOwner}>
-            <option value="">No owner yet</option>
+            <option value="">No one yet</option>
             <PeopleOptions users={staff(d)} />
           </select>
         </Field>
@@ -344,7 +344,6 @@ export function TaskModal({ id, onClose }) {
   const t = byId(d.tasks, id)
   const [err, setErr] = useState('')
   const [handing, setHanding] = useState(false)
-  const [asking, setAsking] = useState(false)
   const [comment, setComment] = useState('')
   const [item, setItem] = useState('')
   if (!t) return null
@@ -371,7 +370,6 @@ export function TaskModal({ id, onClose }) {
             <h3 className="title-static">{t.title}</h3>
           )}
           <Err msg={err} />
-          {t.ask && <TimeAsk t={t} />}
           <h4>Details</h4>
           {editable ? (
             <textarea rows={4} defaultValue={t.desc} aria-label="Details" placeholder="Add a brief, links, references…" onBlur={(e) => e.target.value !== t.desc && save({ desc: e.target.value })} />
@@ -415,15 +413,14 @@ export function TaskModal({ id, onClose }) {
             </form>
           )}
 
-          <h4>Comments & handoffs</h4>
+          <h4>Comments</h4>
           <ul className="comments">
             {t.comments.map((c) => (
-              <li key={c.id} className={c.handoff ? 'handoff' : c.ask ? 'asked' : ''}>
+              <li key={c.id} className={c.handoff ? 'handoff' : ''}>
                 <Avatar user={byId(d.users, c.userId)} size={28} />
                 <div>
                   <p className="comment-meta">
-                    <b>{S.userName(d, c.userId)}</b> {c.handoff && <span className="pill blue">Handed off: {c.handoff}</span>}
-                    {c.ask && <span className="pill amber">{c.ask}</span>} <small className="muted">{ago(c.at)}</small>
+                    <b>{S.userName(d, c.userId)}</b> {c.handoff && <span className="pill blue">Handed over: {c.handoff}</span>} <small className="muted">{ago(c.at)}</small>
                   </p>
                   {c.text && (
                     <p className="prewrap">
@@ -461,15 +458,15 @@ export function TaskModal({ id, onClose }) {
                 ))}
               </select>
             </dd>
-            <dt>Owner</dt>
+            <dt>Given to</dt>
             <dd className="stack">
-              <select value={t.assigneeId || ''} disabled={!editable} onChange={(e) => save({ assigneeId: e.target.value || null })} aria-label="Owner">
-                <option value="">No owner yet</option>
+              <select value={t.assigneeId || ''} disabled={!editable} onChange={(e) => save({ assigneeId: e.target.value || null })} aria-label="Given to">
+                <option value="">No one yet</option>
                 <PeopleOptions users={staff(d)} />
               </select>
               {editable && (
                 <button className="btn sm" onClick={() => setHanding(true)}>
-                  <Icon name="swap" size={14} /> Hand off
+                  <Icon name="swap" size={14} /> Hand over
                 </button>
               )}
             </dd>
@@ -495,11 +492,7 @@ export function TaskModal({ id, onClose }) {
             <dt>Due</dt>
             <dd className="stack">
               {editable && setsDue(me, t) ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
-              {t.assigneeId === me.id && t.status !== 'done' && !t.ask && !setsDue(me, t) && (
-                <button className="btn sm" onClick={() => setAsking(true)}>
-                  <Icon name="clock" size={14} /> Need more time
-                </button>
-              )}
+              {t.assigneeId === me.id && t.status !== 'done' && !setsDue(me, t) && <small className="muted">Need more time? Tell {dateSetter(d, me, t)}.</small>}
             </dd>
             <dt>Repeats</dt>
             <dd>
@@ -523,84 +516,14 @@ export function TaskModal({ id, onClose }) {
         </aside>
       </div>
       {handing && <HandoffForm t={t} onClose={() => setHanding(false)} />}
-      {asking && <AskTimeForm t={t} onClose={() => setAsking(false)} />}
     </Modal>
   )
 }
 
-// a pending "need more time": who asked, until when and why — and, for whoever decides, the two answers
-export function TimeAsk({ t, compact }) {
-  const me = useMe()
-  const d = useDb()
-  const [note, setNote] = useState('')
-  const [err, setErr] = useState('')
-  const decide = (ok) => {
-    try {
-      S.decideTime(me, t.id, ok, note)
-      setErr('')
-    } catch (x) {
-      setErr(x.message)
-    }
-  }
-  const mine = S.canDecideTime(me, t)
-  return (
-    <div className={`ask-box ${compact ? 'compact' : ''}`}>
-      {!compact && (
-        <p>
-          <b>{S.userName(d, t.ask.by).split(' ')[0]}</b> asked for more time, until <b>{fmtDay(t.ask.due)}</b>: {t.ask.reason}
-          {!mine && <span className="muted"> · waiting for an answer</span>}
-        </p>
-      )}
-      {mine && (
-        <div className="row-actions">
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note for them" />
-          <button className="btn sm" onClick={() => decide(false)}>
-            Keep the date
-          </button>
-          <button className="btn sm primary" onClick={() => decide(true)}>
-            Give until {fmtDay(t.ask.due)}
-          </button>
-        </div>
-      )}
-      <Err msg={err} />
-    </div>
-  )
-}
-
-export function AskTimeForm({ t, onClose }) {
-  const me = useMe()
-  const { v, set, err, run } = useForm({ due: addDays(t.due && t.due > today() ? t.due : today(), 1), reason: '' })
-  return (
-    <Modal title="Need more time" onClose={onClose}>
-      <form
-        className="form-grid one"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (run(() => S.askTime(me, t.id, v.due, v.reason))) onClose()
-        }}
-      >
-        <p className="muted">
-          “{t.title}” {isOverdue(t) ? `was due ${fmtDay(t.due)}` : t.due ? `is due ${fmtDay(t.due)}` : 'has no date'}. Ask for a new date — the admin or whoever gave you this
-          task decides, and every extension stays on the task.
-        </p>
-        <Field label="New date">
-          <input type="date" data-autofocus min={today()} value={v.due} onChange={set('due')} />
-        </Field>
-        <Field label="Why">
-          <textarea rows={3} value={v.reason} onChange={set('reason')} placeholder="What’s holding it up, and what you’ve done so far" />
-        </Field>
-        <Err msg={err} />
-        <div className="form-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn primary">
-            <Icon name="clock" size={16} /> Ask for more time
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
+// who to ask for a new date: whoever gave you the task, else the project lead, else a supervisor
+const dateSetter = (d, me, t) => {
+  const id = [t.createdBy, byId(d.projects, t.projectId)?.managerId].find((x) => x && x !== me.id)
+  return id ? S.userName(d, id).split(' ')[0] : 'your supervisor'
 }
 
 export function HandoffForm({ t, onClose }) {
@@ -609,7 +532,7 @@ export function HandoffForm({ t, onClose }) {
   const people = staff(d).filter((u) => u.id !== t.assigneeId)
   const { v, set, err, run } = useForm({ toId: people.find((u) => u.id !== me.id)?.id ?? '', note: '' })
   return (
-    <Modal title="Hand off" onClose={onClose}>
+    <Modal title="Hand over" onClose={onClose}>
       <form
         className="form-grid one"
         onSubmit={(e) => {
@@ -617,8 +540,8 @@ export function HandoffForm({ t, onClose }) {
           if (run(() => S.handoff(me, t.id, v.toId, v.note.trim()))) onClose()
         }}
       >
-        <p className="muted">“{t.title}” becomes theirs and goes back to To do. The checklist and comments go with it, and they get your note.</p>
-        <Field label="Hand to">
+        <p className="muted">“{t.title}” becomes theirs and starts again at To do. The checklist and comments go with it, and they get your note.</p>
+        <Field label="Give it to">
           <select data-autofocus value={v.toId} onChange={set('toId')}>
             {people.map((u) => (
               <option key={u.id} value={u.id}>
@@ -637,7 +560,7 @@ export function HandoffForm({ t, onClose }) {
             Cancel
           </button>
           <button className="btn primary">
-            <Icon name="swap" size={16} /> Hand off
+            <Icon name="swap" size={16} /> Hand over
           </button>
         </div>
       </form>

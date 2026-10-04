@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, taskMark, team } from '../store.js'
-import { Avatar, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, Status, useDb, useForm, useMe } from '../ui.jsx'
+import { Avatar, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, useDb, useForm, useMe } from '../ui.jsx'
 import { addDays, ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, today, ymd } from '../util.js'
 import { MonthGrid } from './Calendar.jsx'
 import { DeptSelect } from './Tasks.jsx'
+import { postsFromSheet, readSheet } from '../xlsx.js'
 
 const shiftMonth = (s, n) => {
   const d = parseDay(`${s.slice(0, 8)}01`)
@@ -12,7 +13,7 @@ const shiftMonth = (s, n) => {
   return ymd(d)
 }
 
-const VIEWS = { month: 'Calendar', board: 'Pipeline', report: 'Report', owed: 'Owed' }
+const VIEWS = { month: 'Calendar', board: 'By stage', report: 'Report', owed: 'Compensation' }
 
 export default function Content({ args = [] }) {
   const me = useMe()
@@ -21,11 +22,12 @@ export default function Content({ args = [] }) {
   const manage = can(me, 'content.manage')
   const [month, setMonth] = useState(`${today().slice(0, 8)}01`)
   const [view, setView] = useState(args[0] === 'owed' && staffer ? 'owed' : 'month')
-  const [making, setMaking] = useState(null) // a make-up to note: {initial}
+  const [making, setMaking] = useState(null) // compensation to note: {initial}
   const [client, setClient] = useState('')
   const [platform, setPlatform] = useState('')
   const [open, setOpen] = useState(null)
   const [form, setForm] = useState(null)
+  const [importing, setImporting] = useState(false)
   const posts = d.posts.filter((p) => can(me, 'content.view', p) && (!client || p.clientId === client) && (!platform || p.platform === platform))
   const inMonth = posts.filter((p) => p.date.slice(0, 7) === month.slice(0, 7))
   const items = posts.map((p) => ({ key: p.id, kind: 'post', date: p.date, title: `${staffer && !client ? `${byId(d.clients, p.clientId)?.name.split(' ')[0]}: ` : ''}${p.format} · ${p.title}`, type: `ps-${p.status}`, post: p }))
@@ -34,9 +36,14 @@ export default function Content({ args = [] }) {
     <div className="page">
       <PageHead title="Content plan" sub={staffer ? 'Every post, Reel and ad for every client — planned, made, approved by the client, scheduled.' : 'What’s going out on your pages and when. Approve posts marked “Ready”.'}>
         {manage && (
-          <button className="btn primary" onClick={() => setForm({ initial: { clientId: client || undefined } })}>
-            <Icon name="plus" /> Plan a post
-          </button>
+          <>
+            <button className="btn" onClick={() => setImporting(true)}>
+              <Icon name="download" /> Import from Excel
+            </button>
+            <button className="btn primary" onClick={() => setForm({ initial: { clientId: client || undefined } })}>
+              <Icon name="plus" /> Plan a post
+            </button>
+          </>
         )}
       </PageHead>
       <div className="toolbar">
@@ -145,11 +152,24 @@ export default function Content({ args = [] }) {
       )}
       {form && <PostForm onClose={() => setForm(null)} initial={form.initial} edit={form.edit} />}
       {making && <CompensationForm {...making} onClose={() => setMaking(null)} />}
+      {importing && (
+        <ImportForm
+          clientId={client}
+          onClose={(added) => {
+            setImporting(false)
+            if (!added) return
+            // show what just went in: that client, from the month of the first post
+            setClient(added.clientId)
+            setMonth(`${added.first.slice(0, 8)}01`)
+            setView('month')
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// a missed post's make-up, filled in: one more of the same, a week from today, by whoever was making it
+// a missed post's compensation, filled in: one more of the same, a week from today, by whoever was making it
 export const makeUpFor = (p) => ({ clientId: p.clientId, postId: p.id, missed: `${p.format} — ${p.title} (${fmtDay(p.date)})`, offer: `1 extra ${p.format}`, due: addDays(today(), 7), ownerId: p.assigneeId || '' })
 
 // marks for the month: per client, what was planned and where each post stands; per person, tasks on time or late
@@ -174,7 +194,6 @@ function Report({ month, posts }) {
           onTime: doneIn.filter((t) => taskMark(t) === 'done').length,
           late: doneIn.filter((t) => taskMark(t) === 'late').length,
           overdue: ts.filter((t) => taskMark(t) === 'overdue').length,
-          asked: ts.reduce((n, t) => n + (t.extensions || []).filter((x) => (x.at || '').slice(0, 7) === m).length + (t.ask ? 1 : 0), 0),
         }
       })
     : []
@@ -196,7 +215,7 @@ function Report({ month, posts }) {
                       <Mark m={k} />
                     </th>
                   ))}
-                  <th className="num">Make-ups owed</th>
+                  <th className="num">Compensation owed</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,7 +259,6 @@ function Report({ month, posts }) {
                   <th className="num">
                     <Mark m="overdue" /> now
                   </th>
-                  <th className="num">Asked for more time</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,7 +272,6 @@ function Report({ month, posts }) {
                     <td className="num">{r.onTime}</td>
                     <td className="num">{r.late}</td>
                     <td className={`num ${r.overdue ? 'late' : ''}`}>{r.overdue}</td>
-                    <td className="num">{r.asked}</td>
                   </tr>
                 ))}
               </tbody>
@@ -285,10 +302,10 @@ function Owed({ client, onNew, onEdit }) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2>Make-ups owed to clients</h2>
+        <h2>Compensation owed to clients</h2>
         {can(me, 'content.manage') && (
           <button className="btn sm primary" onClick={onNew}>
-            <Icon name="plus" size={14} /> Note a make-up
+            <Icon name="plus" size={14} /> Note compensation
           </button>
         )}
       </div>
@@ -327,7 +344,7 @@ function Owed({ client, onNew, onEdit }) {
                     </button>
                   )}
                   {me.role === 'admin' && (
-                    <button className="icon-btn sm" aria-label="Remove" onClick={() => confirm('Remove this make-up?') && run(() => S.deleteCompensation(me, k.id))}>
+                    <button className="icon-btn sm" aria-label="Remove" onClick={() => confirm('Remove this compensation?') && run(() => S.deleteCompensation(me, k.id))}>
                       <Icon name="trash" size={14} />
                     </button>
                   )}
@@ -348,7 +365,7 @@ export function CompensationForm({ onClose, edit, initial = {} }) {
   const d = useDb()
   const { v, set, err, run } = useForm(edit || { clientId: d.clients[0]?.id ?? '', postId: null, missed: '', offer: '', due: addDays(today(), 7), ownerId: '', shared: false, ...initial })
   return (
-    <Modal title={edit ? 'Edit make-up' : 'Make up for missed work'} onClose={onClose}>
+    <Modal title={edit ? 'Edit compensation' : 'Compensation for missed work'} onClose={onClose}>
       <form
         className="form-grid"
         onSubmit={(e) => {
@@ -393,7 +410,7 @@ export function CompensationForm({ onClose, edit, initial = {} }) {
           <button type="button" className="btn ghost" onClick={onClose}>
             {edit ? 'Cancel' : 'Skip'}
           </button>
-          <button className="btn primary">{edit ? 'Save' : 'Note the make-up'}</button>
+          <button className="btn primary">{edit ? 'Save' : 'Note the compensation'}</button>
         </div>
       </form>
     </Modal>
@@ -434,11 +451,19 @@ function PostView({ id, onClose, onEdit, onMissed }) {
           .filter((k) => k.postId === p.id && can(me, 'comp.view', k))
           .map((k) => (
             <p key={k.id} className="warn-box">
-              Make-up {k.status === 'given' ? 'given' : 'owed'}: <b>{k.offer}</b>
+              Compensation {k.status === 'given' ? 'given' : 'owed'}: <b>{k.offer}</b>
               {k.due && k.status === 'open' ? ` by ${fmtDay(k.due)}` : ''}
               {k.ownerId ? ` · ${S.userName(d, k.ownerId).split(' ')[0]}` : ''}
             </p>
           ))}
+        {p.brief && (
+          <>
+            <h4>What to make</h4>
+            <p className="prewrap">
+              <RichText text={p.brief} />
+            </p>
+          </>
+        )}
         <h4>Caption</h4>
         <p className="prewrap caption">{p.caption || <span className="muted">No caption yet.</span>}</p>
         {p.notes?.length > 0 && (
@@ -507,11 +532,117 @@ function PostView({ id, onClose, onEdit, onMissed }) {
   )
 }
 
+// a content calendar made in Excel → posts in the plan, after a look at what was found
+function ImportForm({ clientId: chosen, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const [clientId, setClientId] = useState(chosen || d.clients[0]?.id || '')
+  const [platform, setPlatform] = useState('Instagram')
+  const [found, setFound] = useState(null) // { name, posts }
+  const [err, setErr] = useState('')
+  const pick = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      setFound({ name: file.name, posts: postsFromSheet(await readSheet(new Uint8Array(await file.arrayBuffer()))) })
+      setErr('')
+    } catch (x) {
+      setFound(null)
+      setErr(x.message || 'Couldn’t read that file.')
+    }
+  }
+  // already in the plan (same client, day and title): left out, so importing the same sheet twice is harmless
+  const planned = (p) => d.posts.some((x) => x.clientId === clientId && x.date === p.date && x.title.toLowerCase() === p.title.toLowerCase())
+  const fresh = found ? found.posts.filter((p) => !planned(p)) : []
+  const add = () => {
+    try {
+      for (const p of fresh) S.savePost(me, { platform, ...p, clientId, time: '19:00' })
+      onClose({ clientId, first: fresh.map((p) => p.date).sort()[0] })
+    } catch (x) {
+      setErr(x.message)
+    }
+  }
+  return (
+    <Modal title="Import a content calendar" onClose={() => onClose()} wide>
+      <div className="form-grid">
+        <p className="full muted small">
+          The Excel sheet needs a header row with <b>Date</b> and a <b>Topic</b> or <b>Content Type</b> column. Festival, Script / Reference, Platform and Status columns
+          are used too. Days with nothing planned are skipped.
+        </p>
+        <Field label="Client">
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+            {d.clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Platform" hint="Unless the sheet has a Platform column.">
+          <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+            {PLATFORMS.map((p) => (
+              <option key={p}>{p}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Excel file (.xlsx)" full>
+          <input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={pick} />
+        </Field>
+        <Err msg={err} />
+        {found && (
+          <div className="full">
+            <p className="small">
+              <b>
+                {found.posts.length} {found.posts.length === 1 ? 'post' : 'posts'} found
+              </b>{' '}
+              in {found.name}
+              {found.posts.length > fresh.length && ` · ${found.posts.length - fresh.length} already in the plan, left out`}
+            </p>
+            <div className="table-wrap import-preview">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Day</th>
+                    <th>Type</th>
+                    <th>Topic</th>
+                    <th>What to make</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {found.posts.map((p, i) => (
+                    <tr key={i} className={planned(p) ? 'muted' : ''}>
+                      <td className="nowrap">{fmtDay(p.date)}</td>
+                      <td>{p.format}</td>
+                      <td>
+                        <b>{p.title}</b>
+                        {planned(p) && <small className="block">Already in the plan</small>}
+                      </td>
+                      <td className="small clip">{p.brief}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={() => onClose()}>
+            Cancel
+          </button>
+          <button type="button" className="btn primary" disabled={!fresh.length} onClick={add}>
+            {fresh.length ? `Add ${fresh.length} ${fresh.length === 1 ? 'post' : 'posts'} to the plan` : 'Add to the plan'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 export function PostForm({ onClose, initial = {}, edit }) {
   const me = useMe()
   const d = useDb()
   const { v, set, setV, err, run } = useForm(
-    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', caption: '', status: 'idea', assigneeId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
+    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', brief: '', caption: '', status: 'idea', assigneeId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
   )
   const makers = team(d)
   return (
@@ -572,6 +703,9 @@ export function PostForm({ onClose, initial = {}, edit }) {
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="What to make" hint="Script, reference links — for whoever makes it." full>
+          <textarea rows={3} value={v.brief || ''} onChange={set('brief')} placeholder="What to show, reference Reel, props…" />
         </Field>
         <Field label="Caption" full>
           <textarea rows={4} value={v.caption} onChange={set('caption')} placeholder="Caption, hashtags, CTA…" />

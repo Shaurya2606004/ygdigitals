@@ -1608,20 +1608,19 @@ dialog.modal::backdrop {
   border-radius: 10px;
   padding: 8px 10px;
 }
-.comments li.asked {
-  background: var(--amber-bg);
-  border-radius: 10px;
-  padding: 8px 10px;
+/* content calendar import: what was found in the sheet */
+.import-preview {
+  max-height: 46vh;
+  overflow: auto;
 }
-.ask-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 10px 0 4px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--amber-bg);
-  font-size: 14px;
+.import-preview .nowrap {
+  white-space: nowrap;
+}
+.import-preview .clip {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .check-field {
   display: flex;
@@ -1632,15 +1631,6 @@ dialog.modal::backdrop {
 }
 .check-field input {
   margin-top: 3px;
-}
-.ask-box.compact {
-  margin: 0;
-  padding: 0;
-  background: none;
-}
-.ask-box input {
-  flex: 1 1 160px;
-  min-width: 0;
 }
 .comment-meta {
   display: flex;

@@ -21,7 +21,7 @@ export default function Leave() {
   const mine = visible.filter((l) => l.userId === me.id).sort((a, b) => b.start.localeCompare(a.start))
   return (
     <div className="page">
-      <PageHead title="Leave" sub="Apply for days off; an admin approves. Leave from today or tomorrow needs the work due on those days done or handed off first.">
+      <PageHead title="Leave" sub="Ask for days off; a supervisor approves. For leave today or tomorrow, finish or hand over the work due on those days first.">
         <button className="btn primary" onClick={() => setApplying(true)}>
           <Icon name="plus" /> Apply for leave
         </button>
@@ -204,12 +204,12 @@ function LeaveForm({ onClose }) {
         <Field label="To (last day off)">
           <input type="date" min={v.start || T} value={v.end} onChange={set('end')} />
         </Field>
-        <Field label="Note for the admins" hint="Only you and the admins see this." full>
+        <Field label="Note for your supervisor" hint="Only you and the supervisors see this." full>
           <textarea rows={2} value={v.note} onChange={set('note')} placeholder="Optional" />
         </Field>
         {due.length > 0 ? (
           <div className={`warn-box ${shortNotice ? 'bad' : ''}`}>
-            <b>{shortNotice ? 'Finish or hand off these first — they’re due on those days:' : 'Due while you’re away — finish or hand them off before you go:'}</b>
+            <b>{shortNotice ? 'Finish or hand over these first — they’re due on those days:' : 'Due while you’re away — finish or hand them over before you go:'}</b>
             <ul>
               {due.map((w) => (
                 <li key={w.href + w.title}>

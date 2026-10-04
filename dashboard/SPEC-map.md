@@ -49,3 +49,20 @@ Build order: delete-client → departments → overdue → urgent-home → leave
 - Each module: `npm test` passes, the server access checks pass, and it is verified in the browser as admin, member and freelancer.
 - A member in Video sees only Video work plus their own tasks (if D1 = hard).
 - An overdue task can't sit unresolved for more than 2 days without the admins being emailed.
+
+## Changes asked for on 2026-10-05
+- **Ask for more time: removed.** A task's date is still set only by a supervisor, the project lead or whoever gave the task. The person doing it sees "Need more time? Tell <name>." Overdue escalation to supervisors after 2 days stays.
+- **Owner: a new level above Supervisor** (`people.owner`, a supervisor with a flag, so every supervisor rule covers owners). Their Home shows only:
+  1. Late: every late task, post and compensation, with who has it.
+  2. Today, done or not.
+  3. Coming up this week.
+  Their morning email skips approvals and leave. "Admin" is now called "Supervisor" everywhere.
+- **Plain language for the team and freelancers:**
+  - Their Home is one list of their work, most urgent first, plus today's meetings and announcements.
+  - Wording: "Given to" (was Owner), "Hand over" (was Hand off), "Ready to check" (was Review), "Compensation" (was Make-up).
+- **Bell** closes on a tap anywhere else (pointer events, so phones count too).
+- **excel-import: done** (src/xlsx.js, no new dependency: the browser unzips the .xlsx).
+  - Content plan › Import from Excel shows a preview, then adds the posts.
+  - Columns are found by header: Date, plus Topic and/or Content Type; Festival, Script / Reference, Platform and Status are optional.
+  - Posts already in the plan (same client, day and title) are skipped.
+  - Script / reference / festival go into a new post field, `brief` ("What to make").
