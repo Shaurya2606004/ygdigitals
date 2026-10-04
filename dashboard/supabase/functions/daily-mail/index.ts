@@ -1,6 +1,6 @@
 // The morning email: one per person, only when something needs them — overdue work, what's due today, and (for
-// supervisors) checks and leave waiting on them. Owners get just what's late and what's due. Called by the morning job (private.daily in
-// *_daily.sql, through pg_net); claim_daily_mail() lets it send at most once a day.
+// supervisors) checks and leave waiting on them. Owners get just what's late and what's due. Called by the morning
+// job (private.daily in *_daily.sql, through pg_net); claim_daily_mail() lets it send at most once a day.
 // ponytail: no caller secret — the once-a-day claim caps any misuse at sending that day's email early. Add a shared
 // secret (vault + function secret) if that ever matters.
 import { createClient } from 'npm:@supabase/supabase-js@2'
