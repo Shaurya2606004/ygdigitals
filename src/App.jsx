@@ -9,6 +9,8 @@ import Tapes from './components/Tapes'
 import About from './components/About'
 import Services from './components/Services'
 import { Contact, Footer, WhatsAppFab } from './components/Contact'
+import { prefetchPoses } from './three/Mascot'
+import { SERVICES } from './data'
 
 export default function App() {
   const { loading, progress, onSceneReady, done } = useLoader()
@@ -24,6 +26,8 @@ export default function App() {
     lockScroll(loading)
     if (loading) return
     ScrollTrigger.refresh()
+    // the services' mascot poses (~1.5MB each) start downloading now, not when the visitor reaches each one
+    prefetchPoses(SERVICES.map((s) => s.id))
     // arriving from a service page's menu (/#services etc.): jump straight to that section once the loader is gone
     if (location.hash) scrollToId(decodeURIComponent(location.hash.slice(1)), true)
   }, [loading])

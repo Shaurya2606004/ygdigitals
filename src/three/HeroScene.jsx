@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { MeshTransmissionMaterial, Text } from '@react-three/drei'
 import { AmazonBox, BLACK, Clapper, FeedPhone, FlipkartBag, InstaCube, MIST, Phone, RED_DEEP, displayFont } from './clay'
-import { Mascot, getShadeMap } from './Mascot'
+import { Mascot, getShadeMap, poseReady } from './Mascot'
 import { REDUCED, TOUCH, aim, clamp01, elasticOut } from '../lib/motion'
 
 /* Block-letter headline: stacked troika layers fake a chunky extrusion; each line is scaled to fit `width`. */
@@ -179,6 +179,8 @@ export default function HeroScene({ ready, progress, onReady }) {
   const text = useRef()
   const stage = useRef()
   const reported = useRef(false)
+  const [mascotIn, setMascotIn] = useState(false)
+  useEffect(() => void poseReady('hero').then(() => setMascotIn(true)), [])
 
   useEffect(() => {
     if (ready && readyAt.current == null) readyAt.current = clock.elapsedTime
@@ -200,8 +202,8 @@ export default function HeroScene({ ready, progress, onReady }) {
 
   const framesSinceSync = useRef(0)
   useFrame((state, dt) => {
-    // ready = headline laid out AND real frames on screen (frames only start once the shaders are compiled)
-    if (!reported.current && lines.every((l) => h[l.t]) && ++framesSinceSync.current === 2) {
+    // ready = headline laid out, the mascot loaded AND real frames on screen (frames only start once the shaders are compiled)
+    if (!reported.current && mascotIn && lines.every((l) => h[l.t]) && ++framesSinceSync.current === 2) {
       reported.current = true
       onReady()
     }
