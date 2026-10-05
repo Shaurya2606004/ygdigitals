@@ -241,19 +241,97 @@ begin
   perform set_config('role', 'none', true);
   select s2.status || '|' || (k.status_by = vikas) into s from public.posts s2, public.tasks k where s2.id = 'imp1' and k.id = 'pt-imp1';
   out := out || format(E'\n%s starting the task puts the post in production, and marks who moved it: %s', case when s = 'production|true' then '✓' else '✗' end, s);
+  -- made → the lead checks it and sends it (emails queue once the mail function's address is set)
+  insert into private.settings values ('mail_url', 'http://mail.test') on conflict do nothing;
   perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   perform public.save_task(json_build_object('id', 'pt-imp1', 'status', 'done')::jsonb);
   perform set_config('role', 'none', true);
   select status into s from public.posts where id = 'imp1';
-  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and text = 'has a Reel ready for your approval: “Navratri wishes”';
-  out := out || format(E'\n%s finishing it makes the post ready, and the client is asked: %s, %s', case when s = 'ready' and n = 1 then '✓' else '✗' end, s, n);
+  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and text like 'has a Reel%';
+  out := out || format(E'\n%s finishing it makes the post "Made, to send" — the client hears nothing yet: %s, %s', case when s = 'made' and n = 0 then '✓' else '✗' end, s, n);
+  select format('%s|%s', count(*) filter (where text = 'made the Reel “Navratri wishes” for Desi Crunch Snacks — check it and send it to the client' and link = '#/content/post/imp1'),
+    count(*) filter (where text like 'finished%')) into s from public.notifications where user_id = priya;
+  out := out || format(E'\n%s the lead is told to check it and send it (not just "finished"): %s', case when s = '1|0' then '✓' else '✗' end, s);
+  select string_agg(email || ' ' || subject, ', ') into s from private.outbox;
+  out := out || format(E'\n%s …and emailed: %s', case when s = 'priya@example.com To check and send: Reel “Navratri wishes” for Desi Crunch Snacks' then '✓' else '✗' end, s);
+  delete from private.outbox;
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform public.send_post(json_build_object('id', 'imp1')::jsonb);
+    out := out || E'\n✗ the maker sent it to the client';
+  exception when others then
+    out := out || format(E'\n✓ the maker can''t send it to the client (%s)', sqlerrm);
+  end;
+  begin
+    perform public.save_post(json_build_object('id', 'imp1', 'status', 'ready')::jsonb);
+    out := out || E'\n✗ the maker marked it ready for approval';
+  exception when others then
+    out := out || E'\n✓ …nor mark it "Ready for approval" by hand';
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform public.send_post(json_build_object('id', 'imp1', 'link', 'https://drive.google.com/navratri', 'email', true)::jsonb);
+  perform set_config('role', 'none', true);
+  select format('%s|%s|%s', status, link, notes -> -1 ->> 'text') into s from public.posts where id = 'imp1';
+  select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and text = 'has a Reel ready for your approval: “Navratri wishes”' and link = '#/content/post/imp1';
+  out := out || format(E'\n%s the lead sends it: ready for approval, with the link, and the client is asked: %s, %s', case when s = 'ready|https://drive.google.com/navratri|Sent to the client' and n = 1 then '✓' else '✗' end, s, n);
+  select string_agg(format('%s %s %s %s', email, reply_to, work, link), ', ') into s from private.outbox;
+  out := out || format(E'\n%s …and the client''s login is emailed, replies going to the lead: %s', case when s = 'rahul@example.com priya@example.com https://drive.google.com/navratri #/content/post/imp1' then '✓' else '✗' end, s);
+  delete from private.outbox;
   perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:rahul')::uuid, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   perform public.decide_post(json_build_object('id', 'imp1', 'approve', false, 'note', 'Brighter, please')::jsonb);
   perform set_config('role', 'none', true);
   select s2.status || '|' || k.status into s from public.posts s2, public.tasks k where s2.id = 'imp1' and k.id = 'pt-imp1';
   out := out || format(E'\n%s the client asks for changes: the task is back in To do: %s', case when s = 'production|todo' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task(json_build_object('id', 'pt-imp1', 'status', 'done')::jsonb);
+  perform public.save_task(json_build_object('id', 'pt-imp1', 'status', 'doing')::jsonb);
+  perform set_config('role', 'none', true);
+  select status into s from public.posts where id = 'imp1';
+  out := out || format(E'\n%s reopening a made task puts its post back in production: %s', case when s = 'production' then '✓' else '✗' end, s);
+
+  delete from private.outbox; -- (reopening and finishing it again emailed the lead again)
+  -- a client with no login: the contact email on the client; a lead from another department sees and sends their posts
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'imp5', 'clientId', 'shreeram', 'date', private.today() + 4, 'format', 'Post', 'title', 'Sofa sale', 'status', 'made')::jsonb);
+  perform public.send_post(json_build_object('id', 'imp5', 'email', true)::jsonb);
+  perform public.save_post(json_build_object('id', 'imp6', 'clientId', 'steel', 'projectId', 'p-steel-web', 'date', private.today() + 4, 'format', 'Post',
+    'title', 'Machine of the month', 'dept', 'design', 'status', 'made')::jsonb);
+  perform set_config('role', 'none', true);
+  select string_agg(format('%s %s %s', email, reply_to, link = ''), ', ') into s from private.outbox;
+  out := out || format(E'\n%s a client with no login gets it at their contact email: %s', case when s = 'shreeram@example.com aman@example.com t' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:arjun')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  select count(*) into n from public.posts where id = 'imp6';
+  perform public.send_post(json_build_object('id', 'imp6')::jsonb);
+  perform set_config('role', 'none', true);
+  select status into s from public.posts where id = 'imp6';
+  out := out || format(E'\n%s the project lead (websites) sees a design post in their project and sends it: %s, %s', case when n = 1 and s = 'ready' then '✓' else '✗' end, n, s);
+  -- nobody signed in can queue, read or take the email
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  n := 0;
+  begin
+    perform private.mail(array['someone@example.com'], 'Hi', 'Hi', '', '');
+  exception when others then
+    n := n + 1;
+  end;
+  begin
+    perform count(*) from private.outbox;
+  exception when others then
+    n := n + 1;
+  end;
+  begin
+    perform public.claim_outbox();
+  exception when others then
+    n := n + 1;
+  end;
+  perform set_config('role', 'none', true);
+  out := out || format(E'\n%s a signed-in person can''t queue, read or take emails: %s of 3 refused', case when n = 3 then '✓' else '✗' end, n);
   perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   perform public.save_post(json_build_object('id', 'imp1', 'status', 'posted')::jsonb);

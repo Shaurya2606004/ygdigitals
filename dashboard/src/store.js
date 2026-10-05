@@ -49,7 +49,7 @@ export const DELIV_STATUS = { internal: 'Waiting for check', changes: 'Changes r
 export const DELIV_TYPES = ['Video', 'Design', 'Website', 'Copy', 'Listing', 'Photos', 'Other']
 export const EVENT_TYPES = { meeting: 'Team meeting', client: 'Client call', shoot: 'Shoot', review: 'Creative review' }
 export const REPEAT = { none: 'Does not repeat', weekdays: 'Every weekday', weekly: 'Every week' }
-export const POST_STATUS = { idea: 'Idea', production: 'In production', ready: 'Ready for approval', scheduled: 'Scheduled', posted: 'Posted', missed: 'Undelivered' }
+export const POST_STATUS = { idea: 'Idea', production: 'In production', made: 'Made, to send', ready: 'Ready for approval', scheduled: 'Scheduled', posted: 'Posted', missed: 'Undelivered' }
 export const REPEATS = { none: 'Does not repeat', weekly: 'Every week', monthly: 'Every month' }
 // one mark for every piece of work: where it stands against its date
 export const MARKS = { due: 'Due', today: 'Due today', overdue: 'Overdue', done: 'Done', late: 'Done late', delivered: 'Delivered', undelivered: 'Undelivered' }
@@ -83,7 +83,7 @@ export const PERMISSIONS = [
   ['Create, edit and hand over the tasks they can see, send work for checking', ['admin', 'member', 'freelancer']],
   ['Change a task’s date (the project lead and whoever gave the task can too)', ['admin']],
   ['Plan content posts', ['admin', 'member']],
-  ['Check work and send it to the client', ['admin']],
+  ['Check work and send it to the client (a project’s lead can send its posts too)', ['admin']],
   ['Create projects (a project’s lead can edit it)', ['admin']],
   ['Add people and clients, give client logins', ['admin']],
   ['Post announcements', ['admin']],
@@ -178,6 +178,7 @@ export function can(u, action, x = {}) {
   const free = u.role === 'freelancer'
   const ownProject = (pid) => u.role === 'client' && byId(db.projects, pid)?.clientId === u.clientId
   const leads = (p) => Boolean(p && (p.managerId === u.id || p.memberIds.includes(u.id)))
+  const leadsPost = (s) => Boolean(s.projectId && byId(db.projects, s.projectId)?.managerId === u.id)
   // the task rule (private.sees_task): a member sees their department's work and anything they own, made or lead;
   // a freelancer, the tasks in projects they're on and any handed to them
   const onTask = (t) =>
@@ -225,10 +226,12 @@ export function can(u, action, x = {}) {
       return admin || x.createdBy === u.id
     case 'content.manage':
       return team
-    case 'content.view': // social media captions and posts everything, so they see every post
-      return all || (member && (u.dept === 'social' || (x.dept && x.dept === u.dept) || x.assigneeId === u.id)) || (u.role === 'client' && x.clientId === u.clientId)
+    case 'content.view': // social media captions and posts everything, so they see every post; a project's lead sees its posts
+      return all || (member && (u.dept === 'social' || (x.dept && x.dept === u.dept) || x.assigneeId === u.id || leadsPost(x))) || (u.role === 'client' && x.clientId === u.clientId)
     case 'content.decide':
       return can(u, 'content.view', x) && (isTeam(u) || u.role === 'client')
+    case 'content.send': // checking made work and sending it to the client (private.sends_post)
+      return admin || leadsPost(x)
     case 'channel.view':
       if (x.type === 'dm') return x.memberIds.includes(u.id)
       // an admin can read every group, even ones they aren't in (members aren't told)
@@ -432,7 +435,7 @@ export function saveTask(me, t) {
     if (old && (old.due || null) !== (task.due || null) && task.assigneeId) notify(d, me, [task.assigneeId], `moved ${q} to ${task.due ? fmtDay(task.due) : 'no due date'}`, link)
     if (old && old.status !== task.status) {
       if (task.status === 'review') notify(d, me, [...admins(d), byId(d.projects, task.projectId)?.managerId], `${q} is ready to check`, link)
-      if (task.status === 'done') notify(d, me, [task.createdBy], `finished ${q}`, link)
+      if (task.status === 'done' && !task.postId) notify(d, me, [task.createdBy], `finished ${q}`, link) // a post's task: its post tells the lead (taskMoved)
       log(d, me, `moved ${q} to ${TASK_STATUS[task.status]}`, link)
     } else log(d, me, old ? `updated ${q}` : `created ${q}`, link)
     return task.id
@@ -770,18 +773,21 @@ function postMoved(d, me, old, s) {
   if (s.date !== old.date) k.due = postDue(s.date)
   if ((s.assigneeId || null) !== (old.assigneeId || null)) k.assigneeId = s.assigneeId || null
   if (s.status !== old.status && ['posted', 'missed'].includes(s.status)) setStatus(me, k, 'done')
-  else if (s.status === 'production' && ['ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(me, k, 'todo') // the client asked for changes
+  else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(me, k, 'todo') // sent back for changes
 }
-// the task changed (old → k): its post follows
+// who hears a post is made and waiting to be sent (private.senders): its project's lead and the supervisors, not the owners
+const senders = (d, s) => d.users.filter((u) => u.active && ((u.role === 'admin' && !u.owner) || u.id === byId(d.projects, s.projectId)?.managerId)).map((u) => u.id)
+// the task changed (old → k): its post follows. Finished → "Made, to send", for the lead to check and send to the client.
 function taskMoved(d, me, old, k) {
   const s = k.postId && byId(d.posts, k.postId)
   if (!s) return
   if ((k.assigneeId || null) !== (old.assigneeId || null)) s.assigneeId = k.assigneeId || null
   if (k.status === old.status) return
   if (k.status === 'done' && ['idea', 'production'].includes(s.status)) {
-    s.status = 'ready'
-    notify(d, me, clientUsers(d, s.clientId).map((u) => u.id), `has a ${s.format} ready for your approval: “${s.title}”`, '#/content')
-  } else if (['doing', 'review'].includes(k.status) && s.status === 'idea') s.status = 'production'
+    s.status = 'made'
+    notify(d, me, senders(d, s), `made the ${s.format} “${s.title}” for ${byId(d.clients, s.clientId)?.name} — check it and send it to the client`, `#/content/post/${s.id}`)
+  } else if (old.status === 'done' && ['made', 'ready'].includes(s.status)) s.status = 'production' // reopened before it went out
+  else if (['doing', 'review'].includes(k.status) && s.status === 'idea') s.status = 'production'
 }
 
 // quiet: an import — each maker hears when a post's task lands in their To do, not once per post
@@ -794,6 +800,9 @@ export function savePost(me, p, { quiet = false } = {}) {
   const project = p.projectId && byId(db.projects, p.projectId)
   need(!p.projectId || project?.clientId === p.clientId, 'Pick one of this client’s projects.')
   need(!p.projectId || p.projectId === old?.projectId || can(me, 'project.view', project), 'You can only add posts to a project you work in.')
+  need(!p.link?.trim() || HTTP.test(p.link.trim()), 'The link should start with https://')
+  need(p.status !== 'ready' || old?.status === 'ready' || can(me, 'content.send', p), 'Only the project lead or a supervisor can send work to the client.')
+  if (p.link) p = { ...p, link: p.link.trim() }
   const id = commit((d) => {
     const cur = old && byId(d.posts, p.id)
     if (cur) Object.assign(cur, p, { taskMade: cur.taskMade }) // only the server says a task was made
@@ -803,12 +812,32 @@ export function savePost(me, p, { quiet = false } = {}) {
     if (old) postMoved(d, me, old, s)
     const link = '#/content'
     if (p.assigneeId && (!old || old.assigneeId !== p.assigneeId) && !quiet) notify(d, me, [p.assigneeId], `gave you the ${p.format} “${p.title}” (${fmtDay(p.date)})`, link)
-    if (p.status === 'ready' && old?.status !== 'ready') notify(d, me, clientUsers(d, p.clientId).map((u) => u.id), `has a ${p.format} ready for your approval: “${p.title}”`, link)
+    if (p.status === 'ready' && old?.status !== 'ready') notify(d, me, clientUsers(d, p.clientId).map((u) => u.id), `has a ${p.format} ready for your approval: “${p.title}”`, `#/content/post/${s.id}`)
     log(d, me, `${old ? 'updated' : 'planned'} the ${p.format} “${p.title}” for ${byId(d.clients, p.clientId)?.name}`, link)
     return old ? old.id : d.posts.at(-1).id
   })
   send('save_post', { ...(old ? { id, ...changes(old, p) } : { ...p, id }), ...(quiet && { quiet }) }, old ? [['posts', id]] : [])
   return id
+}
+
+const HTTP = /^https?:\/\//i
+
+// the lead or a supervisor sends made work to the client to approve. email: the client's logins get it too (or, with
+// no login, the contact email on the client); replies come back to whoever sent it. The server sends the email.
+export function sendPost(me, id, { link, email = false } = {}) {
+  const p = byId(db.posts, id)
+  must(p && can(me, 'content.send', p), 'send work to the client')
+  need(['idea', 'production', 'made'].includes(p.status), 'This post has already gone to the client.')
+  const work = link?.trim()
+  need(!work || HTTP.test(work), 'The link should start with https://')
+  commit((d) => {
+    const s = byId(d.posts, id)
+    Object.assign(s, { status: 'ready', ...(link !== undefined && { link: work }) })
+    s.notes = [...(s.notes || []), { userId: me.id, at: nowIso(), text: 'Sent to the client' }]
+    notify(d, me, clientUsers(d, s.clientId).map((u) => u.id), `has a ${s.format} ready for your approval: “${s.title}”`, `#/content/post/${id}`)
+    log(d, me, `sent the ${s.format} “${s.title}” to ${byId(d.clients, s.clientId)?.name}`, `#/content/post/${id}`)
+  })
+  send('send_post', { id, ...(link !== undefined && { link: work }), email }, [['posts', id]])
 }
 
 // a content calendar from Excel: first its project (a new one, or one the client has, with the departments working on

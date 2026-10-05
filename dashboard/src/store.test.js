@@ -323,10 +323,23 @@ test('content plan ↔ tasks: an import makes the project first; this week’s p
   S.moveTask(vikas, k.id, 'doing')
   assert.deepEqual([post(a).status, task(a).statusBy], ['production', 'vikas'])
   S.moveTask(vikas, k.id, 'done')
-  assert.equal(post(a).status, 'ready')
-  assert.ok(unreadFor('rahul').some((n) => n.text === 'has a Reel ready for your approval: “Navratri wishes”'))
+  // made: the lead is asked to check it and send it; the client hears nothing yet, and whoever gave the task isn't told twice
+  assert.equal(post(a).status, 'made')
+  assert.ok(unreadFor('priya').some((n) => n.text === 'made the Reel “Navratri wishes” for Desi Crunch Snacks — check it and send it to the client' && n.link === `#/content/post/${a}`))
+  assert.ok(!unreadFor('rahul').some((n) => n.text.startsWith('has a Reel')))
+  assert.ok(!unreadFor('aman').some((n) => n.text.startsWith('finished')))
+  assert.throws(() => S.sendPost(vikas, a), /permission/) // the maker doesn't send it
+  assert.throws(() => S.savePost(vikas, { ...post(a), status: 'ready' }), /project lead or a supervisor/)
+  assert.throws(() => S.sendPost(priya, a, { link: 'drive.google.com/x' }), /https/)
+  S.sendPost(priya, a, { link: 'https://drive.google.com/navratri', email: true })
+  assert.deepEqual([post(a).status, post(a).link, post(a).notes.at(-1).text], ['ready', 'https://drive.google.com/navratri', 'Sent to the client'])
+  assert.ok(unreadFor('rahul').some((n) => n.text === 'has a Reel ready for your approval: “Navratri wishes”' && n.link === `#/content/post/${a}`))
+  assert.throws(() => S.sendPost(priya, a), /already gone/)
   S.decidePost(rahul, a, false, 'Brighter, please')
   assert.deepEqual([post(a).status, task(a).status], ['production', 'todo'])
+  S.moveTask(vikas, k.id, 'done')
+  S.moveTask(vikas, k.id, 'doing') // reopened before it went out: back in production
+  assert.equal(post(a).status, 'production')
   S.savePost(priya, { ...post(a), status: 'posted' })
   assert.deepEqual([task(a).status, task(a).statusBy], ['done', 'priya'])
 

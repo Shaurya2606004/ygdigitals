@@ -542,6 +542,22 @@ export function TaskModal({ id, onClose }) {
                   <small className="muted block">
                     Goes out {fmtDay(post.date)} · {POST_STATUS[post.status]}
                   </small>
+                  {can(me, 'content.manage') && can(me, 'content.view', post) ? (
+                    <input
+                      type="url"
+                      className="post-link-input"
+                      defaultValue={post.link}
+                      aria-label="Link to the finished work"
+                      placeholder="Link to the finished work"
+                      onBlur={(e) => e.target.value.trim() !== (post.link || '') && run(() => S.savePost(me, { ...post, link: e.target.value }))}
+                    />
+                  ) : (
+                    post.link && (
+                      <a className="work-link" href={post.link} target="_blank" rel="noreferrer">
+                        See the work
+                      </a>
+                    )
+                  )}
                 </dd>
               </>
             )}

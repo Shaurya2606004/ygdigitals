@@ -36,6 +36,8 @@ Manrope for everything else */
   --red-ink: #b91c1c;
   --violet-bg: #efe9fd;
   --violet-ink: #6d28d9;
+  --teal-bg: #dcf3f0;
+  --teal-ink: #0f766e;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
   --top-h: 57px;
 }
@@ -63,6 +65,8 @@ Manrope for everything else */
   --red-ink: #f8a0a0;
   --violet-bg: rgba(124, 58, 237, 0.24);
   --violet-ink: #c9adfc;
+  --teal-bg: rgba(13, 148, 136, 0.22);
+  --teal-ink: #6ee0d2;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -369,6 +373,10 @@ avatars ---------- */
   background: var(--violet-bg);
   color: var(--violet-ink);
 }
+.pill.teal {
+  background: var(--teal-bg);
+  color: var(--teal-ink);
+}
 .due {
   display: inline-flex;
   align-items: center;
@@ -484,6 +492,9 @@ avatars ---------- */
 }
 .t-ps-production {
   --c: #2563eb;
+}
+.t-ps-made {
+  --c: #0d9488;
 }
 .t-ps-ready {
   --c: #d97706;
@@ -1967,6 +1978,22 @@ dialog.modal::backdrop {
   padding: 12px;
   border-radius: 10px;
   background: var(--amber-bg);
+}
+.decide.send-box {
+  background: var(--teal-bg);
+}
+.decide h4 {
+  margin: 0;
+}
+.post-link-input {
+  margin-top: 6px;
+  width: 100%;
+}
+.work-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
 }
 
 /* ---------- home widgets ---------- */

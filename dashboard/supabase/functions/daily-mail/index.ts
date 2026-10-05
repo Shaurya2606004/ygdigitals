@@ -1,8 +1,10 @@
 // The morning email: one per person, only when something needs them — overdue work, what's due today, and (for
 // supervisors) checks and leave waiting on them. Owners get just what's late and what's due. Called by the morning
 // job (private.daily in *_daily.sql, through pg_net); claim_daily_mail() lets it send at most once a day.
-// ponytail: no caller secret — the once-a-day claim caps any misuse at sending that day's email early. Add a shared
-// secret (vault + function secret) if that ever matters.
+// Called with {outbox: true}, it sends the emails the database queued instead (private.mail in *_made_to_send.sql:
+// work made and waiting to be sent, work sent to a client).
+// ponytail: no caller secret — the once-a-day claim caps any misuse at sending that day's email early, and the outbox
+// only holds what the database queued. Add a shared secret (vault + function secret) if that ever matters.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const db = createClient(
@@ -29,18 +31,43 @@ async function send(to: string, subject: string, intro: string, sections: [strin
 ${blocks.map(([h, l]) => `<h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:#666;margin:18px 0 6px">${esc(h)}</h3>
 <ul style="padding-left:18px;margin:0">${l.map((x) => `<li><a href="${HUB}/${x.link}" style="color:#c2334a">${esc(x.text)}</a></li>`).join('')}</ul>`).join('')}
 <p style="margin-top:22px"><a href="${HUB}" style="color:#c2334a">Open YG Hub</a></p></div>`
+  return resend({ to, subject, text, html })
+}
+
+const resend = async (msg: Record<string, string>) => {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${Deno.env.get('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: Deno.env.get('MAIL_FROM') ?? 'YG Hub <hub@ygdigitals.com>', to, subject, text, html }),
+    body: JSON.stringify({ from: Deno.env.get('MAIL_FROM') ?? 'YG Hub <hub@ygdigitals.com>', ...msg }),
   })
   return res.ok
 }
 
+type Queued = { email: string; reply_to: string; subject: string; intro: string; work: string; link: string }
+
+// one email the database queued: a line, the work's link, and where it is in the hub
+async function sendQueued(m: Queued) {
+  const text = [m.intro, m.work && `See the work: ${m.work}`, m.link && `Open it in YG Hub: ${HUB}/${m.link}`].filter(Boolean).join('\n\n')
+  const html = `<div style="font:15px/1.6 system-ui,sans-serif;color:#111;max-width:560px">
+<p>${esc(m.intro)}</p>
+${m.work ? `<p><a href="${esc(m.work)}" style="color:#c2334a">See the work</a></p>` : ''}
+${m.link ? `<p style="margin-top:22px"><a href="${HUB}/${esc(m.link)}" style="color:#c2334a">Open it in YG Hub</a></p>` : ''}</div>`
+  return resend({ to: m.email, subject: m.subject, text, html, ...(m.reply_to ? { reply_to: m.reply_to } : {}) })
+}
+
 Deno.serve(async (req) => {
   try {
-    if (!Deno.env.get('RESEND_API_KEY')) return reply({ skipped: 'RESEND_API_KEY is not set' })
     const body = await req.json().catch(() => ({}))
+    if (body.outbox) {
+      // always take the queue, so nothing waits to go out late (without a key, these are dropped)
+      const { data, error } = await db.rpc('claim_outbox')
+      if (error) throw error
+      if (!Deno.env.get('RESEND_API_KEY')) return reply({ skipped: 'RESEND_API_KEY is not set', dropped: data.length })
+      let sent = 0
+      for (const m of data as Queued[]) if (await sendQueued(m)) sent++
+      return reply({ sent })
+    }
+    if (!Deno.env.get('RESEND_API_KEY')) return reply({ skipped: 'RESEND_API_KEY is not set' })
     const T = ist()
     if (body.day !== T) return reply({ skipped: 'not today’s run' }, 400)
     const { data: claimed, error: claimError } = await db.rpc('claim_daily_mail')

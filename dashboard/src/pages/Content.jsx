@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, DEPTS, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, TASK_STATUS, taskMark, team } from '../store.js'
+import { byId, can, clientUsers, DEPTS, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, TASK_STATUS, taskMark, team } from '../store.js'
 import { Avatar, Confirm, Empty, Err, Field, go, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, useDb, useForm, useMe, usePhone } from '../ui.jsx'
 import { addDays, ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, today, ymd } from '../util.js'
 import { AgendaList, MonthGrid } from './Calendar.jsx'
@@ -14,6 +14,10 @@ const shiftMonth = (s, n) => {
 }
 
 const VIEWS = { month: 'Calendar', board: 'By stage', report: 'Report', owed: 'Compensation' }
+
+// made work nobody has checked yet still reads "In production" to the client
+const seen = (me, p) => (isStaff(me) || p.status !== 'made' ? p : { ...p, status: 'production' })
+const stages = (me) => Object.entries(POST_STATUS).filter(([k]) => isStaff(me) || k !== 'made')
 
 export default function Content({ args = [] }) {
   const me = useMe()
@@ -31,7 +35,7 @@ export default function Content({ args = [] }) {
   const [form, setForm] = useState(null)
   const [importing, setImporting] = useState(false)
   const phone = usePhone()
-  const posts = d.posts.filter((p) => can(me, 'content.view', p) && (!client || p.clientId === client) && (!platform || p.platform === platform))
+  const posts = d.posts.filter((p) => can(me, 'content.view', p) && (!client || p.clientId === client) && (!platform || p.platform === platform)).map((p) => seen(me, p))
   const inMonth = posts.filter((p) => p.date.slice(0, 7) === month.slice(0, 7))
   const items = posts.map((p) => {
     const who = staffer && !client ? byId(d.clients, p.clientId)?.name.split(' ')[0] : ''
@@ -39,9 +43,10 @@ export default function Content({ args = [] }) {
     return { key: p.id, kind: 'post', date: p.date, title: `${who ? `${who}: ` : ''}${p.format} · ${p.title}`, type: `ps-${p.status}`, post: p, when: p.format, line: p.title, sub: [who, POST_STATUS[p.status], p.platform].filter(Boolean).join(' · ') }
   })
   const waiting = posts.filter((p) => p.status === 'ready').length
+  const toSend = posts.filter((p) => p.status === 'made' && can(me, 'content.send', p)).length
   return (
     <div className="page">
-      <PageHead title="Content plan" sub={staffer ? 'Every post, Reel and ad for every client — planned, made, approved by the client, scheduled.' : 'What’s going out on your pages and when. Approve posts marked “Ready”.'}>
+      <PageHead title="Content plan" sub={staffer ? 'Every post, Reel and ad for every client — planned, made, checked and sent, approved by the client, posted.' : 'What’s going out on your pages and when. Approve posts marked “Ready”.'}>
         {manage && (
           <>
             <button className="btn" onClick={() => setImporting(true)}>
@@ -65,6 +70,7 @@ export default function Content({ args = [] }) {
             <Icon name="right" />
           </button>
           <h2 className="cal-label">{fmtMonth(month)}</h2>
+          {toSend > 0 && <span className="pill teal">{toSend} made, to check and send</span>}
           {waiting > 0 && <span className="pill amber">{waiting} waiting for client approval</span>}
         </div>
         <div className="filters">
@@ -102,7 +108,7 @@ export default function Content({ args = [] }) {
       ) : (
         <>
           <p className="legend">
-            {Object.entries(POST_STATUS).map(([k, l]) => (
+            {stages(me).map(([k, l]) => (
               <span key={k}>
                 <i className={`t-ps-${k}`} /> {l}
               </span>
@@ -114,7 +120,7 @@ export default function Content({ args = [] }) {
             <MonthGrid month={month} items={items} onItem={(it) => setOpen(it.post.id)} onDay={(day) => manage && setForm({ initial: { date: day, clientId: client || undefined } })} />
           ) : (
             <div className="board">
-              {Object.entries(POST_STATUS)
+              {stages(me)
                 .filter(([s]) => s !== 'missed' || inMonth.some((p) => p.status === 'missed')) // Undelivered only when there is some
                 .map(([s, label]) => {
                 const col = inMonth.filter((p) => p.status === s).sort((a, b) => a.date.localeCompare(b.date))
@@ -425,7 +431,7 @@ export function CompensationForm({ onClose, edit, initial = {} }) {
 function PostView({ id, onClose, onEdit, onMissed }) {
   const me = useMe()
   const d = useDb()
-  const p = byId(d.posts, id)
+  const p = seen(me, byId(d.posts, id))
   const [note, setNote] = useState('')
   const [err, setErr] = useState('')
   const run = (fn) => {
@@ -440,6 +446,7 @@ function PostView({ id, onClose, onEdit, onMissed }) {
   }
   const manage = can(me, 'content.manage')
   const decide = p.status === 'ready' && can(me, 'content.decide', p)
+  const sending = p.status === 'made' && can(me, 'content.send', p)
   return (
     <Modal title={p.title} onClose={onClose}>
       <div className="event-view">
@@ -453,6 +460,14 @@ function PostView({ id, onClose, onEdit, onMissed }) {
           </p>
         )}
         <PostLinks p={p} />
+        {p.link && (isStaff(me) || ['ready', 'scheduled', 'posted'].includes(p.status)) && (
+          <p>
+            <a className="work-link" href={p.link} target="_blank" rel="noreferrer">
+              <Icon name="link" size={14} /> See the work
+            </a>
+          </p>
+        )}
+        {sending && <SendBox p={p} onDone={onClose} />}
         {d.compensations
           .filter((k) => k.postId === p.id && can(me, 'comp.view', k))
           .map((k) => (
@@ -519,7 +534,7 @@ function PostView({ id, onClose, onEdit, onMissed }) {
               }}
             >
               {Object.entries(POST_STATUS).map(([k, l]) => (
-                <option key={k} value={k}>
+                <option key={k} value={k} disabled={k === 'ready' && p.status !== 'ready' && !can(me, 'content.send', p)}>
                   {l}
                 </option>
               ))}
@@ -535,6 +550,56 @@ function PostView({ id, onClose, onEdit, onMissed }) {
         )}
       </div>
     </Modal>
+  )
+}
+
+// made work: the project's lead or a supervisor checks it, then sends it to the client — by email too — or sends it back
+function SendBox({ p, onDone }) {
+  const me = useMe()
+  const d = useDb()
+  const c = byId(d.clients, p.clientId)
+  const logins = clientUsers(d, p.clientId)
+  const to = logins.length ? logins.map((x) => x.name).join(', ') : c?.email
+  const [link, setLink] = useState(p.link || '')
+  const [email, setEmail] = useState(Boolean(to))
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState('')
+  const run = (fn) => {
+    try {
+      fn()
+      onDone()
+    } catch (x) {
+      setErr(x.message)
+    }
+  }
+  return (
+    <div className="decide send-box">
+      <h4>Check it, then send it to {c?.name}</h4>
+      <Field label="Link to the work" hint="Drive or Dropbox. It goes in the email.">
+        <input type="url" value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://drive.google.com/…" />
+      </Field>
+      {to ? (
+        <label className="check-field">
+          <input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} />
+          <span>
+            Email it to <b>{to}</b>
+            {logins.length ? '' : ' (no YG Hub login, so they reply to your email)'}
+          </span>
+        </label>
+      ) : (
+        <p className="small">{c?.name} has no YG Hub login or email on file. Send it to them yourself, then press Send to client.</p>
+      )}
+      <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="What to change (only to send it back)" aria-label="What to change" />
+      <Err msg={err} />
+      <div className="form-actions">
+        <button className="btn" onClick={() => run(() => S.decidePost(me, p.id, false, note))}>
+          Send back for changes
+        </button>
+        <button className="btn primary" onClick={() => run(() => S.sendPost(me, p.id, { link, email: email && Boolean(to) }))}>
+          <Icon name="send" size={14} /> Send to client
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -782,7 +847,7 @@ export function PostForm({ onClose, initial = {}, edit }) {
   const me = useMe()
   const d = useDb()
   const { v, set, setV, err, run } = useForm(
-    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', brief: '', caption: '', status: 'idea', assigneeId: '', projectId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
+    edit || { clientId: d.clients[0]?.id, date: today(), time: '19:00', platform: 'Instagram', format: 'Reel', dept: 'video', title: '', brief: '', caption: '', link: '', status: 'idea', assigneeId: '', projectId: '', ...Object.fromEntries(Object.entries(initial).filter(([, x]) => x !== undefined)) },
   )
   const makers = team(d)
   const projects = d.projects.filter((p) => p.clientId === v.clientId && (p.status !== 'done' || p.id === v.projectId) && can(me, 'project.view', p))
@@ -849,7 +914,7 @@ export function PostForm({ onClose, initial = {}, edit }) {
         <Field label="Stage" hint="“Ready for approval” notifies the client.">
           <select value={v.status} onChange={set('status')}>
             {Object.entries(POST_STATUS).map(([k, l]) => (
-              <option key={k} value={k}>
+              <option key={k} value={k} disabled={k === 'ready' && edit?.status !== 'ready' && !can(me, 'content.send', v)}>
                 {l}
               </option>
             ))}
@@ -860,6 +925,9 @@ export function PostForm({ onClose, initial = {}, edit }) {
         </Field>
         <Field label="Caption" full>
           <textarea rows={4} value={v.caption} onChange={set('caption')} placeholder="Caption, hashtags, CTA…" />
+        </Field>
+        <Field label="Link to the work" hint="The finished file (Drive, Dropbox), for the check and the client." full>
+          <input type="url" value={v.link || ''} onChange={set('link')} placeholder="https://drive.google.com/…" />
         </Field>
         <Err msg={err} />
         <div className="form-actions">

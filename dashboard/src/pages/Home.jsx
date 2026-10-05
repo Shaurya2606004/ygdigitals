@@ -284,6 +284,7 @@ function Urgent({ me }) {
       }),
     ...d.deliverables.filter((x) => x.status === 'internal' && can(me, 'deliverable.review', x)).map((x) => ({ g: 'decide', at: '', key: x.id, icon: 'eye', text: `Check “${x.title}” v${x.version}`, meta: `${proj(x.projectId)} · from ${S.userName(d, x.submittedBy)}`, href: `#/projects/${x.projectId}/deliverables` })),
     ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}` })),
+    ...d.posts.filter((p) => p.status === 'made' && can(me, 'content.send', p)).map((p) => ({ g: 'decide', at: p.date, key: `m${p.id}`, icon: 'send', text: `Check and send “${p.format}: ${p.title}”`, meta: `${byId(d.clients, p.clientId)?.name} · ${p.assigneeId ? `${first(p.assigneeId)} made it` : 'made'} · goes out ${relDay(p.date)}`, href: `#/content/post/${p.id}` })),
     ...d.deliverables.filter((x) => x.status === 'changes' && x.submittedBy === me.id).map((x) => ({ g: 'decide', at: '', key: `c${x.id}`, icon: 'edit', text: `Changes asked on “${x.title}”`, meta: x.history.at(-1)?.note || proj(x.projectId), href: `#/projects/${x.projectId}/deliverables` })),
     ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” to someone`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
 
@@ -552,7 +553,7 @@ function ClientHome({ me }) {
                 ))}
                 {posts.map((p) => (
                   <li key={p.id}>
-                    <a href="#/content" className="row">
+                    <a href={`#/content/post/${p.id}`} className="row">
                       <span className="row-icon">
                         <Icon name="grid" size={16} />
                       </span>

@@ -87,8 +87,28 @@ Build order: delete-client → departments → overdue → urgent-home → leave
   - A task someone deletes stays deleted (`posts.task_made`).
   - Plan a post has a Project field too.
 - **Sync** (database triggers; the store copies them so the screen updates instantly):
-  - task started → post In production; task done → post Ready for approval, and the client is asked
+  - task started → post In production; task done → post Made, to send (since migration 17, below)
   - post posted or undelivered → task done; client asks for changes → task back to To do
   - the post's day, title and maker carry over to the task
 - **Anyone who can see a task can still change its status** (the user's call). Every task now shows who changed its status last and when (`tasks.status_by`, `status_at`).
 - A task links to its post (`#/content/post/<id>`); a post shows its project and task.
+
+## Made, then sent (2026-10-05, migration 17)
+The user: a maker's Done isn't done for the studio — "it comes to me, I send it to the client", and both steps by email too.
+- **New post stage, "Made, to send"** (`made`). A post's task marked Done moves the post there, not to the client.
+  - The project's lead and the supervisors (not the owners) are told in the app and by email, with a link to the post.
+  - Whoever gave the task no longer gets a separate "finished" note for a post's task.
+  - Their Home lists it under Waiting on you: "Check and send …".
+  - The client still sees it as "In production".
+- **Check and send** (on the post; the project's lead or a supervisor — `content.send`, `private.sends_post`):
+  - Send to client: the post becomes Ready for approval, and its Feedback records "Sent to the client".
+    - "Email it to …" is ticked by default. It goes to the client's YG Hub logins.
+    - With no login, it goes to the contact email on the client, and they reply by email.
+    - Replies go to whoever sent it.
+  - Send back for changes (a note is needed): the post goes back to In production and its task back to the maker's To do.
+  - Only the lead or a supervisor can move a post to Ready for approval, by any route.
+- **Link to the work** (`posts.link`, http(s) only): the maker sets it on their task, or anyone on the post form or the send box. It goes in both emails. The client sees it once the post is sent.
+- **Reopening** a Done task while its post is Made or Ready for approval puts the post back In production.
+- **A project's lead sees its posts** whatever their department (`sees_post` and the posts read rule).
+- **Email:** `private.mail` queues in `private.outbox` (only once `mail_url` is set, so nothing piles up) and wakes `daily-mail` with `{outbox: true}`. The function takes the queue with `claim_outbox()` (service role only; each email is taken once) and sends through Resend. Without RESEND_API_KEY the queue is emptied and nothing is sent.
+- Not done (the user didn't ask): an email when the client approves or asks for changes. That still goes in the app only.

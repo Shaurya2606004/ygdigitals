@@ -80,7 +80,7 @@ const TONES = {
   todo: 'grey', doing: 'blue', review: 'amber', done: 'green',
   planning: 'grey', active: 'blue', hold: 'grey',
   internal: 'amber', changes: 'red', client: 'violet', approved: 'green',
-  idea: 'grey', production: 'blue', ready: 'amber', scheduled: 'violet', posted: 'green',
+  idea: 'grey', production: 'blue', made: 'teal', ready: 'amber', scheduled: 'violet', posted: 'green',
   draft: 'grey', sent: 'blue', paid: 'green', overdue: 'red',
   pending: 'amber', declined: 'red',
   missed: 'red', due: 'grey', today: 'amber', late: 'amber', delivered: 'green', undelivered: 'red',
