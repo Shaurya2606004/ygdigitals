@@ -84,7 +84,7 @@ export const PERMISSIONS = [
   ['Change a task’s date (the project lead and whoever gave the task can too)', ['admin']],
   ['Plan content posts', ['admin', 'member']],
   ['Check work and send it to the client (a project’s lead can send its posts too)', ['admin']],
-  ['Create projects (a project’s lead can edit it)', ['admin']],
+  ['Create and delete projects (a project’s lead can edit it)', ['admin']],
   ['Add people and clients, give client logins', ['admin']],
   ['Post announcements', ['admin']],
   ['Start team group chats', ['admin', 'member', 'freelancer']],
@@ -199,6 +199,7 @@ export function can(u, action, x = {}) {
     case 'project.view':
       return onProject(x.id) || x.clientId === u.clientId
     case 'project.create':
+    case 'project.delete':
       return admin
     case 'project.edit':
       return admin || x.managerId === u.id
@@ -397,6 +398,27 @@ export function saveProject(me, p) {
   })
   send('save_project', old ? { id, ...changes(old, p) } : { ...p, id }, old ? [['projects', id]] : [])
   return id
+}
+
+// a supervisor, typing its name: its tasks, work for approval and discussion go with it. Its posts stay in the client's
+// content plan with no project (a fresh task if they go into another one); meetings stay on the calendar, unlinked.
+export function deleteProject(me, id, confirmName = '') {
+  must(can(me, 'project.delete'), 'delete projects')
+  const p = byId(db.projects, id)
+  need(p, 'This project no longer exists.')
+  need(confirmName.trim().toLowerCase() === p.name.toLowerCase(), 'Type the project’s name exactly to confirm.')
+  commit((d) => {
+    const chans = new Set(d.channels.filter((ch) => ch.projectId === id).map((ch) => ch.id))
+    d.projects = d.projects.filter((x) => x.id !== id)
+    d.tasks = d.tasks.filter((t) => t.projectId !== id)
+    d.deliverables = d.deliverables.filter((x) => x.projectId !== id)
+    d.channels = d.channels.filter((ch) => !chans.has(ch.id))
+    d.messages = d.messages.filter((m) => !chans.has(m.channelId))
+    for (const s of d.posts) if (s.projectId === id) Object.assign(s, { projectId: null, taskMade: false })
+    for (const e of d.events) if (e.projectId === id) e.projectId = null
+    log(d, me, `deleted the project “${p.name}” with its tasks, work and discussion`, '#/projects')
+  })
+  send('delete_project', { id, confirm: confirmName })
 }
 
 /* ---------- tasks ---------- */

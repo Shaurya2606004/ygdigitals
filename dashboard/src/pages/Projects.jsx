@@ -104,6 +104,7 @@ function ProjectPage({ id, tab }) {
   const me = useMe()
   const d = useDb()
   const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [err, setErr] = useState('')
   const p = byId(d.projects, id)
   if (!p || !can(me, 'project.view', p))
@@ -162,6 +163,11 @@ function ProjectPage({ id, tab }) {
             <Icon name="edit" size={16} /> Edit
           </button>
         )}
+        {can(me, 'project.delete') && (
+          <button className="btn danger" onClick={() => setDeleting(true)}>
+            <Icon name="trash" size={16} /> Delete
+          </button>
+        )}
       </PageHead>
       <Err msg={err} />
       <Tabs label="Project sections" value={tab} onChange={(t) => (location.hash = `#/projects/${id}/${t}`)} tabs={tabs} />
@@ -178,7 +184,49 @@ function ProjectPage({ id, tab }) {
         {tab === 'meetings' && <ProjectMeetings p={p} />}
       </div>
       {editing && <ProjectForm edit={p} onClose={() => setEditing(false)} />}
+      {deleting && <DeleteProject p={p} onClose={() => setDeleting(false)} />}
     </div>
+  )
+}
+
+// deleting a project can't be undone, so say exactly what goes (and what stays) and ask for its name
+function DeleteProject({ p, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const { v, set, err, run } = useForm({ confirm: '' })
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many}`
+  const tasks = count(projectTasks(d, p.id).length, 'task', 'tasks')
+  const work = count(d.deliverables.filter((x) => x.projectId === p.id).length, 'piece of work for approval', 'pieces of work for approval')
+  const posts = d.posts.filter((s) => s.projectId === p.id).length
+  const match = v.confirm.trim().toLowerCase() === p.name.toLowerCase()
+  return (
+    <Modal title={`Delete ${p.name}?`} onClose={onClose}>
+      <form
+        className="form-grid one"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (run(() => S.deleteProject(me, p.id, v.confirm))) location.hash = '#/projects'
+        }}
+      >
+        <p>
+          This deletes the project with its <b>{tasks}</b>, <b>{work}</b> and its discussion with the client.{' '}
+          {posts > 0 && `Its ${count(posts, 'post stays', 'posts stay')} in ${byId(d.clients, p.clientId)?.name}’s content plan, with no project. `}
+          Meetings stay on the calendar. <b>It can’t be undone.</b>
+        </p>
+        <Field label={`Type “${p.name}” to confirm`}>
+          <input data-autofocus value={v.confirm} onChange={set('confirm')} autoComplete="off" />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn danger" disabled={!match}>
+            <Icon name="trash" size={16} /> Delete forever
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

@@ -125,3 +125,9 @@ The user: when a Video or Design task is done it should land straight in Social 
 - **Uploaded:** finishing the upload task marks its post Posted. A post marked Posted or Undelivered closes its upload task.
 - **No Ready to check in Social media:** the database refuses it (`tasks_social_no_check`). The status menu leaves it out for Social tasks, and the board drops the column when every task on it is Social media.
 - **Finished tasks leave the Tasks page after a day** (board, list, phone list and a project's Tasks tab), counted from when they were marked Done (`status_at`). It was 14 days. Nothing is deleted: project progress, marks and links to the task still work.
+
+## Delete a project (2026-10-08, migration 19)
+- **Who:** supervisors only (`project.delete`, `public.delete_project`). It's on the project page, next to Edit.
+- **Confirming:** type the project's name, like deleting a client. The popup says how many tasks and pieces of work go, and how many posts stay.
+- **What goes:** its tasks (with their upload tasks), its work for approval, and its discussion with the client.
+- **What stays:** its posts stay in the client's content plan with no project. `task_made` is reset, so a post put into another project gets a fresh task there. Meetings stay on the calendar, unlinked.

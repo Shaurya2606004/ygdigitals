@@ -424,5 +424,32 @@ begin
   select count(*) into n from public.tasks where id = 'up-pt-upl2';
   out := out || format(E'\n%s deleting the post takes its task and that task''s upload: %s', case when n = 0 then '✓' else '✗' end, n);
 
+  /* ---------- deleting a project: a supervisor, typing its name; its posts stay, unlinked ---------- */
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'del1', 'clientId', 'desi', 'projectId', 'p-desi-pack', 'date', private.today() + 3, 'format', 'Post',
+    'title', 'Pouch reveal', 'dept', 'design')::jsonb);
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  begin
+    perform public.delete_project('{"id":"p-desi-pack","confirm":"Masala Range Pouch Packaging"}');
+    out := out || E'\n✗ a team member deleted a project';
+  exception when others then
+    out := out || format(E'\n✓ only a supervisor deletes a project (%s)', sqlerrm);
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  begin
+    perform public.delete_project('{"id":"p-desi-pack","confirm":"Masala"}');
+    out := out || E'\n✗ a project was deleted without its name typed';
+  exception when others then
+    out := out || format(E'\n✓ …typing its name exactly (%s)', sqlerrm);
+  end;
+  perform public.delete_project('{"id":"p-desi-pack","confirm":" masala range pouch packaging "}');
+  perform set_config('role', 'none', true);
+  select format('%s|%s|%s|%s', (select count(*) from public.projects where id = 'p-desi-pack'), (select count(*) from public.tasks where project_id = 'p-desi-pack'),
+    (select count(*) from public.deliverables where project_id = 'p-desi-pack'), (select count(*) from public.channels where id = 'ch-p-desi-pack')) into s;
+  out := out || format(E'\n%s the project goes with its tasks, work and discussion: %s', case when s = '0|0|0|0' then '✓' else '✗' end, s);
+  select format('%s|%s', project_id is null, task_made) into s from public.posts where id = 'del1';
+  out := out || format(E'\n%s its posts stay in the content plan, unlinked, ready for a fresh task: %s', case when s = 't|f' then '✓' else '✗' end, s);
+
   raise exception E'RESULTS (rolled back)%', out;
 end $$;

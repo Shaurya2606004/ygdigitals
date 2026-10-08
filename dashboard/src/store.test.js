@@ -392,3 +392,21 @@ test('video and design finish, social media uploads: a task at once, gone if reo
   S.deletePost(aman, b)
   assert.equal(task(S.uploadTaskId(S.postTaskId(b))), undefined)
 })
+
+test('deleting a project: a supervisor, typing its name; its tasks, work and chat go; its posts stay, unlinked', () => {
+  const [aman, priya] = ['aman', 'priya'].map(u)
+  const d = () => S.getDb()
+  const s = S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title: 'Hamper reveal', assigneeId: 'vikas' })
+  assert.ok(S.byId(d().tasks, S.postTaskId(s)))
+  const event = d().events.find((e) => e.projectId === 'p-diwali')
+  assert.throws(() => S.deleteProject(priya, 'p-diwali', 'Diwali Festive Campaign'), /permission/) // the lead can't
+  assert.throws(() => S.deleteProject(aman, 'p-diwali', 'Diwali'), /name exactly/)
+  S.deleteProject(aman, 'p-diwali', ' diwali festive campaign ')
+  assert.equal(S.byId(d().projects, 'p-diwali'), undefined)
+  assert.deepEqual([d().tasks, d().deliverables, d().channels].map((l) => l.filter((x) => x.projectId === 'p-diwali').length), [0, 0, 0])
+  assert.equal(d().messages.filter((m) => m.channelId === 'ch-p-diwali').length, 0)
+  assert.deepEqual([S.byId(d().posts, s).projectId, S.byId(d().posts, s).taskMade], [null, false])
+  assert.equal(S.byId(d().events, event.id).projectId, null)
+  S.savePost(aman, { ...S.byId(d().posts, s), projectId: 'p-desi-pack' }) // into another project: a fresh task there
+  assert.equal(S.byId(d().tasks, S.postTaskId(s)).projectId, 'p-desi-pack')
+})
