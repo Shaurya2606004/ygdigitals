@@ -21,8 +21,10 @@ export const movedBy = (d, t) => (t.statusAt ? `Moved by ${t.statusBy ? S.userNa
 // finished work stays on the board and in the lists for a day after it's done, then leaves them (it isn't deleted)
 const showing = (t) => t.status !== 'done' || Date.parse(t.statusAt) > Date.now() - 864e5
 
+// soonest date first, undated last
+const byDue = (a, b) => (a.due || '9').localeCompare(b.due || '9')
 // open work first, soonest date first
-const urgentFirst = (a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9')
+const urgentFirst = (a, b) => (a.status === 'done') - (b.status === 'done') || byDue(a, b)
 
 // a link to the task page, or with onOpen a button that opens it where you are
 export function TaskRow({ t, project = true, onOpen }) {
@@ -95,7 +97,7 @@ export function Board({ tasks, project = true }) {
       <div className="board">
         {/* Social media tasks skip "Ready to check": the column is there only for other work */}
         {Object.entries(TASK_STATUS).filter(([s]) => s !== 'review' || tasks.some((t) => t.dept !== 'social')).map(([s, label]) => {
-          const col = tasks.filter((t) => t.status === s && showing(t))
+          const col = tasks.filter((t) => t.status === s && showing(t)).sort(byDue)
           return (
             <section
               key={s}
