@@ -349,3 +349,46 @@ test('content plan ↔ tasks: an import makes the project first; this week’s p
   S.deletePost(priya, b)
   assert.equal(task(b), undefined)
 })
+
+test('video and design finish, social media uploads: a task at once, gone if reopened; uploading marks the post out', () => {
+  const [aman, vikas, priya, arjun] = ['aman', 'vikas', 'priya', 'arjun'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  const up = S.uploadTaskId('t4')
+  S.moveTask(vikas, 't4', 'done')
+  assert.deepEqual([task(up).title, task(up).dept, task(up).assigneeId, task(up).status, task(up).due, task(up).projectId, task(up).uploadOf],
+    ['Upload: Edit Reel 1 — Ghar ki Mithaas (30s)', 'social', null, 'todo', today(), 'p-diwali', 't4'])
+  assert.ok(unreadFor('priya').some((n) => n.text === 'finished “Edit Reel 1 — Ghar ki Mithaas (30s)” — upload it' && n.link === `#/tasks/${up}`))
+  assert.ok(S.can(priya, 'task.edit', task(up)))
+  S.moveTask(vikas, 't4', 'doing') // reopened before it was uploaded: nothing to upload yet
+  assert.equal(task(up), undefined)
+  S.moveTask(vikas, 't4', 'done')
+  assert.equal(S.getDb().tasks.filter((t) => t.uploadOf === 't4').length, 1)
+  // social media work has no check
+  assert.throws(() => S.moveTask(priya, up, 'review'), /don’t need a check/)
+  S.moveTask(priya, up, 'done')
+  S.moveTask(vikas, 't4', 'doing') // an upload already done stays
+  assert.equal(task(up).status, 'done')
+  S.moveTask(arjun, 't8', 'done') // websites: nothing to upload
+  assert.equal(task(S.uploadTaskId('t8')), undefined)
+
+  // a post's task: the upload is due the day it goes out, and uploading it marks the post Posted
+  const post = (id) => S.byId(S.getDb().posts, id)
+  const plan = (title) => S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title, assigneeId: 'vikas' })
+  const a = plan('Hamper reveal')
+  S.moveTask(vikas, S.postTaskId(a), 'done')
+  const upA = S.uploadTaskId(S.postTaskId(a))
+  assert.deepEqual([post(a).status, task(upA).due, task(upA).title], ['made', addDays(today(), 3), 'Upload: Reel: Hamper reveal'])
+  S.decidePost(priya, a, false, 'Brighter') // sent back for changes: the maker's task reopens, so the upload goes
+  assert.equal(task(upA), undefined)
+  S.moveTask(vikas, S.postTaskId(a), 'done')
+  S.moveTask(priya, upA, 'done')
+  assert.equal(post(a).status, 'posted')
+  // a post marked Posted in the content plan closes its upload
+  const b = plan('Sweets close-up')
+  S.moveTask(vikas, S.postTaskId(b), 'done')
+  S.savePost(priya, { ...post(b), status: 'posted' })
+  assert.equal(task(S.uploadTaskId(S.postTaskId(b))).status, 'done')
+  // deleting the post takes its task and that task's upload
+  S.deletePost(aman, b)
+  assert.equal(task(S.uploadTaskId(S.postTaskId(b))), undefined)
+})

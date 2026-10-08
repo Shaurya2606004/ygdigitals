@@ -60,6 +60,8 @@ The admin moves someone to another role with **Edit** in Settings › Team. It a
 
 - **Home**: the admin sees what needs checking, tasks without an owner, overdue work, and who's got what. Team members see their own tasks and day. Clients see what's waiting for their approval, their projects, and what's coming up this week.
 - **Tasks**: a board (drag to change status) or a list. Each task has an owner, due date, checklist and comments with @mentions. **Hand off** passes the task to a teammate with a note; it becomes theirs and starts again at To do.
+  - A finished task stays on the board and in the list for a day, then leaves them (it isn't deleted).
+  - When a Video or Design task is marked Done, a Social media task to upload it appears straight away. Social media tasks skip Ready to check.
 - **Projects**: brief, people, the task board (the client sees it as a read-only **Plan**), **Approvals** (maker submits a link → admin checks it → client approves or asks for changes → new version, with full history), the client-visible **Discussion**, and meetings.
 - **Calendar**: month, week and agenda views of meetings, client calls, shoots, deadlines and posts. It handles repeats (stand-up, weekly planning), Yes/No replies, clash warnings, video-call links, and "Add to Google Calendar" / `.ics` for each event.
 - **Messages**: a studio channel, announcements (admin posts), one channel per project shared with the client, team group chats, and direct messages.

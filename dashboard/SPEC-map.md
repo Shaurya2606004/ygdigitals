@@ -112,3 +112,16 @@ The user: a maker's Done isn't done for the studio — "it comes to me, I send i
 - **A project's lead sees its posts** whatever their department (`sees_post` and the posts read rule).
 - **Email:** `private.mail` queues in `private.outbox` (only once `mail_url` is set, so nothing piles up) and wakes `daily-mail` with `{outbox: true}`. The function takes the queue with `claim_outbox()` (service role only; each email is taken once) and sends through Resend. Without RESEND_API_KEY the queue is emptied and nothing is sent.
 - Not done (the user didn't ask): an email when the client approves or asks for changes. That still goes in the app only.
+
+## Video & Design make it, Social media uploads it (2026-10-08, migration 18)
+The user: when a Video or Design task is done it should land straight in Social media's tasks as "upload the post"; finished tasks should leave the Tasks page after a day; Social media doesn't need Ready to check.
+- **Upload task** (`private.upload_task`, `tasks.upload_of`): any Video or Design task marked Done makes one at once, whether or not it's for a post.
+  - "Upload: <title>", in the same project, Social media, given to no one: the whole Social team sees it and is told ("finished … — upload it").
+  - Due the day its post goes out; a task with no post: today.
+  - Made by the trigger and by the store with the same id (`up-<task id>`), like a post's task.
+  - Reopened before it's uploaded (sent back for changes, handed over, moved back), the upload task goes. Done again, it's made again. An upload already done stays.
+  - Deleting the Video or Design task (or its post) takes its upload task too.
+  - The client's approval doesn't hold it up (the user's call): Social can upload as soon as the maker is done.
+- **Uploaded:** finishing the upload task marks its post Posted. A post marked Posted or Undelivered closes its upload task.
+- **No Ready to check in Social media:** the database refuses it (`tasks_social_no_check`). The status menu leaves it out for Social tasks, and the board drops the column when every task on it is Social media.
+- **Finished tasks leave the Tasks page after a day** (board, list, phone list and a project's Tasks tab), counted from when they were marked Done (`status_at`). It was 14 days. Nothing is deleted: project progress, marks and links to the task still work.

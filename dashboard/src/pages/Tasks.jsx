@@ -2,7 +2,7 @@ import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, DEPTS, isOverdue, POST_STATUS, PRIORITY, REPEATS, seesAll, setsDue, staff, TASK_STATUS, taskMark } from '../store.js'
 import { Avatar, Confirm, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe, usePhone } from '../ui.jsx'
-import { addDays, ago, fmtDay, relDay, today } from '../util.js'
+import { ago, fmtDay, relDay, today } from '../util.js'
 
 // a finished task shows whether it was on time; an open one, when it's due
 export const DueChip = ({ t }) =>
@@ -17,6 +17,9 @@ export const DueChip = ({ t }) =>
 
 // who last changed a task's status, and when ('' if no one has since it was made)
 export const movedBy = (d, t) => (t.statusAt ? `Moved by ${t.statusBy ? S.userName(d, t.statusBy).split(' ')[0] : 'YG Hub'} · ${ago(t.statusAt)}` : '')
+
+// finished work stays on the board and in the lists for a day after it's done, then leaves them (it isn't deleted)
+const showing = (t) => t.status !== 'done' || Date.parse(t.statusAt) > Date.now() - 864e5
 
 // open work first, soonest date first
 const urgentFirst = (a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9')
@@ -58,7 +61,6 @@ export function Board({ tasks, project = true }) {
   const [over, setOver] = useState(null)
   const [err, setErr] = useState('')
   const phone = usePhone()
-  const recent = addDays(today(), -14)
   const drop = (e, status) => {
     e.preventDefault()
     setOver(null)
@@ -69,9 +71,9 @@ export function Board({ tasks, project = true }) {
       setErr(x.message)
     }
   }
-  // a phone can't drag: one list, most urgent first, and finished work only from the last two weeks
+  // a phone can't drag: one list, most urgent first
   if (phone) {
-    const list = tasks.filter((t) => t.status !== 'done' || (t.completedAt || '') >= recent).sort(urgentFirst)
+    const list = tasks.filter(showing).sort(urgentFirst)
     return (
       <>
         {list.length ? (
@@ -91,8 +93,9 @@ export function Board({ tasks, project = true }) {
     <>
       <Err msg={err} />
       <div className="board">
-        {Object.entries(TASK_STATUS).map(([s, label]) => {
-          const col = tasks.filter((t) => t.status === s && (s !== 'done' || (t.completedAt || '') >= recent))
+        {/* Social media tasks skip "Ready to check": the column is there only for other work */}
+        {Object.entries(TASK_STATUS).filter(([s]) => s !== 'review' || tasks.some((t) => t.dept !== 'social')).map(([s, label]) => {
+          const col = tasks.filter((t) => t.status === s && showing(t))
           return (
             <section
               key={s}
@@ -142,7 +145,7 @@ export function Board({ tasks, project = true }) {
                     </button>
                   )
                 })}
-                {!col.length && <p className="col-empty">{s === 'done' ? 'Nothing finished in the last 2 weeks' : 'Drop tasks here'}</p>}
+                {!col.length && <p className="col-empty">{s === 'done' ? 'Nothing finished in the last day' : 'Drop tasks here'}</p>}
               </div>
             </section>
           )
@@ -173,7 +176,7 @@ export default function Tasks({ args }) {
       (!q || t.title.toLowerCase().includes(q)),
   )
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const sorted = [...tasks].sort(urgentFirst)
+  const sorted = tasks.filter(showing).sort(urgentFirst)
   const filtered = Object.values(f).filter(Boolean).length
   return (
     <div className="page">
@@ -398,7 +401,8 @@ export function TaskModal({ id, onClose }) {
   const [item, setItem] = useState('')
   if (!t) return null
   const p = byId(d.projects, t.projectId)
-  const post = byId(d.posts, t.postId)
+  const source = byId(d.tasks, t.uploadOf) // an upload task: the Video or Design work it uploads
+  const post = byId(d.posts, t.postId ?? source?.postId)
   const editable = can(me, 'task.edit', t)
   const run = (fn) => {
     try {
@@ -503,11 +507,13 @@ export function TaskModal({ id, onClose }) {
             <dt>Status</dt>
             <dd className="stack">
               <select value={t.status} disabled={!editable} onChange={(e) => save({ status: e.target.value })} aria-label="Status">
-                {Object.entries(TASK_STATUS).map(([k, l]) => (
-                  <option key={k} value={k}>
-                    {l}
-                  </option>
-                ))}
+                {Object.entries(TASK_STATUS)
+                  .filter(([k]) => k !== 'review' || t.dept !== 'social')
+                  .map(([k, l]) => (
+                    <option key={k} value={k}>
+                      {l}
+                    </option>
+                  ))}
               </select>
               {t.statusAt && <small className="muted">{movedBy(d, t)}</small>}
             </dd>
@@ -532,6 +538,15 @@ export function TaskModal({ id, onClose }) {
               <a href={`#/projects/${p?.id}`}>{p?.name}</a>
               <small className="muted block">{byId(d.clients, p?.clientId)?.name}</small>
             </dd>
+            {source && (
+              <>
+                <dt>Upload of</dt>
+                <dd>
+                  <a href={`#/tasks/${source.id}`}>{source.title}</a>
+                  <small className="muted block">{movedBy(d, source)}</small>
+                </dd>
+              </>
+            )}
             {post && (
               <>
                 <dt>Content plan</dt>

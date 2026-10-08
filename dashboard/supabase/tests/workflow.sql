@@ -251,7 +251,7 @@ begin
   select count(*) into n from public.notifications where user_id = md5('yg-sample:rahul')::uuid and text like 'has a Reel%';
   out := out || format(E'\n%s finishing it makes the post "Made, to send" — the client hears nothing yet: %s, %s', case when s = 'made' and n = 0 then '✓' else '✗' end, s, n);
   select format('%s|%s', count(*) filter (where text = 'made the Reel “Navratri wishes” for Desi Crunch Snacks — check it and send it to the client' and link = '#/content/post/imp1'),
-    count(*) filter (where text like 'finished%')) into s from public.notifications where user_id = priya;
+    count(*) filter (where text = 'finished “Reel: Navratri wishes”')) into s from public.notifications where user_id = priya;
   out := out || format(E'\n%s the lead is told to check it and send it (not just "finished"): %s', case when s = '1|0' then '✓' else '✗' end, s);
   select string_agg(email || ' ' || subject, ', ') into s from private.outbox;
   out := out || format(E'\n%s …and emailed: %s', case when s = 'priya@example.com To check and send: Reel “Navratri wishes” for Desi Crunch Snacks' then '✓' else '✗' end, s);
@@ -365,6 +365,64 @@ begin
   perform private.daily();
   select format('%s|%s', (k.created_by = priya), (select count(*) from public.tasks where post_id = 'imp2')) into s from public.tasks k where k.post_id = 'imp3';
   out := out || format(E'\n%s the 9 am job puts next week''s posts in To do (given by the project lead); a deleted task stays deleted: %s', case when s = 't|0' then '✓' else '✗' end, s);
+
+  /* ---------- Video and Design make it, Social media uploads it ---------- */
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task('{"id":"t4","status":"done"}');
+  perform set_config('role', 'none', true);
+  select format('%s|%s|%s|%s|%s|%s', k.title, k.dept, k.assignee_id is null, k.status, k.due = private.today(), k.upload_of) into s from public.tasks k where k.id = 'up-t4';
+  out := out || format(E'\n%s a Video task done makes a Social media task to upload it, for the whole team, due today: %s',
+    case when s = 'Upload: Edit Reel 1 — Ghar ki Mithaas (30s)|social|t|todo|t|t4' then '✓' else '✗' end, s);
+  select count(*) into n from public.notifications where user_id = priya and text = 'finished “Edit Reel 1 — Ghar ki Mithaas (30s)” — upload it' and link = '#/tasks/up-t4';
+  out := out || format(E'\n%s …and Social media is told: %s', case when n = 1 then '✓' else '✗' end, n);
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task('{"id":"t4","status":"doing"}');
+  select count(*) into n from public.tasks where upload_of = 't4';
+  perform public.save_task('{"id":"t4","status":"done"}');
+  perform set_config('role', 'none', true);
+  select format('%s|%s', n, count(*)) into s from public.tasks where upload_of = 't4';
+  out := out || format(E'\n%s reopened before it''s uploaded, the upload task goes; done again, it''s back once: %s', case when s = '0|1' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform public.save_task('{"id":"up-t4","status":"review"}');
+    out := out || E'\n✗ a Social media task went to Ready to check';
+  exception when others then
+    out := out || E'\n✓ Social media tasks have no Ready to check';
+  end;
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:arjun')::uuid, 'role', 'authenticated')::text, true);
+  perform public.save_task('{"id":"t8","status":"done"}');
+  perform set_config('role', 'none', true);
+  select count(*) into n from public.tasks where upload_of = 't8';
+  out := out || format(E'\n%s a Websites task done: nothing to upload: %s', case when n = 0 then '✓' else '✗' end, n);
+  -- a post's task: due the day it goes out; uploading it marks the post posted; a post marked posted closes its upload
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'upl1', 'clientId', 'desi', 'projectId', 'p-diwali', 'date', private.today() + 3, 'format', 'Reel',
+    'title', 'Hamper reveal', 'dept', 'video', 'assigneeId', vikas)::jsonb);
+  perform public.save_post(json_build_object('id', 'upl2', 'clientId', 'desi', 'projectId', 'p-diwali', 'date', private.today() + 3, 'format', 'Reel',
+    'title', 'Sweets close-up', 'dept', 'video', 'assigneeId', vikas)::jsonb);
+  perform set_config('request.jwt.claims', json_build_object('sub', vikas, 'role', 'authenticated')::text, true);
+  perform public.save_task('{"id":"pt-upl1","status":"done"}');
+  perform public.save_task('{"id":"pt-upl2","status":"done"}');
+  perform set_config('role', 'none', true);
+  select format('%s|%s', s2.status, k.due - private.today()) into s from public.posts s2, public.tasks k where s2.id = 'upl1' and k.id = 'up-pt-upl1';
+  out := out || format(E'\n%s a post''s task done: the post is made, its upload due the day it goes out: %s', case when s = 'made|3' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task('{"id":"up-pt-upl1","status":"done"}');
+  perform public.save_post('{"id":"upl2","status":"posted"}');
+  perform set_config('role', 'none', true);
+  select format('%s|%s', (select status from public.posts where id = 'upl1'), (select status from public.tasks where id = 'up-pt-upl2')) into s;
+  out := out || format(E'\n%s uploading marks the post posted; a post marked posted closes its upload: %s', case when s = 'posted|done' then '✓' else '✗' end, s);
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  perform public.delete_post('{"id":"upl2"}');
+  perform set_config('role', 'none', true);
+  select count(*) into n from public.tasks where id = 'up-pt-upl2';
+  out := out || format(E'\n%s deleting the post takes its task and that task''s upload: %s', case when n = 0 then '✓' else '✗' end, n);
 
   raise exception E'RESULTS (rolled back)%', out;
 end $$;
