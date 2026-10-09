@@ -82,7 +82,7 @@ Build order: delete-client → departments → overdue → urgent-home → leave
   - Pick the departments working on it; their people join its team.
   - Pick who makes the Reels and Shorts (Video) and who makes the rest (Design).
   - Afterwards it opens the project's Tasks tab.
-- **One task per post** in its project, due the day before the post goes out:
+- **One task per post** in its project, due the day the post goes out (the day before until migration 21):
   - Made once the post is a week away (on saving, or by the 9 am job).
   - A task someone deletes stays deleted (`posts.task_made`).
   - Plan a post has a Project field too.
@@ -138,7 +138,7 @@ What changed (the user's calls: uploads to Nandni automatically; anyone can stil
 - **Sort by** (Tasks page): due date (default), priority, project or person. Ties go soonest due first, then most urgent. Kept per device (`localStorage`).
 - **Quick dates:** the date on a card, row or list line is a button for whoever sets dates (`setsDue`). It opens a small popup: Today, Tomorrow or another day.
 - **Post follows pushed work** (`save_task`): a post's task, or its upload task, set past the post's day moves the post to that day (unless it's already Posted or Undelivered). Work set on or before the post's day never moves it. The task keeps the date it was given.
-  - The task is saved first, then the post. Moving a post sets its task to the day before, except a task already on the new day (`post_saved`), so the task is written once.
+  - The task is saved first, then the post. Moving a post takes its task to the new day (`post_saved`), where the pushed task already is, so the task is written once.
 - **Upload follows the post:** a post moved to another day takes its open upload task with it (`post_saved`). An upload closed in the same save (marked Posted and moved at once) keeps its day.
 - **The task window's date** is the same popup as the cards' (it used to save every keystroke, and a day passed while typing could move the post).
 

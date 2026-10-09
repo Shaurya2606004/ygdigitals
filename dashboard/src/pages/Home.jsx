@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, EVENT_TYPES, isOverdue, occurrences, POST_STATUS, postMark, PROJECT_STATUS, progress, staff, taskMark } from '../store.js'
-import { Avatar, Bar, Card, Empty, Err, Icon, isUrl, Mark, RichText, Status, useDb, useMe } from '../ui.jsx'
-import { addDays, ago, daysBetween, fmtDay, fmtLong, fmtTime, relDay, today } from '../util.js'
-import { EventForm } from './Calendar.jsx'
+import { byId, can, isOverdue, POST_STATUS, postMark, PROJECT_STATUS, progress, staff, taskMark } from '../store.js'
+import { Avatar, Bar, Card, Empty, Err, Icon, Mark, RichText, Status, useDb, useMe } from '../ui.jsx'
+import { addDays, ago, daysBetween, fmtDay, fmtLong, relDay, today } from '../util.js'
 import { CompensationForm, makeUpFor } from './Content.jsx'
 import { HandoffForm, SendBackForm, TaskRow } from './Tasks.jsx'
 
@@ -27,11 +26,10 @@ function OwnerHome({ me }) {
   const d = useDb()
   const T = today()
   const [allWeek, setAllWeek] = useState(false)
-  const away = d.users.filter((u) => u.active && S.isAway(d, u.id, T)).map((u) => u.name.split(' ')[0])
   const client = (id) => byId(d.clients, id)?.name ?? ''
   const work = [
     ...d.tasks.filter((t) => t.due).map((t) => ({ key: t.id, what: t.title, client: client(byId(d.projects, t.projectId)?.clientId), who: t.assigneeId, due: t.due, doneOn: t.completedAt, mark: taskMark(t), href: `#/tasks/${t.id}` })),
-    ...d.posts.map((p) => ({ key: p.id, what: `${p.format}: ${p.title}`, client: client(p.clientId), who: p.assigneeId, due: p.date, mark: postMark(p), href: '#/content' })),
+    ...d.posts.map((p) => ({ key: p.id, what: `${p.format}: ${p.title}`, client: client(p.clientId), who: p.assigneeId, due: p.date, mark: postMark(p), href: `#/content/post/${p.id}` })),
     ...d.compensations
       .filter((k) => k.due)
       .map((k) => ({ key: k.id, what: `Compensation: ${k.offer}`, client: client(k.clientId), who: k.ownerId, due: k.due, doneOn: k.givenAt, mark: k.status === 'given' ? 'delivered' : k.due < T ? 'overdue' : k.due === T ? 'today' : 'due', href: '#/content/owed' })),
@@ -60,10 +58,7 @@ function OwnerHome({ me }) {
         <h1>
           {hello()}, {me.name.split(' ')[0]}
         </h1>
-        <p className="sub">
-          {fmtLong(T)}
-          {away.length > 0 && ` · On leave today: ${away.join(', ')}`}
-        </p>
+        <p className="sub">{fmtLong(T)}</p>
       </div>
       <div className="kpis">
         <Kpi label="Late" value={overdue.length} tone={overdue.length ? 'late' : ''} note={overdue.length ? 'not done by their date' : 'nothing late'} />
@@ -126,38 +121,6 @@ const Kpi = ({ label, value, note, tone, href }) => {
     </a>
   ) : (
     <div className="kpi">{body}</div>
-  )
-}
-
-export function Agenda({ me, days = 1 }) {
-  const d = useDb()
-  const from = today()
-  const items = occurrences(d, from, addDays(from, days - 1)).filter((o) => o.attendeeIds.includes(me.id) && o.rsvp?.[me.id] !== 'no')
-  if (!items.length) return <Empty icon="calendar" title={days === 1 ? 'No meetings today' : 'Nothing booked'} />
-  return (
-    <ul className="list">
-      {items.map((o) => (
-        <li key={o.id + o.date} className="row agenda-row">
-          <span className="time">
-            {days > 1 && <small>{relDay(o.date)}</small>}
-            {fmtTime(o.start)}
-          </span>
-          <span className={`type-bar t-${o.type}`} aria-hidden="true" />
-          <span className="grow">
-            <b>{o.title}</b>
-            <small>
-              {EVENT_TYPES[o.type]} · {fmtTime(o.start)}–{fmtTime(o.end)}
-              {o.location && !isUrl(o.location) ? ` · ${o.location}` : ''}
-            </small>
-          </span>
-          {isUrl(o.location) && (
-            <a className="btn sm" href={o.location} target="_blank" rel="noreferrer">
-              <Icon name="video" size={14} /> Join
-            </a>
-          )}
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -273,15 +236,8 @@ function Urgent({ me }) {
         comp: k,
       })),
     ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId === me.id).map((t) => ({ g: 'overdue', at: t.due, key: t.id, icon: 'clock', late: true, text: t.title, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
-    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId === me.id).map((p) => ({ g: 'overdue', at: p.date, key: p.id, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)}, still ${POST_STATUS[p.status]}`, href: '#/content', post: p })),
+    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId === me.id).map((p) => ({ g: 'overdue', at: p.date, key: p.id, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)}, still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}`, post: p })),
 
-    ...d.leaves
-      .filter((l) => admin && l.status === 'pending' && l.userId !== me.id)
-      .map((l) => {
-        const due = S.openWork(d, l.userId, l.start, l.end).length
-        const meta = [l.note, due ? `${due} of their tasks or posts are due then` : 'nothing of theirs is due then'].filter(Boolean).join(' · ')
-        return { g: 'decide', at: l.start, key: `v${l.id}`, icon: 'sun', text: `${first(l.userId)} asks for leave: ${S.leaveDays(l)}`, meta, href: '#/leave' }
-      }),
     ...d.deliverables.filter((x) => x.status === 'internal' && can(me, 'deliverable.review', x)).map((x) => ({ g: 'decide', at: '', key: x.id, icon: 'eye', text: `Check “${x.title}” v${x.version}`, meta: `${proj(x.projectId)} · from ${S.userName(d, x.submittedBy)}`, href: `#/projects/${x.projectId}/deliverables` })),
     ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}`, check: t })),
     ...d.posts.filter((p) => p.status === 'made' && can(me, 'content.send', p)).map((p) => ({ g: 'decide', at: p.date, key: `m${p.id}`, icon: 'send', text: `Check and send “${p.format}: ${p.title}”`, meta: `${byId(d.clients, p.clientId)?.name} · ${p.assigneeId ? `${first(p.assigneeId)} made it` : 'made'} · goes out ${relDay(p.date)}`, href: `#/content/post/${p.id}` })),
@@ -289,10 +245,10 @@ function Urgent({ me }) {
     ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” to someone`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
 
     ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId && t.assigneeId !== me.id && (admin || leads(t.projectId))).map((t) => ({ g: 'late', at: t.due, key: `l${t.id}`, icon: 'clock', late: true, text: `${first(t.assigneeId)}: “${t.title}”`, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}` })),
-    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId !== me.id && S.seesAll(me)).map((p) => ({ g: 'late', at: p.date, key: `p${p.id}`, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)} · ${p.assigneeId ? first(p.assigneeId) : 'no one on it'}`, href: '#/content', post: p })),
+    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId !== me.id && S.seesAll(me)).map((p) => ({ g: 'late', at: p.date, key: `p${p.id}`, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)} · ${p.assigneeId ? first(p.assigneeId) : 'no one on it'}`, href: `#/content/post/${p.id}`, post: p })),
 
     ...d.tasks.filter((t) => openTask(t) && t.due === T && t.assigneeId === me.id).map((t) => ({ g: 'today', at: t.due, key: `t${t.id}`, icon: 'check', text: t.title, meta: proj(t.projectId), href: `#/tasks/${t.id}`, task: t })),
-    ...d.posts.filter((p) => p.date === T && p.assigneeId === me.id && !['scheduled', 'posted', 'missed'].includes(p.status)).map((p) => ({ g: 'today', at: p.date, key: `d${p.id}`, icon: 'grid', text: `${p.format} goes out today: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · still ${POST_STATUS[p.status]}`, href: '#/content' })),
+    ...d.posts.filter((p) => p.date === T && p.assigneeId === me.id && !['scheduled', 'posted', 'missed'].includes(p.status)).map((p) => ({ g: 'today', at: p.date, key: `d${p.id}`, icon: 'grid', text: `${p.format} goes out today: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}` })),
 
     ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && t.due > T && t.due <= addDays(T, 7)).map((t) => ({ g: 'week', at: t.due, key: `w${t.id}`, icon: 'calendar', text: t.title, meta: `${proj(t.projectId)} · ${relDay(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
     ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && (!t.due || t.due > addDays(T, 7))).map((t) => ({ g: 'later', at: t.due || '9', key: `n${t.id}`, icon: 'calendar', text: t.title, meta: [proj(t.projectId), t.due && relDay(t.due)].filter(Boolean).join(' · '), href: `#/tasks/${t.id}`, task: t })),
@@ -385,7 +341,6 @@ function StaffHome({ me }) {
   const T = today()
   const admin = me.role === 'admin'
   const free = me.role === 'freelancer' // no studio-wide feeds: they only see their own projects
-  const away = d.users.filter((u) => u.active && S.isAway(d, u.id, T)).map((u) => u.name.split(' ')[0])
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))
   const open = d.tasks.filter((t) => t.status !== 'done')
   const checks = d.deliverables.filter((x) => x.status === 'internal').length + d.tasks.filter((t) => t.status === 'review').length
@@ -403,7 +358,7 @@ function StaffHome({ me }) {
         { label: 'Overdue', value: mine.filter(isOverdue).length, tone: mine.some(isOverdue) ? 'late' : '' },
       ]
 
-  // the team and freelancers: just their work, most urgent first, and today's meetings
+  // the team and freelancers: just their work, most urgent first
   if (!admin)
     return (
       <div className="page">
@@ -411,10 +366,7 @@ function StaffHome({ me }) {
           <h1>
             {hello()}, {me.name.split(' ')[0]}
           </h1>
-          <p className="sub">
-            {fmtLong(T)}
-            {away.length > 0 && ` · On leave today: ${away.join(', ')}`}
-          </p>
+          <p className="sub">{fmtLong(T)}</p>
         </div>
         <div className="cols">
           <div className="col-main">
@@ -423,9 +375,6 @@ function StaffHome({ me }) {
             </Card>
           </div>
           <div className="col-side">
-            <Card title="Today’s meetings" action={<a href="#/calendar">Calendar</a>}>
-              <Agenda me={me} />
-            </Card>
             {!free && (
               <Card title="Announcements" action={<a href="#/chat/ch-announce">Open</a>}>
                 <Announcements />
@@ -442,10 +391,7 @@ function StaffHome({ me }) {
         <h1>
           {hello()}, {me.name.split(' ')[0]}
         </h1>
-        <p className="sub">
-          {fmtLong(T)}
-          {away.length > 0 && ` · Away today: ${away.join(', ')}`}
-        </p>
+        <p className="sub">{fmtLong(T)}</p>
       </div>
       <Card title="Most urgent first" className="urgent-card">
         <Urgent me={me} />
@@ -480,9 +426,6 @@ function StaffHome({ me }) {
           )}
         </div>
         <div className="col-side">
-          <Card title="Today" action={<a href="#/calendar">Calendar</a>}>
-            <Agenda me={me} />
-          </Card>
           {!free && (
             <Card title="Announcements" action={<a href="#/chat/ch-announce">Open</a>}>
               <Announcements />
@@ -516,14 +459,12 @@ function StaffHome({ me }) {
 function ClientHome({ me }) {
   const d = useDb()
   const T = today()
-  const [booking, setBooking] = useState(false)
   const client = byId(d.clients, me.clientId)
   const projects = d.projects.filter((p) => p.clientId === me.clientId)
   const ids = projects.map((p) => p.id)
   const waiting = d.deliverables.filter((x) => x.status === 'client' && can(me, 'deliverable.decide', x))
   const posts = d.posts.filter((p) => p.clientId === me.clientId && p.status === 'ready')
   const comingUp = d.tasks.filter((t) => ids.includes(t.projectId) && t.status !== 'done' && t.due && t.due <= addDays(T, 7)).sort((a, b) => a.due.localeCompare(b.due))
-  const meetings = occurrences(d, T, addDays(T, 30)).filter((o) => o.attendeeIds.includes(me.id))
   const teamIds = [...new Set(projects.filter((p) => p.status !== 'done').flatMap((p) => [p.managerId, ...p.memberIds]))]
   const chans = d.channels.filter((c) => c.type === 'project' && can(me, 'channel.view', c)).map((c) => c.id)
   const msgs = d.messages.filter((m) => chans.includes(m.channelId) && !m.deleted).slice(-4).reverse()
@@ -542,7 +483,6 @@ function ClientHome({ me }) {
         <Kpi label="Active projects" value={projects.filter((p) => p.status !== 'done').length} href="#/projects" />
         <Kpi label="Waiting for your approval" value={waiting.length + posts.length} tone={waiting.length + posts.length ? 'warn' : ''} />
         <Kpi label="Due this week" value={comingUp.length} note="across your projects" />
-        <Kpi label="Meetings (next 30 days)" value={meetings.length} href="#/calendar" />
       </div>
       <div className="cols">
         <div className="col-main">
@@ -671,16 +611,6 @@ function ClientHome({ me }) {
           </Card>
         </div>
         <div className="col-side">
-          <Card
-            title="Upcoming meetings"
-            action={
-              <button className="btn sm" onClick={() => setBooking(true)}>
-                <Icon name="plus" size={14} /> Book
-              </button>
-            }
-          >
-            <Agenda me={me} days={30} />
-          </Card>
           <Card title="Your team at YG">
             <ul className="list">
               {teamIds.map((id) => {
@@ -701,7 +631,6 @@ function ClientHome({ me }) {
           </Card>
         </div>
       </div>
-      {booking && <EventForm onClose={() => setBooking(false)} initial={{ type: 'client', title: `${client?.name} — catch-up`, attendeeIds: leads.slice(0, 1) }} />}
     </div>
   )
 }

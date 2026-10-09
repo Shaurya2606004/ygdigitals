@@ -332,8 +332,7 @@ function DeleteClient({ c, onClose }) {
         }}
       >
         <p>
-          This deletes the client and everything of theirs: <b>{goes.join(', ')}</b>, and their project discussions. Meetings stay on the
-          calendar. <b>It can’t be undone.</b>
+          This deletes the client and everything of theirs: <b>{goes.join(', ')}</b>, and their project discussions. <b>It can’t be undone.</b>
         </p>
         <Field label={`Type “${c.name}” to confirm`}>
           <input data-autofocus value={v.confirm} onChange={set('confirm')} autoComplete="off" />

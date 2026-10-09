@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import * as S from '../store.js'
-import { byId, can, DELIV_STATUS, DELIV_TYPES, isOverdue, isStaff, occurrences, PRIORITY, PROJECT_STATUS, progress, projectTasks, staff } from '../store.js'
+import { byId, can, DELIV_STATUS, DELIV_TYPES, isOverdue, isStaff, PRIORITY, PROJECT_STATUS, progress, projectTasks, staff } from '../store.js'
 import { Avatar, Avatars, Bar, Card, Empty, Err, Field, Icon, Modal, PageHead, PeopleOptions, PeoplePicker, Status, Tabs, useDb, useForm, useMe, usePhone } from '../ui.jsx'
-import { addDays, ago, fmtDay, fmtTime, relDay, today } from '../util.js'
-import { EventForm } from './Calendar.jsx'
+import { addDays, ago, fmtDay, relDay, today } from '../util.js'
 import { ChatPane } from './Chat.jsx'
 import { Activity } from './Home.jsx'
 import { Board, TaskForm } from './Tasks.jsx'
@@ -124,7 +123,6 @@ function ProjectPage({ id, tab }) {
     staffer ? ['tasks', 'Tasks', projectTasks(d, id).filter((t) => t.status !== 'done').length] : ['plan', 'Plan'],
     ['deliverables', 'Approvals', delivs.filter((x) => (staffer ? ['internal', 'client'] : ['client']).includes(x.status)).length],
     ['discussion', 'Discussion'],
-    ['meetings', 'Meetings'],
   ]
   return (
     <div className="page">
@@ -181,7 +179,6 @@ function ProjectPage({ id, tab }) {
             <ChatPane channelId={`ch-${id}`} />
           </div>
         )}
-        {tab === 'meetings' && <ProjectMeetings p={p} />}
       </div>
       {editing && <ProjectForm edit={p} onClose={() => setEditing(false)} />}
       {deleting && <DeleteProject p={p} onClose={() => setDeleting(false)} />}
@@ -210,8 +207,8 @@ function DeleteProject({ p, onClose }) {
       >
         <p>
           This deletes the project with its <b>{tasks}</b>, <b>{work}</b> and its discussion with the client.{' '}
-          {posts > 0 && `Its ${count(posts, 'post stays', 'posts stay')} in ${byId(d.clients, p.clientId)?.name}’s content plan, with no project. `}
-          Meetings stay on the calendar. <b>It can’t be undone.</b>
+          {posts > 0 && `Its ${count(posts, 'post stays', 'posts stay')} on ${byId(d.clients, p.clientId)?.name}’s calendar, with no project. `}
+          <b>It can’t be undone.</b>
         </p>
         <Field label={`Type “${p.name}” to confirm`}>
           <input data-autofocus value={v.confirm} onChange={set('confirm')} autoComplete="off" />
@@ -360,52 +357,6 @@ function ProjectTasks({ p }) {
       <Board tasks={projectTasks(d, p.id)} project={false} />
       {adding && <TaskForm onClose={() => setAdding(false)} initial={{ projectId: p.id }} />}
     </>
-  )
-}
-
-function ProjectMeetings({ p }) {
-  const me = useMe()
-  const d = useDb()
-  const [adding, setAdding] = useState(false)
-  const T = today()
-  const all = occurrences(d, addDays(T, -60), addDays(T, 60)).filter((o) => o.projectId === p.id && can(me, 'event.view', o))
-  const upcoming = all.filter((o) => o.date >= T)
-  const past = all.filter((o) => o.date < T).reverse()
-  const row = (o) => (
-    <li key={o.id + o.date} className="row">
-      <span className="time">
-        <small>{relDay(o.date)}</small>
-        {fmtTime(o.start)}
-      </span>
-      <span className={`type-bar t-${o.type}`} aria-hidden="true" />
-      <span className="grow">
-        <b>{o.title}</b>
-        <small>{o.location}</small>
-      </span>
-      <Avatars ids={o.attendeeIds} max={4} size={22} />
-    </li>
-  )
-  return (
-    <div className="cols">
-      <div className="col-main">
-        <Card
-          title="Upcoming"
-          action={
-            <button className="btn sm primary" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={14} /> Schedule
-            </button>
-          }
-        >
-          {upcoming.length ? <ul className="list">{upcoming.map(row)}</ul> : <Empty icon="calendar" title="Nothing scheduled" />}
-        </Card>
-        {past.length > 0 && (
-          <Card title="Past">
-            <ul className="list">{past.map(row)}</ul>
-          </Card>
-        )}
-      </div>
-      {adding && <EventForm onClose={() => setAdding(false)} initial={{ projectId: p.id, title: `${p.name} — `, type: isStaff(me) ? 'meeting' : 'client', attendeeIds: [p.managerId] }} />}
-    </div>
   )
 }
 

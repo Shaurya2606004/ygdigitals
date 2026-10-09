@@ -331,9 +331,6 @@ export const Card = ({ title, action, children, className = '' }) => (
   </section>
 )
 
-// a meeting's location is either a place or a video-call link
-export const isUrl = (s) => /^https?:\/\//.test(s || '')
-
 export const PageHead = ({ title, sub, children }) => (
   <div className="page-head">
     <div>

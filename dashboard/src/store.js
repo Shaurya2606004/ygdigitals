@@ -782,11 +782,10 @@ export function leaveGroup(me, id) {
 
 /* ---------- content plan ---------- */
 
-// A post in a project has one task there, made once it's a week away and due the day before it goes out; the task
+// A post in a project has one task there, made once it's a week away and due the day it goes out; the task
 // moves the post and the post moves the task. The server does all of this itself (*_content_tasks.sql) — these are
 // its copies, so the screen changes at once.
 export const postTaskId = (postId) => `pt-${postId}`
-const postDue = (date) => (date > today() ? addDays(date, -1) : date)
 const setStatus = (d, me, k, status) => {
   if (status === k.status) return
   const old = { ...k }
@@ -828,7 +827,7 @@ function postTask(d, me, s) {
   const id = postTaskId(s.id)
   if (!byId(d.tasks, id)) {
     d.tasks.push({ id, projectId: s.projectId, postId: s.id, assigneeId: s.assigneeId || null, status: s.status === 'production' ? 'doing' : 'todo', priority: 'normal',
-      due: postDue(s.date), title: `${s.format}: ${s.title}`, dept: s.dept, repeat: 'none', desc: s.brief || '', checklist: [], comments: [], createdBy: me.id, createdAt: nowIso(), completedAt: null })
+      due: s.date, title: `${s.format}: ${s.title}`, dept: s.dept, repeat: 'none', desc: s.brief || '', checklist: [], comments: [], createdBy: me.id, createdAt: nowIso(), completedAt: null })
     if (s.assigneeId) notify(d, me, [s.assigneeId], `gave you “${s.format}: ${s.title}” — it goes out ${fmtDay(s.date)}`, `#/tasks/${id}`)
   }
   s.taskMade = true
@@ -844,10 +843,10 @@ function postMoved(d, me, old, s) {
     const up = byId(d.tasks, uploadTaskId(k.id))
     if (up) setStatus(d, me, up, 'done') // out: nothing left to upload
   } else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(d, me, k, 'todo') // sent back for changes
-  // a new day: due the day before, unless it already falls on it (its work pushed the post there); its open upload goes
-  // up that day. After the status, as on the server: an upload this save closed stays where it was
+  // a new day: its task and its open upload go there too. After the status, as on the server: an upload this save
+  // closed stays where it was
   if (s.date !== old.date) {
-    if (k.due !== s.date) k.due = postDue(s.date)
+    k.due = s.date
     uploadDue(d, k, s.date)
   }
 }
@@ -858,6 +857,14 @@ function uploadDue(d, k, date) {
 }
 // the post a task puts out: its own, or (an upload task) the post of the work it uploads
 export const taskPost = (d, k) => byId(d.posts, k.postId ?? byId(d.tasks, k.uploadOf)?.postId)
+// what else of a task's project falls on a day: its other open tasks due then, and its posts going out then with no
+// open task of their own yet. A day with none is free (the date popup shows which)
+export function busyOn(d, k, day) {
+  const tasks = d.tasks.filter((t) => t.id !== k.id && t.projectId === k.projectId && t.status !== 'done' && t.due === day)
+  const counted = new Set([taskPost(d, k)?.id, ...tasks.map((t) => taskPost(d, t)?.id)])
+  const posts = d.posts.filter((s) => s.projectId === k.projectId && s.date === day && !OUT.includes(s.status) && !counted.has(s.id))
+  return [...tasks.map((t) => t.title), ...posts.map((s) => `${s.format}: ${s.title}`)]
+}
 // work set past the day its post goes out: the post goes out that day instead (the task keeps the date it was given)
 function postPushed(d, me, k) {
   const s = taskPost(d, k)
