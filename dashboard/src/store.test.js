@@ -127,7 +127,7 @@ test('freelancers see and touch only the projects they’re on, and tasks handed
   const p = (id) => S.byId(d.projects, id)
   assert.equal(S.can(saif, 'project.view', p('p-diwali')), true)
   assert.equal(S.can(saif, 'project.view', p('p-steel-web')), false)
-  const steelTask = d.tasks.find((t) => t.projectId === 'p-steel-web')
+  const steelTask = d.tasks.find((t) => t.projectId === 'p-steel-web' && t.status !== 'done')
   assert.equal(S.can(saif, 'task.view', steelTask), false)
   assert.throws(() => S.saveTask(saif, { projectId: 'p-steel-web', title: 'Sneaky', assigneeId: 'ritika' }), /permission/)
   assert.throws(() => S.submitDeliverable(saif, { projectId: 'p-steel-web', title: 'x', link: 'https://x.co' }), /permission/)
@@ -356,7 +356,7 @@ test('video and design finish, social media uploads: a task at once, gone if reo
   const up = S.uploadTaskId('t4')
   S.moveTask(vikas, 't4', 'done')
   assert.deepEqual([task(up).title, task(up).dept, task(up).assigneeId, task(up).status, task(up).due, task(up).projectId, task(up).uploadOf],
-    ['Upload: Edit Reel 1 — Ghar ki Mithaas (30s)', 'social', null, 'todo', today(), 'p-diwali', 't4'])
+    ['Upload: Edit Reel 1 — Ghar ki Mithaas (30s)', 'social', 'priya', 'todo', today(), 'p-diwali', 't4'])
   assert.ok(unreadFor('priya').some((n) => n.text === 'finished “Edit Reel 1 — Ghar ki Mithaas (30s)” — upload it' && n.link === `#/tasks/${up}`))
   assert.ok(S.can(priya, 'task.edit', task(up)))
   S.moveTask(vikas, 't4', 'doing') // reopened before it was uploaded: nothing to upload yet
@@ -391,6 +391,40 @@ test('video and design finish, social media uploads: a task at once, gone if reo
   // deleting the post takes its task and that task's upload
   S.deletePost(aman, b)
   assert.equal(task(S.uploadTaskId(S.postTaskId(b))), undefined)
+})
+
+test('checked work: sent back with a note, or approved and straight to its uploader; finished work isn’t handed over', () => {
+  const [aman, vikas] = ['aman', 'vikas'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  S.moveTask(vikas, 't4', 'review')
+  assert.throws(() => S.sendBack(aman, 't4', ' '), /what to change/)
+  S.sendBack(aman, 't4', 'Brighter thumbnail')
+  assert.deepEqual([task('t4').status, task('t4').comments.at(-1).text], ['doing', 'Brighter thumbnail'])
+  assert.ok(unreadFor('vikas').some((n) => n.text === 'commented on “Edit Reel 1 — Ghar ki Mithaas (30s)”: Brighter thumbnail'))
+  S.moveTask(vikas, 't4', 'review')
+  S.moveTask(aman, 't4', 'done') // approved: the upload is the Social media person's at once
+  assert.equal(task(S.uploadTaskId('t4')).assigneeId, 'priya')
+  assert.throws(() => S.handoff(aman, 't4', 'priya'), /finished/)
+  S.moveTask(aman, 't4', 'doing')
+  S.byId(S.getDb().users, 'arjun').dept = 'social' // two people in Social media: the upload waits for the team
+  S.moveTask(aman, 't4', 'done')
+  assert.equal(task(S.uploadTaskId('t4')).assigneeId, null)
+})
+
+test('work pushed past the day its post goes out moves the post; earlier never does; its upload follows the post', () => {
+  const [aman, vikas] = ['aman', 'vikas'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  const post = (id) => S.byId(S.getDb().posts, id)
+  const a = S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title: 'Hamper reveal', assigneeId: 'vikas' })
+  const k = S.postTaskId(a)
+  S.saveTask(aman, { ...task(k), due: addDays(today(), 5) })
+  assert.deepEqual([task(k).due, post(a).date], [addDays(today(), 5), addDays(today(), 5)])
+  S.saveTask(aman, { ...task(k), due: today() })
+  assert.deepEqual([task(k).due, post(a).date], [today(), addDays(today(), 5)])
+  S.moveTask(vikas, k, 'done')
+  assert.equal(task(S.uploadTaskId(k)).due, addDays(today(), 5))
+  S.savePost(aman, { ...post(a), date: addDays(today(), 6) })
+  assert.deepEqual([task(k).due, task(S.uploadTaskId(k)).due], [addDays(today(), 5), addDays(today(), 6)])
 })
 
 test('deleting a project: a supervisor, typing its name; its tasks, work and chat go; its posts stay, unlinked', () => {

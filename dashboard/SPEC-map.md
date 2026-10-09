@@ -126,6 +126,20 @@ The user: when a Video or Design task is done it should land straight in Social 
 - **No Ready to check in Social media:** the database refuses it (`tasks_social_no_check`). The status menu leaves it out for Social tasks, and the board drops the column when every task on it is Social media.
 - **Finished tasks leave the Tasks page after a day** (board, list, phone list and a project's Tasks tab), counted from when they were marked Done (`status_at`). It was 14 days. Nothing is deleted: project progress, marks and links to the task still work.
 
+## Made, approved, uploaded: nothing passed by hand (2026-10-09, migration 20)
+The user: the flow is Sanyam (video) or Naina (design) finish, Shaurya approves, Nandni uploads, and finding finished work to give to Nandni by hand was too much. Tasks also needed a sort, and postponing one thing to do another today was confusing.
+What the live data showed (2026-10-09):
+- Shaurya approved by marking a task Done, then handed the same task to Nandni (10 times). The handover put it back to To do, deleted the automatic upload task, put its post back In production with Nandni as maker, and Nandni's Done then made a second upload task he deleted by hand.
+- The live board listed each column in the order tasks were made (PR #1's due-date order wasn't deployed). All 13 date moves were made one at a time in the task window, and a task's date moved without its post.
+What changed (the user's calls: uploads to Nandni automatically; anyone can still mark work Done; a post moves with work pushed past it; old data left as it is):
+- **Upload task given to the uploader** (`private.uploader`): the one active person in Social media. None or several: given to no one, so the whole team sees it.
+- **Finished work isn't handed over** (`handoff` refuses Done; the button is gone from a finished task). Move it back first if it needs more work.
+- **Approve and Send back on Home** for work Ready to check. Send back needs a note: it goes on the task as a comment and the task goes back to In progress. Each Home group shows its count, and "Waiting for your check" counts tasks too.
+- **Sort by** (Tasks page): due date (default), priority, project or person. Ties go soonest due first, then most urgent. Kept per device (`localStorage`).
+- **Quick dates:** the date on a card, row or list line is a button for whoever sets dates (`setsDue`). It opens a small popup: Today, Tomorrow or another day.
+- **Post follows pushed work** (`save_task`): a post task's date moved past its post's day moves the post to that day (unless it's already Posted or Undelivered). Moving work earlier never moves the post. The task keeps the date it was given.
+- **Upload follows the post:** a post moved to another day takes its open upload task with it (`post_saved`).
+
 ## Delete a project (2026-10-08, migration 19)
 - **Who:** supervisors only (`project.delete`, `public.delete_project`). It's on the project page, next to Edit.
 - **Confirming:** type the project's name, like deleting a client. The popup says how many tasks and pieces of work go, and how many posts stay.

@@ -444,6 +444,7 @@ export function saveTask(me, t) {
     if (task.status === 'done') task.completedAt ||= today()
     else task.completedAt = null
     if (old && old.status !== task.status) Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
+    if (old && (old.due || null) !== (task.due || null)) postPushed(d, task)
     if (old) {
       taskMoved(d, me, old, task)
       uploadFollows(d, me, old, task)
@@ -473,10 +474,18 @@ export function saveTask(me, t) {
 
 export const moveTask = (me, id, status) => saveTask(me, { ...byId(db.tasks, id), status })
 
+// checked and not right yet: back to In progress, with what to change as a comment (its maker and giver hear it)
+export function sendBack(me, id, note) {
+  need(note?.trim(), 'Say what to change.')
+  commentTask(me, id, note)
+  moveTask(me, id, 'doing')
+}
+
 // pass work to someone else with a note: they own it now, it starts again at To do, and the note stays on the task
 export function handoff(me, id, toId, note) {
   const t = byId(db.tasks, id)
   must(can(me, 'task.edit', t), 'hand over this task')
+  need(t.status !== 'done', 'This task is finished, so there’s nothing to hand over. Move it back first if it needs more work.')
   need(byId(db.users, toId)?.active && toId !== t.assigneeId, 'Pick who to give it to.')
   const commentId = uid()
   commit((d) => {
@@ -786,10 +795,15 @@ const setStatus = (d, me, k, status) => {
 }
 
 // Video and Design make it, Social media uploads it (*_social_upload.sql does this on the server; this is its copy).
-// A Video or Design task done → "Upload: …" for the whole Social team, due the day its post goes out (no post: today);
-// reopened before it's uploaded → that task goes. The upload done → its post is Posted.
+// A Video or Design task done → "Upload: …" for the Social media person (*_upload_handover.sql), due the day its post
+// goes out (no post: today); reopened before it's uploaded → that task goes. The upload done → its post is Posted.
 export const uploadTaskId = (taskId) => `up-${taskId}`
 const OUT = ['posted', 'missed']
+// who uploads (private.uploader): the one active person in Social media; none or several → no one, so the team sees it
+const uploader = (d) => {
+  const social = d.users.filter((u) => u.active && isStaff(u) && u.dept === 'social')
+  return social.length === 1 ? social[0].id : null
+}
 function uploadFollows(d, me, old, k) {
   if (k.uploadOf) {
     const post = k.status === 'done' && old.status !== 'done' && byId(d.posts, byId(d.tasks, k.uploadOf)?.postId)
@@ -804,7 +818,7 @@ function uploadFollows(d, me, old, k) {
   }
   const post = byId(d.posts, k.postId)
   if (byId(d.tasks, id) || OUT.includes(post?.status)) return
-  const up = { id, projectId: k.projectId, uploadOf: k.id, assigneeId: null, status: 'todo', priority: k.priority, due: post?.date ?? today(), title: `Upload: ${k.title}`.slice(0, 300),
+  const up = { id, projectId: k.projectId, uploadOf: k.id, assigneeId: uploader(d), status: 'todo', priority: k.priority, due: post?.date ?? today(), title: `Upload: ${k.title}`.slice(0, 300),
     dept: 'social', repeat: 'none', desc: '', checklist: [], comments: [], createdBy: me.id, createdAt: nowIso(), completedAt: null }
   d.tasks.push(up)
   notify(d, me, d.users.filter((u) => u.dept === 'social' && can(u, 'task.view', up)).map((u) => u.id), `finished “${k.title}” — upload it`, `#/tasks/${id}`)
@@ -824,13 +838,28 @@ function postMoved(d, me, old, s) {
   const k = d.tasks.find((t) => t.postId === s.id)
   if (!k) return
   if (s.title !== old.title || s.format !== old.format) k.title = `${s.format}: ${s.title}`
-  if (s.date !== old.date) k.due = postDue(s.date)
+  if (s.date !== old.date) {
+    k.due = postDue(s.date)
+    uploadDue(d, k, s.date)
+  }
   if ((s.assigneeId || null) !== (old.assigneeId || null)) k.assigneeId = s.assigneeId || null
   if (s.status !== old.status && OUT.includes(s.status)) {
     setStatus(d, me, k, 'done')
     const up = byId(d.tasks, uploadTaskId(k.id))
     if (up) setStatus(d, me, up, 'done') // out: nothing left to upload
   } else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(d, me, k, 'todo') // sent back for changes
+}
+// a post on another day: its open upload task goes up that day
+function uploadDue(d, k, date) {
+  const up = byId(d.tasks, uploadTaskId(k.id))
+  if (up && up.status !== 'done') up.due = date
+}
+// a post's work pushed past the day it goes out: the post goes out that day instead (its task keeps the date it was given)
+function postPushed(d, k) {
+  const s = k.postId && byId(d.posts, k.postId)
+  if (!s || OUT.includes(s.status) || !k.due || k.due <= s.date) return
+  s.date = k.due
+  uploadDue(d, k, s.date)
 }
 // who hears a post is made and waiting to be sent (private.senders): its project's lead and the supervisors, not the owners
 const senders = (d, s) => d.users.filter((u) => u.active && ((u.role === 'admin' && !u.owner) || u.id === byId(d.projects, s.projectId)?.managerId)).map((u) => u.id)

@@ -371,8 +371,8 @@ begin
   perform set_config('role', 'authenticated', true);
   perform public.save_task('{"id":"t4","status":"done"}');
   perform set_config('role', 'none', true);
-  select format('%s|%s|%s|%s|%s|%s', k.title, k.dept, k.assignee_id is null, k.status, k.due = private.today(), k.upload_of) into s from public.tasks k where k.id = 'up-t4';
-  out := out || format(E'\n%s a Video task done makes a Social media task to upload it, for the whole team, due today: %s',
+  select format('%s|%s|%s|%s|%s|%s', k.title, k.dept, k.assignee_id = priya, k.status, k.due = private.today(), k.upload_of) into s from public.tasks k where k.id = 'up-t4';
+  out := out || format(E'\n%s a Video task done makes a Social media task to upload it, given to the one person in Social media, due today: %s',
     case when s = 'Upload: Edit Reel 1 — Ghar ki Mithaas (30s)|social|t|todo|t|t4' then '✓' else '✗' end, s);
   select count(*) into n from public.notifications where user_id = priya and text = 'finished “Edit Reel 1 — Ghar ki Mithaas (30s)” — upload it' and link = '#/tasks/up-t4';
   out := out || format(E'\n%s …and Social media is told: %s', case when n = 1 then '✓' else '✗' end, n);
@@ -423,6 +423,42 @@ begin
   perform set_config('role', 'none', true);
   select count(*) into n from public.tasks where id = 'up-pt-upl2';
   out := out || format(E'\n%s deleting the post takes its task and that task''s upload: %s', case when n = 0 then '✓' else '✗' end, n);
+
+  /* ---------- finished work isn't handed over; the upload waits for the team when Social media has several people ---------- */
+  perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform public.handoff(json_build_object('id', 't4', 'toId', priya)::jsonb);
+    out := out || E'\n✗ finished work was handed over';
+  exception when others then
+    out := out || format(E'\n✓ finished work isn''t handed over (%s)', sqlerrm);
+  end;
+  perform set_config('role', 'none', true);
+  update public.people set dept = 'social' where id = md5('yg-sample:arjun')::uuid;
+  perform set_config('role', 'authenticated', true);
+  perform public.save_task('{"id":"t4","status":"doing"}');
+  perform public.save_task('{"id":"t4","status":"done"}');
+  perform set_config('role', 'none', true);
+  update public.people set dept = 'website' where id = md5('yg-sample:arjun')::uuid;
+  select format('%s|%s', count(*), bool_and(assignee_id is null)) into s from public.tasks where upload_of = 't4';
+  out := out || format(E'\n%s two people in Social media: the upload is given to no one, so the whole team sees it: %s', case when s = '1|t' then '✓' else '✗' end, s);
+
+  /* ---------- work pushed past the day its post goes out moves the post; earlier never does; its upload follows the post ---------- */
+  perform set_config('role', 'authenticated', true);
+  perform public.save_post(json_build_object('id', 'push1', 'clientId', 'desi', 'projectId', 'p-diwali', 'date', private.today() + 3, 'format', 'Reel',
+    'title', 'Hamper unboxing', 'dept', 'video', 'assigneeId', vikas)::jsonb);
+  perform public.save_task(json_build_object('id', 'pt-push1', 'due', private.today() + 5)::jsonb);
+  select format('%s|%s', k.due - private.today(), s2.date - private.today()) into s from public.tasks k, public.posts s2 where k.id = 'pt-push1' and s2.id = 'push1';
+  perform public.save_task(json_build_object('id', 'pt-push1', 'due', private.today())::jsonb);
+  select s || format(' then %s|%s', k.due - private.today(), s2.date - private.today()) into s from public.tasks k, public.posts s2 where k.id = 'pt-push1' and s2.id = 'push1';
+  out := out || format(E'\n%s work pushed past its post''s day takes the post with it; brought earlier, the post stays: %s',
+    case when s = '5|5 then 0|5' then '✓' else '✗' end, s);
+  perform public.save_task('{"id":"pt-push1","status":"done"}');
+  select s || format(' then %s', due - private.today()) into s from public.tasks where id = 'up-pt-push1';
+  perform public.save_post(json_build_object('id', 'push1', 'date', private.today() + 6)::jsonb);
+  perform set_config('role', 'none', true);
+  select format('%s|%s', (select due - private.today() from public.tasks where id = 'pt-push1'), (select due - private.today() from public.tasks where id = 'up-pt-push1')) into s;
+  out := out || format(E'\n%s its upload is due the day the post goes out, and follows the post to a new day: %s', case when s = '5|6' then '✓' else '✗' end, s);
 
   /* ---------- deleting a project: a supervisor, typing its name; its posts stay, unlinked ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);

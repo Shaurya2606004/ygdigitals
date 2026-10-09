@@ -5,7 +5,7 @@ import { Avatar, Bar, Card, Empty, Err, Icon, isUrl, Mark, RichText, Status, use
 import { addDays, ago, daysBetween, fmtDay, fmtLong, fmtTime, relDay, today } from '../util.js'
 import { EventForm } from './Calendar.jsx'
 import { CompensationForm, makeUpFor } from './Content.jsx'
-import { HandoffForm, TaskRow } from './Tasks.jsx'
+import { HandoffForm, SendBackForm, TaskRow } from './Tasks.jsx'
 
 const hello = () => {
   const h = new Date().getHours()
@@ -242,7 +242,7 @@ function Urgent({ me }) {
   const d = useDb()
   const T = today()
   const admin = me.role === 'admin'
-  const [form, setForm] = useState(null) // {kind: 'handoff', t} or {kind: 'makeup', initial}
+  const [form, setForm] = useState(null) // {kind: 'handoff' or 'back', t} or {kind: 'makeup', initial}
   const [err, setErr] = useState('')
   const [more, setMore] = useState(false)
   const run = (fn) => {
@@ -283,7 +283,7 @@ function Urgent({ me }) {
         return { g: 'decide', at: l.start, key: `v${l.id}`, icon: 'sun', text: `${first(l.userId)} asks for leave: ${S.leaveDays(l)}`, meta, href: '#/leave' }
       }),
     ...d.deliverables.filter((x) => x.status === 'internal' && can(me, 'deliverable.review', x)).map((x) => ({ g: 'decide', at: '', key: x.id, icon: 'eye', text: `Check “${x.title}” v${x.version}`, meta: `${proj(x.projectId)} · from ${S.userName(d, x.submittedBy)}`, href: `#/projects/${x.projectId}/deliverables` })),
-    ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}` })),
+    ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}`, check: t })),
     ...d.posts.filter((p) => p.status === 'made' && can(me, 'content.send', p)).map((p) => ({ g: 'decide', at: p.date, key: `m${p.id}`, icon: 'send', text: `Check and send “${p.format}: ${p.title}”`, meta: `${byId(d.clients, p.clientId)?.name} · ${p.assigneeId ? `${first(p.assigneeId)} made it` : 'made'} · goes out ${relDay(p.date)}`, href: `#/content/post/${p.id}` })),
     ...d.deliverables.filter((x) => x.status === 'changes' && x.submittedBy === me.id).map((x) => ({ g: 'decide', at: '', key: `c${x.id}`, icon: 'edit', text: `Changes asked on “${x.title}”`, meta: x.history.at(-1)?.note || proj(x.projectId), href: `#/projects/${x.projectId}/deliverables` })),
     ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” to someone`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
@@ -308,7 +308,11 @@ function Urgent({ me }) {
       <ul className="list urgent">
         {shown.map((r, i) => (
           <li key={r.key}>
-            {shown[i - 1]?.g !== r.g && <h3 className={`urgent-head ${r.g === 'overdue' ? 'is-late' : ''}`}>{GROUPS[r.g]}</h3>}
+            {shown[i - 1]?.g !== r.g && (
+              <h3 className={`urgent-head ${r.g === 'overdue' ? 'is-late' : ''}`}>
+                {GROUPS[r.g]} · {rows.filter((x) => x.g === r.g).length}
+              </h3>
+            )}
             <div className="row">
               <span className={`row-icon ${r.late ? 'late' : ''}`}>
                 <Icon name={r.icon} size={16} />
@@ -318,6 +322,16 @@ function Urgent({ me }) {
                 <small>{r.meta}</small>
               </a>
               <span className="row-actions end">
+                {r.check && (
+                  <>
+                    <button className="btn sm" onClick={() => run(() => S.moveTask(me, r.check.id, 'done'))}>
+                      <Icon name="check" size={14} /> Approve
+                    </button>
+                    <button className="btn sm ghost" onClick={() => setForm({ kind: 'back', t: r.check })}>
+                      Send back
+                    </button>
+                  </>
+                )}
                 {r.task && r.g === 'overdue' && (
                   <>
                     <button className="btn sm" onClick={() => run(() => S.moveTask(me, r.task.id, 'done'))}>
@@ -360,6 +374,7 @@ function Urgent({ me }) {
         </button>
       )}
       {form?.kind === 'handoff' && <HandoffForm t={form.t} onClose={() => setForm(null)} />}
+      {form?.kind === 'back' && <SendBackForm t={form.t} onClose={() => setForm(null)} />}
       {form?.kind === 'makeup' && <CompensationForm initial={form.initial} onClose={() => setForm(null)} />}
     </>
   )
@@ -373,12 +388,13 @@ function StaffHome({ me }) {
   const away = d.users.filter((u) => u.active && S.isAway(d, u.id, T)).map((u) => u.name.split(' ')[0])
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').sort((a, b) => (a.due || '9').localeCompare(b.due || '9'))
   const open = d.tasks.filter((t) => t.status !== 'done')
+  const checks = d.deliverables.filter((x) => x.status === 'internal').length + d.tasks.filter((t) => t.status === 'review').length
   const kpis = admin
     ? [
         { label: 'Active projects', value: d.projects.filter((p) => ['active', 'review', 'planning'].includes(p.status)).length, href: '#/projects' },
         { label: 'Open tasks', value: open.length, note: `${open.filter((t) => t.due && t.due <= addDays(T, 7)).length} due this week`, href: '#/tasks' },
         { label: 'Overdue', value: open.filter(isOverdue).length, tone: open.some(isOverdue) ? 'late' : '' },
-        { label: 'Waiting for your check', value: d.deliverables.filter((x) => x.status === 'internal').length, tone: d.deliverables.some((x) => x.status === 'internal') ? 'warn' : '' },
+        { label: 'Waiting for your check', value: checks, tone: checks ? 'warn' : '' },
         { label: 'Waiting on clients', value: d.deliverables.filter((x) => x.status === 'client').length + d.posts.filter((p) => p.status === 'ready').length, note: 'work + posts to approve' },
       ]
     : [

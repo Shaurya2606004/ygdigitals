@@ -1516,6 +1516,35 @@ dialog.modal::backdrop {
   gap: 8px;
   flex-wrap: wrap;
 }
+/* a task card or row opens wherever it's clicked: its title is the button (for keyboards), its date a button of its own */
+.tcard {
+  cursor: pointer;
+}
+.tcard-open {
+  padding: 0;
+  text-align: left;
+}
+.task-row {
+  border-radius: 0; /* the divider between rows runs straight */
+  cursor: pointer;
+}
+.task-row:hover {
+  background: var(--surface-2);
+}
+.task-row > .grow {
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+.due-btn {
+  display: inline-flex;
+  padding: 3px 6px;
+  margin: -3px -6px;
+  border-radius: 6px;
+}
+.due-btn:hover {
+  background: var(--line);
+}
 .col-empty {
   padding: 18px 0;
   text-align: center;

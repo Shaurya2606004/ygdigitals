@@ -307,7 +307,7 @@ begin
 
   /* ---------- Ritika as a freelancer: on Diwali, GV monthly, Glow and Desi packaging only ---------- */
   update public.people set role = 'freelancer' where id = fl;
-  select id into steel from public.tasks where project_id = 'p-steel-web' and assignee_id is distinct from fl limit 1;
+  select id into steel from public.tasks where project_id = 'p-steel-web' and assignee_id is distinct from fl and status <> 'done' limit 1;
   perform set_config('request.jwt.claims', json_build_object('sub', fl, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   select string_agg(id, ',' order by id) into s from public.projects;
