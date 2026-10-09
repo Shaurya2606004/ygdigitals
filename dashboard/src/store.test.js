@@ -127,7 +127,7 @@ test('freelancers see and touch only the projects they’re on, and tasks handed
   const p = (id) => S.byId(d.projects, id)
   assert.equal(S.can(saif, 'project.view', p('p-diwali')), true)
   assert.equal(S.can(saif, 'project.view', p('p-steel-web')), false)
-  const steelTask = d.tasks.find((t) => t.projectId === 'p-steel-web')
+  const steelTask = d.tasks.find((t) => t.projectId === 'p-steel-web' && t.status !== 'done')
   assert.equal(S.can(saif, 'task.view', steelTask), false)
   assert.throws(() => S.saveTask(saif, { projectId: 'p-steel-web', title: 'Sneaky', assigneeId: 'ritika' }), /permission/)
   assert.throws(() => S.submitDeliverable(saif, { projectId: 'p-steel-web', title: 'x', link: 'https://x.co' }), /permission/)
@@ -348,4 +348,105 @@ test('content plan ↔ tasks: an import makes the project first; this week’s p
   assert.throws(() => S.savePost(priya, { ...post(b), projectId: 'p-gv-month' }), /this client’s projects/)
   S.deletePost(priya, b)
   assert.equal(task(b), undefined)
+})
+
+test('video and design finish, social media uploads: a task at once, gone if reopened; uploading marks the post out', () => {
+  const [aman, vikas, priya, arjun] = ['aman', 'vikas', 'priya', 'arjun'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  const up = S.uploadTaskId('t4')
+  S.moveTask(vikas, 't4', 'done')
+  assert.deepEqual([task(up).title, task(up).dept, task(up).assigneeId, task(up).status, task(up).due, task(up).projectId, task(up).uploadOf],
+    ['Upload: Edit Reel 1 — Ghar ki Mithaas (30s)', 'social', 'priya', 'todo', today(), 'p-diwali', 't4'])
+  assert.ok(unreadFor('priya').some((n) => n.text === 'finished “Edit Reel 1 — Ghar ki Mithaas (30s)” — upload it' && n.link === `#/tasks/${up}`))
+  assert.ok(S.can(priya, 'task.edit', task(up)))
+  S.moveTask(vikas, 't4', 'doing') // reopened before it was uploaded: nothing to upload yet
+  assert.equal(task(up), undefined)
+  S.moveTask(vikas, 't4', 'done')
+  assert.equal(S.getDb().tasks.filter((t) => t.uploadOf === 't4').length, 1)
+  // social media work has no check
+  assert.throws(() => S.moveTask(priya, up, 'review'), /don’t need a check/)
+  S.moveTask(priya, up, 'done')
+  S.moveTask(vikas, 't4', 'doing') // an upload already done stays
+  assert.equal(task(up).status, 'done')
+  S.moveTask(arjun, 't8', 'done') // websites: nothing to upload
+  assert.equal(task(S.uploadTaskId('t8')), undefined)
+
+  // a post's task: the upload is due the day it goes out, and uploading it marks the post Posted
+  const post = (id) => S.byId(S.getDb().posts, id)
+  const plan = (title) => S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title, assigneeId: 'vikas' })
+  const a = plan('Hamper reveal')
+  S.moveTask(vikas, S.postTaskId(a), 'done')
+  const upA = S.uploadTaskId(S.postTaskId(a))
+  assert.deepEqual([post(a).status, task(upA).due, task(upA).title], ['made', addDays(today(), 3), 'Upload: Reel: Hamper reveal'])
+  S.decidePost(priya, a, false, 'Brighter') // sent back for changes: the maker's task reopens, so the upload goes
+  assert.equal(task(upA), undefined)
+  S.moveTask(vikas, S.postTaskId(a), 'done')
+  S.moveTask(priya, upA, 'done')
+  assert.equal(post(a).status, 'posted')
+  // a post marked Posted in the content plan closes its upload
+  const b = plan('Sweets close-up')
+  S.moveTask(vikas, S.postTaskId(b), 'done')
+  S.savePost(priya, { ...post(b), status: 'posted' })
+  assert.equal(task(S.uploadTaskId(S.postTaskId(b))).status, 'done')
+  // deleting the post takes its task and that task's upload
+  S.deletePost(aman, b)
+  assert.equal(task(S.uploadTaskId(S.postTaskId(b))), undefined)
+})
+
+test('checked work: sent back with a note, or approved and straight to its uploader; finished work isn’t handed over', () => {
+  const [aman, vikas] = ['aman', 'vikas'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  S.moveTask(vikas, 't4', 'review')
+  assert.throws(() => S.sendBack(aman, 't4', ' '), /what to change/)
+  S.sendBack(aman, 't4', 'Brighter thumbnail')
+  assert.deepEqual([task('t4').status, task('t4').comments.at(-1).text], ['doing', 'Brighter thumbnail'])
+  assert.ok(unreadFor('vikas').some((n) => n.text === 'commented on “Edit Reel 1 — Ghar ki Mithaas (30s)”: Brighter thumbnail'))
+  S.moveTask(vikas, 't4', 'review')
+  S.moveTask(aman, 't4', 'done') // approved: the upload is the Social media person's at once
+  assert.equal(task(S.uploadTaskId('t4')).assigneeId, 'priya')
+  assert.throws(() => S.handoff(aman, 't4', 'priya'), /finished/)
+  S.moveTask(aman, 't4', 'doing')
+  S.byId(S.getDb().users, 'arjun').dept = 'social' // two people in Social media: the upload waits for the team
+  S.moveTask(aman, 't4', 'done')
+  assert.equal(task(S.uploadTaskId('t4')).assigneeId, null)
+})
+
+test('work pushed past the day its post goes out moves the post; earlier never does; its upload follows the post', () => {
+  const [aman, vikas] = ['aman', 'vikas'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  const post = (id) => S.byId(S.getDb().posts, id)
+  const a = S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title: 'Hamper reveal', assigneeId: 'vikas' })
+  const k = S.postTaskId(a)
+  S.saveTask(aman, { ...task(k), due: addDays(today(), 5) })
+  assert.deepEqual([task(k).due, post(a).date], [addDays(today(), 5), addDays(today(), 5)])
+  S.saveTask(aman, { ...task(k), due: today() })
+  assert.deepEqual([task(k).due, post(a).date], [today(), addDays(today(), 5)])
+  S.moveTask(vikas, k, 'done')
+  assert.equal(task(S.uploadTaskId(k)).due, addDays(today(), 5))
+  S.savePost(aman, { ...post(a), date: addDays(today(), 6) })
+  assert.deepEqual([task(k).due, task(S.uploadTaskId(k)).due], [addDays(today(), 5), addDays(today(), 6)])
+  // the upload put off past the day: the post goes out that day too, and the work's own date follows the post
+  S.saveTask(aman, { ...task(S.uploadTaskId(k)), due: addDays(today(), 8) })
+  assert.deepEqual([post(a).date, task(S.uploadTaskId(k)).due, task(k).due], [addDays(today(), 8), addDays(today(), 8), addDays(today(), 7)])
+  // marked Posted and moved in one save: the upload it closes keeps its day (as on the server)
+  S.savePost(aman, { ...post(a), date: addDays(today(), 9), status: 'posted' })
+  assert.deepEqual([task(S.uploadTaskId(k)).status, task(S.uploadTaskId(k)).due], ['done', addDays(today(), 8)])
+})
+
+test('deleting a project: a supervisor, typing its name; its tasks, work and chat go; its posts stay, unlinked', () => {
+  const [aman, priya] = ['aman', 'priya'].map(u)
+  const d = () => S.getDb()
+  const s = S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), 3), format: 'Reel', platform: 'Instagram', title: 'Hamper reveal', assigneeId: 'vikas' })
+  assert.ok(S.byId(d().tasks, S.postTaskId(s)))
+  const event = d().events.find((e) => e.projectId === 'p-diwali')
+  assert.throws(() => S.deleteProject(priya, 'p-diwali', 'Diwali Festive Campaign'), /permission/) // the lead can't
+  assert.throws(() => S.deleteProject(aman, 'p-diwali', 'Diwali'), /name exactly/)
+  S.deleteProject(aman, 'p-diwali', ' diwali festive campaign ')
+  assert.equal(S.byId(d().projects, 'p-diwali'), undefined)
+  assert.deepEqual([d().tasks, d().deliverables, d().channels].map((l) => l.filter((x) => x.projectId === 'p-diwali').length), [0, 0, 0])
+  assert.equal(d().messages.filter((m) => m.channelId === 'ch-p-diwali').length, 0)
+  assert.deepEqual([S.byId(d().posts, s).projectId, S.byId(d().posts, s).taskMade], [null, false])
+  assert.equal(S.byId(d().events, event.id).projectId, null)
+  S.savePost(aman, { ...S.byId(d().posts, s), projectId: 'p-desi-pack' }) // into another project: a fresh task there
+  assert.equal(S.byId(d().tasks, S.postTaskId(s)).projectId, 'p-desi-pack')
 })

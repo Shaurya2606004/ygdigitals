@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import * as S from '../store.js'
 import { byId, can, DEPTS, isOverdue, POST_STATUS, PRIORITY, REPEATS, seesAll, setsDue, staff, TASK_STATUS, taskMark } from '../store.js'
 import { Avatar, Confirm, Empty, Err, Field, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, Tabs, useDb, useForm, useMe, usePhone } from '../ui.jsx'
@@ -15,50 +16,143 @@ export const DueChip = ({ t }) =>
     </span>
   ) : null
 
+// when it's due; whoever sets the dates moves it from here without opening the task. Its popup lives outside the card
+// or row, and clicks on it stay out of the card's own (which opens the task).
+export function DueMenu({ t }) {
+  const me = useMe()
+  const [moving, setMoving] = useState(false)
+  if (t.status === 'done' || !can(me, 'task.edit', t) || !setsDue(me, t)) return <DueChip t={t} />
+  return (
+    <span className="due-menu" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="due-btn" title="Change the date" onClick={() => setMoving(true)}>
+        {t.due ? (
+          <DueChip t={t} />
+        ) : (
+          <span className="due">
+            <Icon name="clock" size={13} /> Set a date
+          </span>
+        )}
+      </button>
+      {moving && createPortal(<MoveDate t={t} onClose={() => setMoving(false)} />, document.body)}
+    </span>
+  )
+}
+
+function MoveDate({ t, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const post = S.taskPost(d, t)
+  const { v, set, err, run } = useForm({ day: t.due || '' })
+  const move = (due) => (due === t.due || run(() => S.saveTask(me, { ...t, due }))) && onClose()
+  return (
+    <Modal title={`When is “${t.title}” due?`} onClose={onClose}>
+      <form
+        className="form-grid one"
+        onSubmit={(e) => {
+          e.preventDefault()
+          move(v.day)
+        }}
+      >
+        <div className="row-actions">
+          <button type="button" className="btn" data-autofocus onClick={() => move(today())}>
+            Today
+          </button>
+          <button type="button" className="btn" onClick={() => move(addDays(today(), 1))}>
+            Tomorrow
+          </button>
+        </div>
+        <Field label="Another day" hint={post && !['posted', 'missed'].includes(post.status) ? `It goes out ${fmtDay(post.date)}. A later day moves the post to that day too.` : ''}>
+          <input type="date" value={v.day} onChange={set('day')} required />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary">Move it</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 // who last changed a task's status, and when ('' if no one has since it was made)
 export const movedBy = (d, t) => (t.statusAt ? `Moved by ${t.statusBy ? S.userName(d, t.statusBy).split(' ')[0] : 'YG Hub'} · ${ago(t.statusAt)}` : '')
 
-// open work first, soonest date first
-const urgentFirst = (a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9')
+// finished work stays on the board and in the lists for a day after it's done, then leaves them (it isn't deleted)
+const showing = (t) => t.status !== 'done' || Date.parse(t.statusAt) > Date.now() - 864e5
 
-// a link to the task page, or with onOpen a button that opens it where you are
+// soonest date first, undated last
+const byDue = (a, b) => (a.due || '9').localeCompare(b.due || '9')
+const RANK = { urgent: 0, high: 1, normal: 2, low: 3 }
+const projectName = (d, t) => byId(d.projects, t.projectId)?.name ?? ''
+const personName = (d, t) => (t.assigneeId ? S.userName(d, t.assigneeId) : '')
+// "Sort by": each puts its own order first, then soonest due, then the most urgent
+const SORTS = {
+  due: ['Due date', () => 0],
+  priority: ['Priority', (d, a, b) => RANK[a.priority] - RANK[b.priority]],
+  project: ['Project', (d, a, b) => projectName(d, a).localeCompare(projectName(d, b))],
+  person: ['Person', (d, a, b) => Number(!a.assigneeId) - Number(!b.assigneeId) || personName(d, a).localeCompare(personName(d, b))], // no one: last
+}
+const order = (d, sort) => (a, b) => SORTS[sort][1](d, a, b) || byDue(a, b) || RANK[a.priority] - RANK[b.priority]
+// a list: open work first
+const openFirst = (d, sort) => (a, b) => (a.status === 'done') - (b.status === 'done') || order(d, sort)(a, b)
+
+// the sort each person last picked stays, on this device
+const SORT_KEY = 'yg-hub.tasks.sort'
+function savedSort() {
+  try {
+    const s = localStorage.getItem(SORT_KEY)
+    return s in SORTS ? s : 'due'
+  } catch {
+    return 'due' // storage blocked (a private window): it just isn't remembered
+  }
+}
+function saveSort(s) {
+  try {
+    localStorage.setItem(SORT_KEY, s)
+  } catch {
+    // storage blocked: it just isn't remembered
+  }
+}
+
+// a link to the task page, or with onOpen a button that opens it where you are. A click anywhere else on the row opens
+// it too (its date is a button of its own).
 export function TaskRow({ t, project = true, onOpen }) {
   const d = useDb()
   const p = byId(d.projects, t.projectId)
-  const inner = (
+  const open = onOpen ?? (() => (location.hash = `#/tasks/${t.id}`))
+  const title = (
     <>
-      <Status s={t.status} label={TASK_STATUS[t.status]} />
-      <span className="grow">
-        <b>{t.title}</b>
-        {(project || t.statusAt) && <small>{[project && p?.name, movedBy(d, t)].filter(Boolean).join(' · ')}</small>}
-      </span>
-      <DueChip t={t} />
-      {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">Not given to anyone</span>}
+      <b>{t.title}</b>
+      {(project || t.statusAt) && <small>{[project && p?.name, movedBy(d, t)].filter(Boolean).join(' · ')}</small>}
     </>
   )
   return (
-    <li>
+    <li className="row task-row" onClick={(e) => !e.target.closest('a, button') && open()}>
+      <Status s={t.status} label={TASK_STATUS[t.status]} />
       {onOpen ? (
-        <button type="button" className="row task-row" onClick={onOpen}>
-          {inner}
+        <button type="button" className="grow" onClick={onOpen}>
+          {title}
         </button>
       ) : (
-        <a href={`#/tasks/${t.id}`} className="row task-row">
-          {inner}
+        <a href={`#/tasks/${t.id}`} className="grow">
+          {title}
         </a>
       )}
+      <DueMenu t={t} />
+      {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={24} /> : <span className="pill amber">Not given to anyone</span>}
     </li>
   )
 }
 
-export function Board({ tasks, project = true }) {
+export function Board({ tasks, project = true, sort = 'due' }) {
   const me = useMe()
   const d = useDb()
   const [open, setOpen] = useState(null)
   const [over, setOver] = useState(null)
   const [err, setErr] = useState('')
   const phone = usePhone()
-  const recent = addDays(today(), -14)
   const drop = (e, status) => {
     e.preventDefault()
     setOver(null)
@@ -69,9 +163,9 @@ export function Board({ tasks, project = true }) {
       setErr(x.message)
     }
   }
-  // a phone can't drag: one list, most urgent first, and finished work only from the last two weeks
+  // a phone can't drag: one list, most urgent first
   if (phone) {
-    const list = tasks.filter((t) => t.status !== 'done' || (t.completedAt || '') >= recent).sort(urgentFirst)
+    const list = tasks.filter(showing).sort(openFirst(d, sort))
     return (
       <>
         {list.length ? (
@@ -91,8 +185,9 @@ export function Board({ tasks, project = true }) {
     <>
       <Err msg={err} />
       <div className="board">
-        {Object.entries(TASK_STATUS).map(([s, label]) => {
-          const col = tasks.filter((t) => t.status === s && (s !== 'done' || (t.completedAt || '') >= recent))
+        {/* Social media tasks skip "Ready to check": the column is there only for other work */}
+        {Object.entries(TASK_STATUS).filter(([s]) => s !== 'review' || tasks.some((t) => t.dept !== 'social')).map(([s, label]) => {
+          const col = tasks.filter((t) => t.status === s && showing(t)).sort(order(d, sort))
           return (
             <section
               key={s}
@@ -113,17 +208,26 @@ export function Board({ tasks, project = true }) {
                 {col.map((t) => {
                   const done = t.checklist.filter((c) => c.done).length
                   return (
-                    <button key={t.id} type="button" className="tcard" draggable={can(me, 'task.edit', t)} onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)} onClick={() => setOpen(t.id)}>
+                    // a click anywhere on the card opens it (the title is its button, for keyboards; the date is one of its own)
+                    <div
+                      key={t.id}
+                      className="tcard"
+                      draggable={can(me, 'task.edit', t)}
+                      onDragStart={(e) => e.dataTransfer.setData('text/plain', t.id)}
+                      onClick={(e) => !e.target.closest('button') && setOpen(t.id)}
+                    >
                       {t.priority !== 'normal' && (
                         <span className="tcard-top">
                           <Status s={t.priority} label={PRIORITY[t.priority]} />
                         </span>
                       )}
-                      <b>{t.title}</b>
+                      <button type="button" className="tcard-open" onClick={() => setOpen(t.id)}>
+                        <b>{t.title}</b>
+                      </button>
                       <small className="muted">{byId(d.projects, t.projectId)?.name}</small>
                       {t.statusAt && <small className="muted">{movedBy(d, t)}</small>}
                       <span className="tcard-foot">
-                        <DueChip t={t} />
+                        <DueMenu t={t} />
                         {t.checklist.length > 0 && (
                           <span className="meta">
                             <Icon name="check" size={13} />
@@ -139,10 +243,10 @@ export function Board({ tasks, project = true }) {
                         <span className="grow" />
                         {t.assigneeId ? <Avatar user={byId(d.users, t.assigneeId)} size={22} /> : <span className="pill amber">Not given to anyone</span>}
                       </span>
-                    </button>
+                    </div>
                   )
                 })}
-                {!col.length && <p className="col-empty">{s === 'done' ? 'Nothing finished in the last 2 weeks' : 'Drop tasks here'}</p>}
+                {!col.length && <p className="col-empty">{s === 'done' ? 'Nothing finished in the last day' : 'Drop tasks here'}</p>}
               </div>
             </section>
           )
@@ -159,6 +263,7 @@ export default function Tasks({ args }) {
   const [scope, setScope] = useState(me.role === 'admin' ? 'all' : 'mine')
   const [view, setView] = useState('board')
   const [f, setF] = useState({ project: '', person: '', priority: '', q: '' })
+  const [sort, setSort] = useState(savedSort)
   const [adding, setAdding] = useState(false)
   const phone = usePhone()
   const [filtering, setFiltering] = useState(false)
@@ -173,7 +278,7 @@ export default function Tasks({ args }) {
       (!q || t.title.toLowerCase().includes(q)),
   )
   const mine = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const sorted = [...tasks].sort(urgentFirst)
+  const sorted = tasks.filter(showing).sort(openFirst(d, sort))
   const filtered = Object.values(f).filter(Boolean).length
   return (
     <div className="page">
@@ -194,11 +299,25 @@ export default function Tasks({ args }) {
         />
         {phone && (
           <button className="btn" aria-expanded={filtering} onClick={() => setFiltering(!filtering)}>
-            <Icon name="sliders" size={16} /> Filter{filtered ? ` (${filtered})` : ''}
+            <Icon name="sliders" size={16} /> Sort & filter{filtered ? ` (${filtered})` : ''}
           </button>
         )}
         {(!phone || filtering) && (
           <div className="filters">
+            <select
+              aria-label="Sort by"
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value)
+                saveSort(e.target.value)
+              }}
+            >
+              {Object.entries(SORTS).map(([k, [label]]) => (
+                <option key={k} value={k}>
+                  Sort by: {label}
+                </option>
+              ))}
+            </select>
             <input type="search" placeholder="Filter by title" aria-label="Filter tasks by title" value={f.q} onChange={set('q')} />
             <select aria-label="Project" value={f.project} onChange={set('project')}>
               <option value="">All projects</option>
@@ -237,7 +356,7 @@ export default function Tasks({ args }) {
         )}
       </div>
       {phone || view === 'board' ? (
-        <Board tasks={tasks} />
+        <Board tasks={tasks} sort={sort} />
       ) : sorted.length ? (
         <TaskTable tasks={sorted} />
       ) : (
@@ -281,7 +400,7 @@ function TaskTable({ tasks }) {
                 <Status s={t.priority} label={PRIORITY[t.priority]} />
               </td>
               <td>
-                <DueChip t={t} />
+                <DueMenu t={t} />
               </td>
             </tr>
           ))}
@@ -398,7 +517,8 @@ export function TaskModal({ id, onClose }) {
   const [item, setItem] = useState('')
   if (!t) return null
   const p = byId(d.projects, t.projectId)
-  const post = byId(d.posts, t.postId)
+  const source = byId(d.tasks, t.uploadOf) // an upload task: the Video or Design work it uploads
+  const post = S.taskPost(d, t)
   const editable = can(me, 'task.edit', t)
   const run = (fn) => {
     try {
@@ -503,11 +623,13 @@ export function TaskModal({ id, onClose }) {
             <dt>Status</dt>
             <dd className="stack">
               <select value={t.status} disabled={!editable} onChange={(e) => save({ status: e.target.value })} aria-label="Status">
-                {Object.entries(TASK_STATUS).map(([k, l]) => (
-                  <option key={k} value={k}>
-                    {l}
-                  </option>
-                ))}
+                {Object.entries(TASK_STATUS)
+                  .filter(([k]) => k !== 'review' || t.dept !== 'social')
+                  .map(([k, l]) => (
+                    <option key={k} value={k}>
+                      {l}
+                    </option>
+                  ))}
               </select>
               {t.statusAt && <small className="muted">{movedBy(d, t)}</small>}
             </dd>
@@ -517,7 +639,7 @@ export function TaskModal({ id, onClose }) {
                 <option value="">No one yet</option>
                 <PeopleOptions users={staff(d)} />
               </select>
-              {editable && (
+              {editable && t.status !== 'done' && (
                 <button className="btn sm" onClick={() => setHanding(true)}>
                   <Icon name="swap" size={14} /> Hand over
                 </button>
@@ -532,6 +654,15 @@ export function TaskModal({ id, onClose }) {
               <a href={`#/projects/${p?.id}`}>{p?.name}</a>
               <small className="muted block">{byId(d.clients, p?.clientId)?.name}</small>
             </dd>
+            {source && (
+              <>
+                <dt>Upload of</dt>
+                <dd>
+                  <a href={`#/tasks/${source.id}`}>{source.title}</a>
+                  <small className="muted block">{movedBy(d, source)}</small>
+                </dd>
+              </>
+            )}
             {post && (
               <>
                 <dt>Content plan</dt>
@@ -573,7 +704,7 @@ export function TaskModal({ id, onClose }) {
             </dd>
             <dt>Due</dt>
             <dd className="stack">
-              {editable && setsDue(me, t) ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
+              <DueMenu t={t} />
               {t.assigneeId === me.id && t.status !== 'done' && !setsDue(me, t) && <small className="muted">Need more time? Tell {dateSetter(d, me, t)}.</small>}
             </dd>
             <dt>Repeats</dt>
@@ -607,6 +738,35 @@ export function TaskModal({ id, onClose }) {
 const dateSetter = (d, me, t) => {
   const id = [t.createdBy, byId(d.projects, t.projectId)?.managerId].find((x) => x && x !== me.id)
   return id ? S.userName(d, id).split(' ')[0] : 'your supervisor'
+}
+
+export function SendBackForm({ t, onClose }) {
+  const me = useMe()
+  const d = useDb()
+  const { v, set, err, run } = useForm({ note: '' })
+  return (
+    <Modal title={`Send “${t.title}” back`} onClose={onClose}>
+      <form
+        className="form-grid one"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (run(() => S.sendBack(me, t.id, v.note))) onClose()
+        }}
+      >
+        <p className="muted">It goes back to In progress, and {t.assigneeId ? S.userName(d, t.assigneeId).split(' ')[0] : 'whoever made it'} gets your note.</p>
+        <Field label="What needs changing?">
+          <textarea data-autofocus rows={3} value={v.note} onChange={set('note')} placeholder="e.g. Brighter thumbnail, and the logo bigger" />
+        </Field>
+        <Err msg={err} />
+        <div className="form-actions">
+          <button type="button" className="btn ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn primary">Send back</button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 export function HandoffForm({ t, onClose }) {

@@ -47,7 +47,7 @@ In `npm run dev`, the sign-in screen shows one-click buttons for these accounts.
 
 | Role | Can |
 |---|---|
-| Admin | Everything. Adds people and clients, gives clients logins, creates projects, and **checks work before it goes to a client**. Can read every group chat, unseen (not other people's DMs). |
+| Admin | Everything. Adds people and clients, gives clients logins, creates and deletes projects, and **checks work before it goes to a client**. Can read every group chat, unseen (not other people's DMs). |
 | Team member | Create, edit and hand off any task, submit work for a check, plan content, meetings and chat, and start group chats. A project's lead can also edit that project. |
 | Freelancer | Like a team member, but only inside the projects they lead or are on, plus any task handed to them. No company channels, content plan, activity log or client notes. |
 | Client | Only their own projects: progress, a read-only plan of tasks, approving work and posts, the project discussion, and meetings. |
@@ -59,8 +59,15 @@ The admin moves someone to another role with **Edit** in Settings › Team. It a
 ## What's in it
 
 - **Home**: the admin sees what needs checking, tasks without an owner, overdue work, and who's got what. Team members see their own tasks and day. Clients see what's waiting for their approval, their projects, and what's coming up this week.
-- **Tasks**: a board (drag to change status) or a list. Each task has an owner, due date, checklist and comments with @mentions. **Hand off** passes the task to a teammate with a note; it becomes theirs and starts again at To do.
+- **Tasks**: a board (drag to change status) or a list. Each task has an owner, due date, checklist and comments with @mentions. **Hand off** passes unfinished work to a teammate with a note; it becomes theirs and starts again at To do.
+  - **Sort by** due date (the default), priority, project or person, on the board, the list and phones. Each device remembers the choice.
+  - Whoever sets dates moves one from the card: tap its date for Today, Tomorrow or another day.
+  - A finished task stays on the board and in the list for a day, then leaves them (it isn't deleted).
+  - When a Video or Design task is marked Done, a Social media task to upload it appears straight away, given to the person in Social media. Social media tasks skip Ready to check.
+  - Work (a post's own task, or its upload) set past the day its post goes out moves the post to that day too.
+- **Home** for a supervisor: work that's Ready to check has **Approve** and **Send back** (with a note for the maker) right on the row.
 - **Projects**: brief, people, the task board (the client sees it as a read-only **Plan**), **Approvals** (maker submits a link → admin checks it → client approves or asks for changes → new version, with full history), the client-visible **Discussion**, and meetings.
+  - A supervisor can delete a project by typing its name. Its tasks, work for approval and discussion go with it; its posts stay in the client's content plan, and meetings stay on the calendar.
 - **Calendar**: month, week and agenda views of meetings, client calls, shoots, deadlines and posts. It handles repeats (stand-up, weekly planning), Yes/No replies, clash warnings, video-call links, and "Add to Google Calendar" / `.ics` for each event.
 - **Messages**: a studio channel, announcements (admin posts), one channel per project shared with the client, team group chats, and direct messages.
   - In every conversation:

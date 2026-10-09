@@ -84,7 +84,7 @@ export const PERMISSIONS = [
   ['Change a task’s date (the project lead and whoever gave the task can too)', ['admin']],
   ['Plan content posts', ['admin', 'member']],
   ['Check work and send it to the client (a project’s lead can send its posts too)', ['admin']],
-  ['Create projects (a project’s lead can edit it)', ['admin']],
+  ['Create and delete projects (a project’s lead can edit it)', ['admin']],
   ['Add people and clients, give client logins', ['admin']],
   ['Post announcements', ['admin']],
   ['Start team group chats', ['admin', 'member', 'freelancer']],
@@ -199,6 +199,7 @@ export function can(u, action, x = {}) {
     case 'project.view':
       return onProject(x.id) || x.clientId === u.clientId
     case 'project.create':
+    case 'project.delete':
       return admin
     case 'project.edit':
       return admin || x.managerId === u.id
@@ -399,6 +400,27 @@ export function saveProject(me, p) {
   return id
 }
 
+// a supervisor, typing its name: its tasks, work for approval and discussion go with it. Its posts stay in the client's
+// content plan with no project (a fresh task if they go into another one); meetings stay on the calendar, unlinked.
+export function deleteProject(me, id, confirmName = '') {
+  must(can(me, 'project.delete'), 'delete projects')
+  const p = byId(db.projects, id)
+  need(p, 'This project no longer exists.')
+  need(confirmName.trim().toLowerCase() === p.name.toLowerCase(), 'Type the project’s name exactly to confirm.')
+  commit((d) => {
+    const chans = new Set(d.channels.filter((ch) => ch.projectId === id).map((ch) => ch.id))
+    d.projects = d.projects.filter((x) => x.id !== id)
+    d.tasks = d.tasks.filter((t) => t.projectId !== id)
+    d.deliverables = d.deliverables.filter((x) => x.projectId !== id)
+    d.channels = d.channels.filter((ch) => !chans.has(ch.id))
+    d.messages = d.messages.filter((m) => !chans.has(m.channelId))
+    for (const s of d.posts) if (s.projectId === id) Object.assign(s, { projectId: null, taskMade: false })
+    for (const e of d.events) if (e.projectId === id) e.projectId = null
+    log(d, me, `deleted the project “${p.name}” with its tasks, work and discussion`, '#/projects')
+  })
+  send('delete_project', { id, confirm: confirmName })
+}
+
 /* ---------- tasks ---------- */
 
 export function saveTask(me, t) {
@@ -411,6 +433,7 @@ export function saveTask(me, t) {
   need(t.projectId, 'Pick the project.')
   need(!old || (t.due || null) === (old.due || null) || setsDue(me, old), 'Only a supervisor, the project lead or whoever gave you this task can change its date. Tell them if you need more time.')
   need(!t.repeat || t.repeat === 'none' || t.due, 'A repeating task needs a due date.')
+  need(!(t.dept === 'social' && t.status === 'review'), 'Social media tasks don’t need a check: move it to Done once it’s up.')
   // finishing a repeating task makes the next one (the server makes it with this id too)
   const repeat = t.status === 'done' && old?.status !== 'done' && t.repeat && t.repeat !== 'none' ? t.repeat : null
   const nextId = repeat && uid()
@@ -421,7 +444,11 @@ export function saveTask(me, t) {
     if (task.status === 'done') task.completedAt ||= today()
     else task.completedAt = null
     if (old && old.status !== task.status) Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
-    if (old) taskMoved(d, me, old, task)
+    if (old && (old.due || null) !== (task.due || null)) postPushed(d, me, task)
+    if (old) {
+      taskMoved(d, me, old, task)
+      uploadFollows(d, me, old, task)
+    }
     if (repeat) {
       task.repeat = 'none'
       const due = repeat === 'weekly' ? addDays(task.due, 7) : addMonth(task.due)
@@ -447,10 +474,18 @@ export function saveTask(me, t) {
 
 export const moveTask = (me, id, status) => saveTask(me, { ...byId(db.tasks, id), status })
 
+// checked and not right yet: back to In progress, with what to change as a comment (its maker and giver hear it)
+export function sendBack(me, id, note) {
+  need(note?.trim(), 'Say what to change.')
+  commentTask(me, id, note)
+  moveTask(me, id, 'doing')
+}
+
 // pass work to someone else with a note: they own it now, it starts again at To do, and the note stays on the task
 export function handoff(me, id, toId, note) {
   const t = byId(db.tasks, id)
   must(can(me, 'task.edit', t), 'hand over this task')
+  need(t.status !== 'done', 'This task is finished, so there’s nothing to hand over. Move it back first if it needs more work.')
   need(byId(db.users, toId)?.active && toId !== t.assigneeId, 'Pick who to give it to.')
   const commentId = uid()
   commit((d) => {
@@ -460,6 +495,7 @@ export function handoff(me, id, toId, note) {
     Object.assign(task, { assigneeId: toId, status: 'todo', completedAt: null })
     if (t.status !== 'todo') Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
     taskMoved(d, me, t, task)
+    uploadFollows(d, me, t, task)
     task.comments.push({ id: commentId, userId: me.id, at: nowIso(), text: note || '', handoff: `${from} → ${to}` })
     const link = `#/tasks/${id}`
     notify(d, me, [toId], `handed you “${task.title}”${note ? `: ${note}` : ''}`, link)
@@ -498,7 +534,7 @@ export function deleteTask(me, id) {
   const t = byId(db.tasks, id)
   must(can(me, 'task.delete', t), 'delete this task')
   commit((d) => {
-    d.tasks = d.tasks.filter((x) => x.id !== id)
+    d.tasks = d.tasks.filter((x) => x.id !== id && x.uploadOf !== id) // its upload task goes with it
     log(d, me, `deleted the task “${t.title}”`)
   })
   send('delete_task', { id })
@@ -751,9 +787,41 @@ export function leaveGroup(me, id) {
 // its copies, so the screen changes at once.
 export const postTaskId = (postId) => `pt-${postId}`
 const postDue = (date) => (date > today() ? addDays(date, -1) : date)
-const setStatus = (me, k, status) => {
+const setStatus = (d, me, k, status) => {
   if (status === k.status) return
+  const old = { ...k }
   Object.assign(k, { status, statusBy: me.id, statusAt: nowIso(), completedAt: status === 'done' ? k.completedAt || today() : null })
+  uploadFollows(d, me, old, k)
+}
+
+// Video and Design make it, Social media uploads it (*_social_upload.sql does this on the server; this is its copy).
+// A Video or Design task done → "Upload: …" for the Social media person (*_upload_handover.sql), due the day its post
+// goes out (no post: today); reopened before it's uploaded → that task goes. The upload done → its post is Posted.
+export const uploadTaskId = (taskId) => `up-${taskId}`
+const OUT = ['posted', 'missed']
+// who uploads (private.uploader): the one active person in Social media; none or several → no one, so the team sees it
+const uploader = (d) => {
+  const social = d.users.filter((u) => u.active && isStaff(u) && u.dept === 'social')
+  return social.length === 1 ? social[0].id : null
+}
+function uploadFollows(d, me, old, k) {
+  if (k.uploadOf) {
+    const post = k.status === 'done' && old.status !== 'done' && byId(d.posts, byId(d.tasks, k.uploadOf)?.postId)
+    if (post && !OUT.includes(post.status)) post.status = 'posted'
+    return
+  }
+  if (!['video', 'design'].includes(k.dept) || (k.status === 'done') === (old.status === 'done')) return
+  const id = uploadTaskId(k.id)
+  if (k.status !== 'done') {
+    d.tasks = d.tasks.filter((t) => t.id !== id || t.status === 'done')
+    return
+  }
+  const post = byId(d.posts, k.postId)
+  if (byId(d.tasks, id) || OUT.includes(post?.status)) return
+  const up = { id, projectId: k.projectId, uploadOf: k.id, assigneeId: uploader(d), status: 'todo', priority: k.priority, due: post?.date ?? today(), title: `Upload: ${k.title}`.slice(0, 300),
+    dept: 'social', repeat: 'none', desc: '', checklist: [], comments: [], createdBy: me.id, createdAt: nowIso(), completedAt: null }
+  d.tasks.push(up)
+  notify(d, me, d.users.filter((u) => u.dept === 'social' && can(u, 'task.view', up)).map((u) => u.id), `finished “${k.title}” — upload it`, `#/tasks/${id}`)
 }
 function postTask(d, me, s) {
   if (!s.projectId || s.taskMade || !['idea', 'production'].includes(s.status) || s.date > addDays(today(), 7)) return
@@ -770,10 +838,33 @@ function postMoved(d, me, old, s) {
   const k = d.tasks.find((t) => t.postId === s.id)
   if (!k) return
   if (s.title !== old.title || s.format !== old.format) k.title = `${s.format}: ${s.title}`
-  if (s.date !== old.date) k.due = postDue(s.date)
   if ((s.assigneeId || null) !== (old.assigneeId || null)) k.assigneeId = s.assigneeId || null
-  if (s.status !== old.status && ['posted', 'missed'].includes(s.status)) setStatus(me, k, 'done')
-  else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(me, k, 'todo') // sent back for changes
+  if (s.status !== old.status && OUT.includes(s.status)) {
+    setStatus(d, me, k, 'done')
+    const up = byId(d.tasks, uploadTaskId(k.id))
+    if (up) setStatus(d, me, up, 'done') // out: nothing left to upload
+  } else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(d, me, k, 'todo') // sent back for changes
+  // a new day: due the day before, unless it already falls on it (its work pushed the post there); its open upload goes
+  // up that day. After the status, as on the server: an upload this save closed stays where it was
+  if (s.date !== old.date) {
+    if (k.due !== s.date) k.due = postDue(s.date)
+    uploadDue(d, k, s.date)
+  }
+}
+// a post on another day: its open upload task goes up that day
+function uploadDue(d, k, date) {
+  const up = byId(d.tasks, uploadTaskId(k.id))
+  if (up && up.status !== 'done') up.due = date
+}
+// the post a task puts out: its own, or (an upload task) the post of the work it uploads
+export const taskPost = (d, k) => byId(d.posts, k.postId ?? byId(d.tasks, k.uploadOf)?.postId)
+// work set past the day its post goes out: the post goes out that day instead (the task keeps the date it was given)
+function postPushed(d, me, k) {
+  const s = taskPost(d, k)
+  if (!s || OUT.includes(s.status) || !k.due || k.due <= s.date) return
+  const old = { ...s }
+  s.date = k.due
+  postMoved(d, me, old, s)
 }
 // who hears a post is made and waiting to be sent (private.senders): its project's lead and the supervisors, not the owners
 const senders = (d, s) => d.users.filter((u) => u.active && ((u.role === 'admin' && !u.owner) || u.id === byId(d.projects, s.projectId)?.managerId)).map((u) => u.id)
@@ -870,7 +961,8 @@ export function deletePost(me, id) {
   must(can(me, 'content.manage') && can(me, 'content.view', byId(db.posts, id)), 'delete posts')
   commit((d) => {
     d.posts = d.posts.filter((x) => x.id !== id)
-    d.tasks = d.tasks.filter((t) => t.postId !== id) // its task goes with it
+    const k = d.tasks.find((t) => t.postId === id)
+    d.tasks = d.tasks.filter((t) => t.postId !== id && !(k && t.uploadOf === k.id)) // its task (and that task's upload) go with it
   })
   send('delete_post', { id })
 }
