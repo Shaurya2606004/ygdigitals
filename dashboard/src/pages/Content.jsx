@@ -2,8 +2,7 @@ import { useState } from 'react'
 import * as S from '../store.js'
 import { byId, can, clientUsers, DEPTS, FORMATS, isStaff, PLATFORMS, POST_STATUS, postDept, postMark, seesAll, staff, TASK_STATUS, taskMark, team } from '../store.js'
 import { Avatar, Confirm, Empty, Err, Field, go, Icon, Mark, Modal, PageHead, PeopleOptions, RichText, Status, useDb, useForm, useMe, usePhone } from '../ui.jsx'
-import { addDays, ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, today, ymd } from '../util.js'
-import { AgendaList, MonthGrid } from './Calendar.jsx'
+import { addDays, ago, fmtDay, fmtLong, fmtMonth, fmtTime, parseDay, startOfWeek, today, ymd } from '../util.js'
 import { DeptSelect } from './Tasks.jsx'
 import { postsFromSheet, readSheet } from '../xlsx.js'
 
@@ -13,7 +12,7 @@ const shiftMonth = (s, n) => {
   return ymd(d)
 }
 
-const VIEWS = { month: 'Calendar', board: 'By stage', report: 'Report', owed: 'Compensation' }
+const VIEWS = { month: 'Month', board: 'By stage', report: 'Report', owed: 'Compensation' }
 
 // made work nobody has checked yet still reads "In production" to the client
 const seen = (me, p) => (isStaff(me) || p.status !== 'made' ? p : { ...p, status: 'production' })
@@ -39,14 +38,14 @@ export default function Content({ args = [] }) {
   const inMonth = posts.filter((p) => p.date.slice(0, 7) === month.slice(0, 7))
   const items = posts.map((p) => {
     const who = staffer && !client ? byId(d.clients, p.clientId)?.name.split(' ')[0] : ''
-    // title is the month grid's chip; when / line / sub are the phone's day list
-    return { key: p.id, kind: 'post', date: p.date, title: `${who ? `${who}: ` : ''}${p.format} · ${p.title}`, type: `ps-${p.status}`, post: p, when: p.format, line: p.title, sub: [who, POST_STATUS[p.status], p.platform].filter(Boolean).join(' · ') }
+    // the month grid's chip: tag over line (title in full on hover); the phone's day list: when, line, sub
+    return { key: p.id, kind: 'post', date: p.date, title: `${who ? `${who}: ` : ''}${p.format} · ${p.title}`, tag: [who, p.format].filter(Boolean).join(' · '), type: `ps-${p.status}`, post: p, when: p.format, line: p.title, sub: [who, POST_STATUS[p.status], p.platform].filter(Boolean).join(' · ') }
   })
   const waiting = posts.filter((p) => p.status === 'ready').length
   const toSend = posts.filter((p) => p.status === 'made' && can(me, 'content.send', p)).length
   return (
     <div className="page">
-      <PageHead title="Content plan" sub={staffer ? 'Every post, Reel and ad for every client — planned, made, checked and sent, approved by the client, posted.' : 'What’s going out on your pages and when. Approve posts marked “Ready”.'}>
+      <PageHead title="Calendar" sub={staffer ? 'Every post for every client, on the day it goes out. Click one to open it.' : 'What’s going out on your pages and when. Approve posts marked “Ready”.'}>
         {manage && (
           <>
             <button className="btn" onClick={() => setImporting(true)}>
@@ -176,6 +175,77 @@ export default function Content({ args = [] }) {
           }}
         />
       )}
+    </div>
+  )
+}
+
+const Chip = ({ it, onItem }) => (
+  <button type="button" className={`ev-chip t-${it.type}`} onClick={() => onItem(it)} title={it.title}>
+    <small>{it.tag}</small>
+    <span className="ev-title">{it.line}</span>
+  </button>
+)
+
+function MonthGrid({ month, items, onItem, onDay }) {
+  const start = startOfWeek(month)
+  const T = today()
+  const days = Array.from({ length: 42 }, (_, i) => addDays(start, i))
+  return (
+    <div className="month" role="grid" aria-label={fmtMonth(month)}>
+      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((w) => (
+        <div key={w} className="month-dow" role="columnheader">
+          {w}
+        </div>
+      ))}
+      {days.map((day) => {
+        const list = items.filter((i) => i.date === day)
+        return (
+          <div key={day} role="gridcell" className={`month-cell ${day.slice(0, 7) !== month.slice(0, 7) ? 'out' : ''} ${day === T ? 'today' : ''}`}>
+            <button className="day-num" onClick={() => onDay(day)} aria-label={`${fmtLong(day)}, ${list.length} items`}>
+              {Number(day.slice(8))}
+            </button>
+            {list.slice(0, 3).map((it) => (
+              <Chip key={it.key} it={it} onItem={onItem} />
+            ))}
+            {list.length > 3 && (
+              <button className="more" onClick={() => onDay(day)}>
+                +{list.length - 3} more
+              </button>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AgendaList({ from, to, items, onItem, empty }) {
+  const days = []
+  for (let day = from; day <= to; day = addDays(day, 1)) if (items.some((i) => i.date === day)) days.push(day)
+  if (!days.length) return <Empty icon="calendar" title={empty} />
+  return (
+    <div className="agenda">
+      {days.map((day) => (
+        <section key={day} className={`card agenda-day ${day === today() ? 'today' : ''}`}>
+          <h3>{fmtLong(day)}</h3>
+          <ul className="list">
+            {items
+              .filter((i) => i.date === day)
+              .map((it) => (
+                <li key={it.key}>
+                  <button className="row day-item" onClick={() => onItem(it)}>
+                    <span className="time">{it.when}</span>
+                    <span className={`type-bar t-${it.type}`} aria-hidden="true" />
+                    <span className="grow">
+                      <b>{it.line}</b>
+                      <small>{it.sub}</small>
+                    </span>
+                  </button>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))}
     </div>
   )
 }

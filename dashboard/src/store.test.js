@@ -315,7 +315,7 @@ test('content plan ↔ tasks: an import makes the project first; this week’s p
   const post = (id) => S.byId(S.getDb().posts, id)
   const task = (id) => S.getDb().tasks.find((t) => t.postId === id)
   const k = task(a)
-  assert.deepEqual([k.projectId, k.title, k.due, k.status, k.assigneeId, k.desc], [pid, 'Reel: Navratri wishes', addDays(today(), 2), 'todo', 'vikas', 'Festival: Navratri'])
+  assert.deepEqual([k.projectId, k.title, k.due, k.status, k.assigneeId, k.desc], [pid, 'Reel: Navratri wishes', addDays(today(), 3), 'todo', 'vikas', 'Festival: Navratri'])
   assert.equal(task(b), undefined) // three weeks away: not yet
   assert.equal(unreadFor('vikas').filter((n) => n.text.startsWith('gave you “Reel: Navratri wishes” — it goes out')).length, 1)
   assert.ok(!unreadFor('vikas').some((n) => n.text.startsWith('gave you the Reel'))) // told once, when it's in their To do
@@ -344,7 +344,7 @@ test('content plan ↔ tasks: an import makes the project first; this week’s p
   assert.deepEqual([task(a).status, task(a).statusBy], ['done', 'priya'])
 
   S.savePost(priya, { ...post(b), date: addDays(today(), 6), title: 'Diwali post' })
-  assert.deepEqual([task(b).due, task(b).title], [addDays(today(), 5), 'Post: Diwali post'])
+  assert.deepEqual([task(b).due, task(b).title], [addDays(today(), 6), 'Post: Diwali post'])
   assert.throws(() => S.savePost(priya, { ...post(b), projectId: 'p-gv-month' }), /this client’s projects/)
   S.deletePost(priya, b)
   assert.equal(task(b), undefined)
@@ -424,10 +424,10 @@ test('work pushed past the day its post goes out moves the post; earlier never d
   S.moveTask(vikas, k, 'done')
   assert.equal(task(S.uploadTaskId(k)).due, addDays(today(), 5))
   S.savePost(aman, { ...post(a), date: addDays(today(), 6) })
-  assert.deepEqual([task(k).due, task(S.uploadTaskId(k)).due], [addDays(today(), 5), addDays(today(), 6)])
+  assert.deepEqual([task(k).due, task(S.uploadTaskId(k)).due], [addDays(today(), 6), addDays(today(), 6)])
   // the upload put off past the day: the post goes out that day too, and the work's own date follows the post
   S.saveTask(aman, { ...task(S.uploadTaskId(k)), due: addDays(today(), 8) })
-  assert.deepEqual([post(a).date, task(S.uploadTaskId(k)).due, task(k).due], [addDays(today(), 8), addDays(today(), 8), addDays(today(), 7)])
+  assert.deepEqual([post(a).date, task(S.uploadTaskId(k)).due, task(k).due], [addDays(today(), 8), addDays(today(), 8), addDays(today(), 8)])
   // marked Posted and moved in one save: the upload it closes keeps its day (as on the server)
   S.savePost(aman, { ...post(a), date: addDays(today(), 9), status: 'posted' })
   assert.deepEqual([task(S.uploadTaskId(k)).status, task(S.uploadTaskId(k)).due], ['done', addDays(today(), 8)])
@@ -449,4 +449,21 @@ test('deleting a project: a supervisor, typing its name; its tasks, work and cha
   assert.equal(S.byId(d().events, event.id).projectId, null)
   S.savePost(aman, { ...S.byId(d().posts, s), projectId: 'p-desi-pack' }) // into another project: a fresh task there
   assert.equal(S.byId(d().tasks, S.postTaskId(s)).projectId, 'p-desi-pack')
+})
+
+test('free days: what else of the same project falls on a day, each post counted once', () => {
+  const [aman, ritika] = ['aman', 'ritika'].map(u)
+  const task = (id) => S.byId(S.getDb().tasks, id)
+  const plan = (date, format, title, assigneeId) => S.savePost(aman, { clientId: 'desi', projectId: 'p-diwali', date: addDays(today(), date), format, platform: 'Instagram', title, assigneeId })
+  const a = S.postTaskId(plan(3, 'Reel', 'Hamper reveal', 'vikas'))
+  const b = S.postTaskId(plan(3, 'Post', 'Gift guide', 'ritika'))
+  plan(10, 'Carousel', 'Thank you') // too far off for a task yet
+  const busy = (k, n) => S.busyOn(S.getDb(), task(k), addDays(today(), n))
+  assert.deepEqual(busy(a, 3), ['Post: Gift guide']) // not itself, nor another project's work due that day
+  assert.deepEqual(busy(a, 2), ['Shoot day: family Reels + product macros at the Sonipat unit'])
+  assert.deepEqual(busy(a, 9), [])
+  assert.deepEqual(busy(a, 10), ['Carousel: Thank you'])
+  S.moveTask(ritika, b, 'done') // made: its upload is what's left of it that day
+  assert.deepEqual(busy(a, 3), ['Upload: Post: Gift guide'])
+  assert.deepEqual(busy(S.uploadTaskId(b), 3), ['Reel: Hamper reveal'])
 })

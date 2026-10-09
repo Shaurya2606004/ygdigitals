@@ -226,7 +226,7 @@ begin
     'title', 'Later post', 'dept', 'design', 'quiet', true)::jsonb);
   perform set_config('role', 'none', true);
   select format('%s|%s|%s|%s|%s', k.project_id, k.status, k.due - private.today(), k.assignee_id = vikas, k.title) into s from public.tasks k where k.post_id = 'imp1';
-  out := out || format(E'\n%s a post in a project, a week away, gets its task (due the day before): %s', case when s = 'p-diwali|todo|2|t|Reel: Navratri wishes' then '✓' else '✗' end, s);
+  out := out || format(E'\n%s a post in a project, a week away, gets its task (due the day it goes out): %s', case when s = 'p-diwali|todo|3|t|Reel: Navratri wishes' then '✓' else '✗' end, s);
   select "desc" into s from public.task_private where task_id = 'pt-imp1';
   out := out || format(E'\n%s …with the post''s brief as its details: %s', case when s = 'Festival: Navratri' then '✓' else '✗' end, s);
   select count(*) into n from public.tasks where post_id = 'imp2';
@@ -345,7 +345,7 @@ begin
   perform public.save_post(json_build_object('id', 'imp2', 'date', private.today() + 6, 'title', 'Diwali post')::jsonb);
   perform set_config('role', 'none', true);
   select (k.due - private.today()) || '|' || k.title into s from public.tasks k where k.post_id = 'imp2';
-  out := out || format(E'\n%s a post moved into the week gets its task; its new day and title carry over: %s', case when s = '5|Post: Diwali post' then '✓' else '✗' end, s);
+  out := out || format(E'\n%s a post moved into the week gets its task; its new day and title carry over: %s', case when s = '6|Post: Diwali post' then '✓' else '✗' end, s);
   perform set_config('request.jwt.claims', json_build_object('sub', priya, 'role', 'authenticated')::text, true);
   perform set_config('role', 'authenticated', true);
   perform public.delete_task(json_build_object('id', 'pt-imp2')::jsonb);
@@ -459,7 +459,7 @@ begin
   perform public.save_post(json_build_object('id', 'push1', 'date', private.today() + 6)::jsonb);
   perform set_config('role', 'none', true);
   select format('%s|%s', (select due - private.today() from public.tasks where id = 'pt-push1'), (select due - private.today() from public.tasks where id = 'up-pt-push1')) into s;
-  out := out || format(E'\n%s its upload is due the day the post goes out, and follows the post to a new day: %s', case when s = '5|6' then '✓' else '✗' end, s);
+  out := out || format(E'\n%s the work and its upload are due the day the post goes out, and follow the post to a new day: %s', case when s = '6|6' then '✓' else '✗' end, s);
   perform set_config('role', 'authenticated', true);
   perform public.save_task(json_build_object('id', 'up-pt-push1', 'due', private.today() + 8)::jsonb);
   select format('%s|%s|%s', (select date - private.today() from public.posts where id = 'push1'), (select due - private.today() from public.tasks where id = 'up-pt-push1'),
@@ -468,7 +468,7 @@ begin
   perform set_config('role', 'none', true);
   select s || format(' then %s|%s', status, due - private.today()) into s from public.tasks where id = 'up-pt-push1';
   out := out || format(E'\n%s the upload put off past the day takes the post with it; posted and moved at once, the closed upload keeps its day: %s',
-    case when s = '8|8|7 then done|8' then '✓' else '✗' end, s);
+    case when s = '8|8|8 then done|8' then '✓' else '✗' end, s);
 
   /* ---------- deleting a project: a supervisor, typing its name; its posts stay, unlinked ---------- */
   perform set_config('request.jwt.claims', json_build_object('sub', md5('yg-sample:aman')::uuid, 'role', 'authenticated')::text, true);

@@ -10,11 +10,9 @@ import { byId, can, isStaff, level, PERSON_DEPTS, readNotifications, ROLES, unre
 import { seed } from './seed.js'
 import { Avatar, Empty, Icon, MeCtx, Menu, useDb } from './ui.jsx'
 import { ago } from './util.js'
-import Calendar, { EventForm } from './pages/Calendar.jsx'
 import Chat from './pages/Chat.jsx'
 import Content, { PostForm } from './pages/Content.jsx'
 import Home from './pages/Home.jsx'
-import Leave from './pages/Leave.jsx'
 import Projects, { ProjectForm } from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
 import Tasks, { TaskForm } from './pages/Tasks.jsx'
@@ -28,15 +26,13 @@ const NAV = [
   { id: 'home', label: 'Home', icon: 'home', show: () => true, page: Home },
   { id: 'tasks', label: 'Tasks', icon: 'check', show: isStaff, page: Tasks },
   { id: 'projects', label: 'Projects', icon: 'folder', show: () => true, page: Projects },
-  { id: 'calendar', label: 'Calendar', icon: 'calendar', show: () => true, page: Calendar },
-  { id: 'leave', label: 'Leave', icon: 'sun', show: isStaff, page: Leave },
+  { id: 'content', label: 'Calendar', icon: 'calendar', show: (u) => u.role !== 'freelancer', page: Content },
   { id: 'chat', label: 'Messages', icon: 'chat', show: () => true, page: Chat },
-  { id: 'content', label: 'Content plan', icon: 'grid', show: (u) => u.role !== 'freelancer', page: Content },
   { id: 'settings', label: 'Settings', icon: 'sliders', show: () => true, page: Settings },
 ]
 
 // on a phone these sit along the bottom, where a thumb reaches (the first four someone can open); "More" opens the rest
-const TABBAR = ['home', 'tasks', 'chat', 'calendar', 'projects']
+const TABBAR = ['home', 'tasks', 'chat', 'content', 'projects']
 
 function useRoute() {
   const [hash, setHash] = useState(location.hash)
@@ -209,8 +205,7 @@ export function Shell({ me, signOut }) {
   const Page = current && current.show(me) ? current.page : null
   const unreadChat = d.channels.filter((c) => can(me, 'channel.view', c)).reduce((s, c) => s + unread(d, me, c), 0)
   const myOpen = d.tasks.filter((t) => t.assigneeId === me.id && t.status !== 'done').length
-  const leaveAsks = me.role === 'admin' ? d.leaves.filter((l) => l.status === 'pending' && l.userId !== me.id).length : 0
-  const badge = { chat: unreadChat, tasks: myOpen, leave: leaveAsks }
+  const badge = { chat: unreadChat, tasks: myOpen }
   const quick = TABBAR.map((id) => nav.find((n) => n.id === id)).filter(Boolean).slice(0, 4)
   const rest = nav.filter((n) => !quick.includes(n))
   const restBadge = rest.reduce((s, n) => s + (badge[n.id] || 0), 0)
@@ -272,9 +267,6 @@ export function Shell({ me, signOut }) {
                   <Icon name="folder" /> Project
                 </button>
               )}
-              <button className="menu-item" onClick={() => setModal('event')}>
-                <Icon name="calendar" /> Meeting
-              </button>
               {can(me, 'content.manage') && (
                 <button className="menu-item" onClick={() => setModal('post')}>
                   <Icon name="grid" /> Content post
@@ -329,7 +321,6 @@ export function Shell({ me, signOut }) {
       {S.getNotice() && <Toast text={S.getNotice()} />}
       {modal === 'task' && <TaskForm onClose={() => setModal(null)} />}
       {modal === 'project' && <ProjectForm onClose={() => setModal(null)} />}
-      {modal === 'event' && <EventForm onClose={() => setModal(null)} />}
       {modal === 'post' && <PostForm onClose={() => setModal(null)} />}
     </div>
   )

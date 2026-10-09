@@ -38,14 +38,16 @@ export function DueMenu({ t }) {
   )
 }
 
+// the next two weeks to pick from, each marked free or with how much else of the project falls on it
 function MoveDate({ t, onClose }) {
   const me = useMe()
   const d = useDb()
   const post = S.taskPost(d, t)
   const { v, set, err, run } = useForm({ day: t.due || '' })
   const move = (due) => (due === t.due || run(() => S.saveTask(me, { ...t, due }))) && onClose()
+  const days = Array.from({ length: 14 }, (_, i) => addDays(today(), i))
   return (
-    <Modal title={`When is “${t.title}” due?`} onClose={onClose}>
+    <Modal title={`Move “${t.title}”`} onClose={onClose}>
       <form
         className="form-grid one"
         onSubmit={(e) => {
@@ -53,15 +55,32 @@ function MoveDate({ t, onClose }) {
           move(v.day)
         }}
       >
-        <div className="row-actions">
-          <button type="button" className="btn" data-autofocus onClick={() => move(today())}>
-            Today
-          </button>
-          <button type="button" className="btn" onClick={() => move(addDays(today(), 1))}>
-            Tomorrow
-          </button>
+        <p className="day-pick-help">
+          Tap a day. <b className="free">Free</b> means nothing else for {byId(d.projects, t.projectId)?.name} that day. The ringed day is its day now.
+          {post && !['posted', 'missed'].includes(post.status) && ` It goes out ${fmtDay(post.date)}: a later day moves the post too.`}
+        </p>
+        <div className="day-pick" role="group" aria-label="The next two weeks">
+          {days.map((day, i) => {
+            const busy = S.busyOn(d, t, day)
+            const [dow, date] = fmtDay(day).split(', ')
+            return (
+              <button
+                key={day}
+                type="button"
+                className={`day-opt ${busy.length ? 'busy' : 'free'} ${day === t.due ? 'on' : ''}`}
+                aria-pressed={day === t.due}
+                title={busy.join('\n')}
+                data-autofocus={i === 0 || undefined}
+                onClick={() => move(day)}
+              >
+                <small>{i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : dow}</small>
+                <b>{date}</b>
+                <span>{busy.length ? `${busy.length} ${busy.length === 1 ? 'task' : 'tasks'}` : 'Free'}</span>
+              </button>
+            )
+          })}
         </div>
-        <Field label="Another day" hint={post && !['posted', 'missed'].includes(post.status) ? `It goes out ${fmtDay(post.date)}. A later day moves the post to that day too.` : ''}>
+        <Field label="A later day">
           <input type="date" value={v.day} onChange={set('day')} required />
         </Field>
         <Err msg={err} />
@@ -282,7 +301,7 @@ export default function Tasks({ args }) {
   const filtered = Object.values(f).filter(Boolean).length
   return (
     <div className="page">
-      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everything the studio is working on' : 'Your work and your department’s'}. ${phone ? 'Tap a task to open it.' : 'Drag a card to change where it’s at, or open it to change it.'}`}>
+      <PageHead title="Tasks" sub={`${seesAll(me) ? 'Everyone’s work' : 'Your work and your department’s'}. ${phone ? 'Tap a task to open it.' : 'Drag a card to move it along, or click it to open it.'}`}>
         <button className="btn primary" onClick={() => setAdding(true)}>
           <Icon name="plus" /> New task
         </button>
@@ -453,7 +472,7 @@ export function TaskForm({ onClose, initial = {} }) {
         <Field label="Department" hint="Everyone in it can see this task.">
           <DeptSelect value={v.dept} onChange={set('dept')} />
         </Field>
-        <Field label="Due" hint={v.assigneeId && v.due && S.isAway(d, v.assigneeId, v.due) ? `${S.userName(d, v.assigneeId).split(' ')[0]} is on leave that day.` : ''}>
+        <Field label="Due">
           <input type="date" value={v.due} onChange={set('due')} />
         </Field>
         <Field label="Priority">
@@ -665,7 +684,7 @@ export function TaskModal({ id, onClose }) {
             )}
             {post && (
               <>
-                <dt>Content plan</dt>
+                <dt>Post</dt>
                 <dd>
                   <a href={`#/content/post/${post.id}`}>
                     {post.format} on {post.platform}
