@@ -28,7 +28,8 @@ function OwnerHome({ me }) {
   const [allWeek, setAllWeek] = useState(false)
   const client = (id) => byId(d.clients, id)?.name ?? ''
   const work = [
-    ...d.tasks.filter((t) => t.due).map((t) => ({ key: t.id, what: t.title, client: client(byId(d.projects, t.projectId)?.clientId), who: t.assigneeId, due: t.due, doneOn: t.completedAt, mark: taskMark(t), href: `#/tasks/${t.id}` })),
+    // a post and its work are one thing here: the post, which carries the work's state (its task, then its upload)
+    ...d.tasks.filter((t) => t.due && !S.taskPost(d, t)).map((t) => ({ key: t.id, what: t.title, client: client(byId(d.projects, t.projectId)?.clientId), who: t.assigneeId, due: t.due, doneOn: t.completedAt, mark: taskMark(t), href: `#/tasks/${t.id}` })),
     ...d.posts.map((p) => ({ key: p.id, what: `${p.format}: ${p.title}`, client: client(p.clientId), who: p.assigneeId, due: p.date, mark: postMark(p), href: `#/content/post/${p.id}` })),
     ...d.compensations
       .filter((k) => k.due)
@@ -220,6 +221,8 @@ function Urgent({ me }) {
   const first = (id) => S.userName(d, id).split(' ')[0]
   const leads = (pid) => byId(d.projects, pid)?.managerId === me.id
   const openTask = (t) => t.status !== 'done'
+  // a post with open work of its own (its task or its upload) shows as that work, not twice
+  const hasWork = (p) => d.tasks.some((t) => openTask(t) && S.taskPost(d, t)?.id === p.id)
   const rows = [
     // compensation owed to clients: the person on it, by their date; the supervisors once it's late
     ...d.compensations
@@ -236,7 +239,7 @@ function Urgent({ me }) {
         comp: k,
       })),
     ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId === me.id).map((t) => ({ g: 'overdue', at: t.due, key: t.id, icon: 'clock', late: true, text: t.title, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
-    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId === me.id).map((p) => ({ g: 'overdue', at: p.date, key: p.id, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)}, still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}`, post: p })),
+    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId === me.id && !hasWork(p)).map((p) => ({ g: 'overdue', at: p.date, key: p.id, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)}, still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}`, post: p })),
 
     ...d.deliverables.filter((x) => x.status === 'internal' && can(me, 'deliverable.review', x)).map((x) => ({ g: 'decide', at: '', key: x.id, icon: 'eye', text: `Check “${x.title}” v${x.version}`, meta: `${proj(x.projectId)} · from ${S.userName(d, x.submittedBy)}`, href: `#/projects/${x.projectId}/deliverables` })),
     ...d.tasks.filter((t) => t.status === 'review' && (admin || leads(t.projectId))).map((t) => ({ g: 'decide', at: t.due || '', key: `r${t.id}`, icon: 'check', text: `Check “${t.title}”`, meta: `${first(t.assigneeId)} says it’s ready`, href: `#/tasks/${t.id}`, check: t })),
@@ -245,10 +248,10 @@ function Urgent({ me }) {
     ...d.tasks.filter((t) => admin && !t.assigneeId && openTask(t)).map((t) => ({ g: 'decide', at: t.due || '9', key: `o${t.id}`, icon: 'swap', text: `Give “${t.title}” to someone`, meta: proj(t.projectId), href: `#/tasks/${t.id}` })),
 
     ...d.tasks.filter((t) => isOverdue(t) && t.assigneeId && t.assigneeId !== me.id && (admin || leads(t.projectId))).map((t) => ({ g: 'late', at: t.due, key: `l${t.id}`, icon: 'clock', late: true, text: `${first(t.assigneeId)}: “${t.title}”`, meta: `${proj(t.projectId)} · ${late(t.due)}`, href: `#/tasks/${t.id}` })),
-    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId !== me.id && S.seesAll(me)).map((p) => ({ g: 'late', at: p.date, key: `p${p.id}`, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)} · ${p.assigneeId ? first(p.assigneeId) : 'no one on it'}`, href: `#/content/post/${p.id}`, post: p })),
+    ...d.posts.filter((p) => postMark(p) === 'overdue' && p.assigneeId !== me.id && S.seesAll(me) && !hasWork(p)).map((p) => ({ g: 'late', at: p.date, key: `p${p.id}`, icon: 'grid', late: true, text: `${p.format}: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · was going out ${fmtDay(p.date)} · ${p.assigneeId ? first(p.assigneeId) : 'no one on it'}`, href: `#/content/post/${p.id}`, post: p })),
 
     ...d.tasks.filter((t) => openTask(t) && t.due === T && t.assigneeId === me.id).map((t) => ({ g: 'today', at: t.due, key: `t${t.id}`, icon: 'check', text: t.title, meta: proj(t.projectId), href: `#/tasks/${t.id}`, task: t })),
-    ...d.posts.filter((p) => p.date === T && p.assigneeId === me.id && !['scheduled', 'posted', 'missed'].includes(p.status)).map((p) => ({ g: 'today', at: p.date, key: `d${p.id}`, icon: 'grid', text: `${p.format} goes out today: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}` })),
+    ...d.posts.filter((p) => p.date === T && p.assigneeId === me.id && !['scheduled', 'posted', 'missed'].includes(p.status) && !hasWork(p)).map((p) => ({ g: 'today', at: p.date, key: `d${p.id}`, icon: 'grid', text: `${p.format} goes out today: ${p.title}`, meta: `${byId(d.clients, p.clientId)?.name} · still ${POST_STATUS[p.status]}`, href: `#/content/post/${p.id}` })),
 
     ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && t.due > T && t.due <= addDays(T, 7)).map((t) => ({ g: 'week', at: t.due, key: `w${t.id}`, icon: 'calendar', text: t.title, meta: `${proj(t.projectId)} · ${relDay(t.due)}`, href: `#/tasks/${t.id}`, task: t })),
     ...d.tasks.filter((t) => openTask(t) && t.assigneeId === me.id && (!t.due || t.due > addDays(T, 7))).map((t) => ({ g: 'later', at: t.due || '9', key: `n${t.id}`, icon: 'calendar', text: t.title, meta: [proj(t.projectId), t.due && relDay(t.due)].filter(Boolean).join(' · '), href: `#/tasks/${t.id}`, task: t })),
