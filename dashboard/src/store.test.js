@@ -425,6 +425,12 @@ test('work pushed past the day its post goes out moves the post; earlier never d
   assert.equal(task(S.uploadTaskId(k)).due, addDays(today(), 5))
   S.savePost(aman, { ...post(a), date: addDays(today(), 6) })
   assert.deepEqual([task(k).due, task(S.uploadTaskId(k)).due], [addDays(today(), 5), addDays(today(), 6)])
+  // the upload put off past the day: the post goes out that day too, and the work's own date follows the post
+  S.saveTask(aman, { ...task(S.uploadTaskId(k)), due: addDays(today(), 8) })
+  assert.deepEqual([post(a).date, task(S.uploadTaskId(k)).due, task(k).due], [addDays(today(), 8), addDays(today(), 8), addDays(today(), 7)])
+  // marked Posted and moved in one save: the upload it closes keeps its day (as on the server)
+  S.savePost(aman, { ...post(a), date: addDays(today(), 9), status: 'posted' })
+  assert.deepEqual([task(S.uploadTaskId(k)).status, task(S.uploadTaskId(k)).due], ['done', addDays(today(), 8)])
 })
 
 test('deleting a project: a supervisor, typing its name; its tasks, work and chat go; its posts stay, unlinked', () => {

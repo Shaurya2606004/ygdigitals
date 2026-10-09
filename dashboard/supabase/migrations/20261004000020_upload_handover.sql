@@ -3,7 +3,8 @@
 --    so the whole team sees it, as before)
 --  * finished work can't be handed over. Done on a Video or Design task already gives its upload to Social media;
 --    handing the finished task on put it back to To do, took its upload task away and made the uploader its maker
---  * work pushed past the day its post goes out moves the post to that day. Bringing work earlier never moves it
+--  * work set past the day its post goes out (the post's own task, or its upload task) moves the post to that day.
+--    Work set on or before that day never moves it
 --  * a post moved to another day takes its open upload task with it
 
 -- who uploads: the one active person in Social media
@@ -65,7 +66,8 @@ begin
   perform private.log(me.id, 'handed ' || private.q(t.title) || ' to ' || to_name, '#/tasks/' || t.id);
 end $$;
 
--- as in *_made_to_send.sql, and a post moved to another day takes its open upload task with it
+-- as in *_made_to_send.sql, and a post moved to another day takes its open upload task with it. Its own task stays put
+-- if it already falls on the new day: that's its work pushed there (save_task)
 create or replace function private.post_saved() returns trigger language plpgsql security definer set search_path = '' as $$
 declare
   k public.tasks;
@@ -89,7 +91,7 @@ begin
     when new.status = 'production' and old.status in ('made', 'ready', 'scheduled') and k.status = 'done' then 'todo'
     else k.status end;
   ti := case when new.title is distinct from old.title or new.format is distinct from old.format then new.format || ': ' || new.title else k.title end;
-  du := case when new.date is distinct from old.date then private.post_due(new.date) else k.due end;
+  du := case when new.date is distinct from old.date and k.due is distinct from new.date then private.post_due(new.date) else k.due end;
   who := case when new.assignee_id is distinct from old.assignee_id then new.assignee_id else k.assignee_id end;
   if (st, ti, du, who) is distinct from (k.status, k.title, k.due, k.assignee_id) then
     update public.tasks set status = st, title = ti, due = du, assignee_id = who,
@@ -97,12 +99,12 @@ begin
     where id = k.id;
   end if;
   if new.date is distinct from old.date then
-    update public.tasks set due = new.date where upload_of = k.id and status <> 'done';
+    update public.tasks set due = new.date where upload_of = k.id and status <> 'done' and due is distinct from new.date;
   end if;
   return null;
 end $$;
 
--- as in *_made_to_send.sql, and work pushed past the day its post goes out moves the post to that day
+-- as in *_made_to_send.sql, and work set past the day its post goes out moves the post to that day
 create or replace function public.save_task(p jsonb) returns text language plpgsql security definer set search_path = '' as $$
 declare
   me public.people := private.me();
@@ -112,8 +114,10 @@ declare
   nxt text;
   rep text;
   lnk text;
+  pid text; -- the post this work puts out: its own, or (an upload task) the post of the work it uploads
 begin
   select * into old from public.tasks where id = tid for update;
+  pid := coalesce(old.post_id, (select post_id from public.tasks where id = old.upload_of));
   perform private.need(case when old.id is null then me.role in ('admin', 'member', 'freelancer') else private.sees_task(old, me) end,
     case when old.id is null then 'You don''t have permission to create tasks.' else 'You don''t have permission to edit this task.' end);
 
@@ -138,13 +142,6 @@ begin
     'Only a supervisor, the project lead or whoever gave you this task can change its date. Tell them if you need more time.');
   perform private.need(t.repeat = 'none' or t.due is not null, 'A repeating task needs a due date.');
 
-  -- pushed past the day its post goes out: the post goes out that day. Moved first, so the task's own update below
-  -- has the last word on its due (moving a post sets its task's due to the day before)
-  if old.post_id is not null and t.due is distinct from old.due
-    and t.due > (select date from public.posts where id = old.post_id and status not in ('posted', 'missed')) then
-    update public.posts set date = t.due where id = old.post_id;
-  end if;
-
   -- finishing a repeating task makes the next one; the chain carries on from there
   if t.status = 'done' and old.status is distinct from 'done' and t.repeat <> 'none' then
     nxt := coalesce(nullif(p ->> 'nextId', ''), gen_random_uuid()::text);
@@ -168,6 +165,10 @@ begin
         "desc" = case when p ? 'desc' then coalesce(p ->> 'desc', '') else "desc" end,
         checklist = case when jsonb_typeof(p -> 'checklist') = 'array' then p -> 'checklist' else checklist end
       where task_id = t.id;
+    end if;
+    -- set past the day its post goes out: the post goes out that day (and the task, already due then, stays put)
+    if t.due is distinct from old.due and t.due > (select date from public.posts where id = pid and status not in ('posted', 'missed')) then
+      update public.posts set date = t.due where id = pid;
     end if;
   end if;
 

@@ -41,7 +41,7 @@ export function DueMenu({ t }) {
 function MoveDate({ t, onClose }) {
   const me = useMe()
   const d = useDb()
-  const post = byId(d.posts, t.postId)
+  const post = S.taskPost(d, t)
   const { v, set, err, run } = useForm({ day: t.due || '' })
   const move = (due) => (due === t.due || run(() => S.saveTask(me, { ...t, due }))) && onClose()
   return (
@@ -518,7 +518,7 @@ export function TaskModal({ id, onClose }) {
   if (!t) return null
   const p = byId(d.projects, t.projectId)
   const source = byId(d.tasks, t.uploadOf) // an upload task: the Video or Design work it uploads
-  const post = byId(d.posts, t.postId ?? source?.postId)
+  const post = S.taskPost(d, t)
   const editable = can(me, 'task.edit', t)
   const run = (fn) => {
     try {
@@ -704,7 +704,7 @@ export function TaskModal({ id, onClose }) {
             </dd>
             <dt>Due</dt>
             <dd className="stack">
-              {editable && setsDue(me, t) ? <input type="date" value={t.due || ''} onChange={(e) => save({ due: e.target.value })} aria-label="Due date" /> : <DueChip t={t} />}
+              <DueMenu t={t} />
               {t.assigneeId === me.id && t.status !== 'done' && !setsDue(me, t) && <small className="muted">Need more time? Tell {dateSetter(d, me, t)}.</small>}
             </dd>
             <dt>Repeats</dt>

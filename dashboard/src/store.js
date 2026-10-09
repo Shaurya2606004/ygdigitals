@@ -444,7 +444,7 @@ export function saveTask(me, t) {
     if (task.status === 'done') task.completedAt ||= today()
     else task.completedAt = null
     if (old && old.status !== task.status) Object.assign(task, { statusBy: me.id, statusAt: nowIso() })
-    if (old && (old.due || null) !== (task.due || null)) postPushed(d, task)
+    if (old && (old.due || null) !== (task.due || null)) postPushed(d, me, task)
     if (old) {
       taskMoved(d, me, old, task)
       uploadFollows(d, me, old, task)
@@ -838,28 +838,33 @@ function postMoved(d, me, old, s) {
   const k = d.tasks.find((t) => t.postId === s.id)
   if (!k) return
   if (s.title !== old.title || s.format !== old.format) k.title = `${s.format}: ${s.title}`
-  if (s.date !== old.date) {
-    k.due = postDue(s.date)
-    uploadDue(d, k, s.date)
-  }
   if ((s.assigneeId || null) !== (old.assigneeId || null)) k.assigneeId = s.assigneeId || null
   if (s.status !== old.status && OUT.includes(s.status)) {
     setStatus(d, me, k, 'done')
     const up = byId(d.tasks, uploadTaskId(k.id))
     if (up) setStatus(d, me, up, 'done') // out: nothing left to upload
   } else if (s.status === 'production' && ['made', 'ready', 'scheduled'].includes(old.status) && k.status === 'done') setStatus(d, me, k, 'todo') // sent back for changes
+  // a new day: due the day before, unless it already falls on it (its work pushed the post there); its open upload goes
+  // up that day. After the status, as on the server: an upload this save closed stays where it was
+  if (s.date !== old.date) {
+    if (k.due !== s.date) k.due = postDue(s.date)
+    uploadDue(d, k, s.date)
+  }
 }
 // a post on another day: its open upload task goes up that day
 function uploadDue(d, k, date) {
   const up = byId(d.tasks, uploadTaskId(k.id))
   if (up && up.status !== 'done') up.due = date
 }
-// a post's work pushed past the day it goes out: the post goes out that day instead (its task keeps the date it was given)
-function postPushed(d, k) {
-  const s = k.postId && byId(d.posts, k.postId)
+// the post a task puts out: its own, or (an upload task) the post of the work it uploads
+export const taskPost = (d, k) => byId(d.posts, k.postId ?? byId(d.tasks, k.uploadOf)?.postId)
+// work set past the day its post goes out: the post goes out that day instead (the task keeps the date it was given)
+function postPushed(d, me, k) {
+  const s = taskPost(d, k)
   if (!s || OUT.includes(s.status) || !k.due || k.due <= s.date) return
+  const old = { ...s }
   s.date = k.due
-  uploadDue(d, k, s.date)
+  postMoved(d, me, old, s)
 }
 // who hears a post is made and waiting to be sent (private.senders): its project's lead and the supervisors, not the owners
 const senders = (d, s) => d.users.filter((u) => u.active && ((u.role === 'admin' && !u.owner) || u.id === byId(d.projects, s.projectId)?.managerId)).map((u) => u.id)

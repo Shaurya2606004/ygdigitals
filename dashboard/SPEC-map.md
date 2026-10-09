@@ -137,8 +137,10 @@ What changed (the user's calls: uploads to Nandni automatically; anyone can stil
 - **Approve and Send back on Home** for work Ready to check. Send back needs a note: it goes on the task as a comment and the task goes back to In progress. Each Home group shows its count, and "Waiting for your check" counts tasks too.
 - **Sort by** (Tasks page): due date (default), priority, project or person. Ties go soonest due first, then most urgent. Kept per device (`localStorage`).
 - **Quick dates:** the date on a card, row or list line is a button for whoever sets dates (`setsDue`). It opens a small popup: Today, Tomorrow or another day.
-- **Post follows pushed work** (`save_task`): a post task's date moved past its post's day moves the post to that day (unless it's already Posted or Undelivered). Moving work earlier never moves the post. The task keeps the date it was given.
-- **Upload follows the post:** a post moved to another day takes its open upload task with it (`post_saved`).
+- **Post follows pushed work** (`save_task`): a post's task, or its upload task, set past the post's day moves the post to that day (unless it's already Posted or Undelivered). Work set on or before the post's day never moves it. The task keeps the date it was given.
+  - The task is saved first, then the post. Moving a post sets its task to the day before, except a task already on the new day (`post_saved`), so the task is written once.
+- **Upload follows the post:** a post moved to another day takes its open upload task with it (`post_saved`). An upload closed in the same save (marked Posted and moved at once) keeps its day.
+- **The task window's date** is the same popup as the cards' (it used to save every keystroke, and a day passed while typing could move the post).
 
 ## Delete a project (2026-10-08, migration 19)
 - **Who:** supervisors only (`project.delete`, `public.delete_project`). It's on the project page, next to Edit.
